@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="blackjack_helper"
+   author="Oona"
+   id="2ef03fa4d8183eda694c08d1"
+   language="Lua"
+   purpose=""
+   save_state="y"
+   date_written="2025-06-07 11:54:19"
+   requires="4.71"
+   version="1.0"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+  <alias enabled="y" match="^blackjack on$" regexp="y" send_to="12" sequence="100">
+    <send>setEnabled()</send>
+  </alias>
+
+  <alias enabled="y" match="^blackjack off$" regexp="y" send_to="12" sequence="100">
+    <send>setDisabled()</send>
+  </alias>
+
+</aliases>
+
+<triggers>
+
+  <trigger enabled="y" keep_evaluating="y" match="^A blackjack dealer in a taupe suit speedily shuffles a deck of cards\.$" regexp="y" send_to="12" sequence="100">
+    <send>enter()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^A blackjack dealer deals (.*?) face up to himself\.$" regexp="y" send_to="12" sequence="100">
+    <send>setDealerCard("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^Your current total is\: (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>setCurrentTotal("%1") </send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^A blackjack dealer asks\, \'Who is next\?\'$" regexp="y" send_to="12" sequence="100">
+    <send>Send("give voucher dealer")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^\'Who is next\?\' a blackjack dealer asks\.$" regexp="y" send_to="12" sequence="100">
+    <send>Send("give voucher dealer")</send>
+  </trigger>  
+
+  <trigger enabled="y" keep_evaluating="y" match="^A blackjack dealer gives her sack of cards a good shaking\.$" regexp="y" send_to="12" sequence="100">
+    <send>start()</send>
+  </trigger>
+  
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?)Will you hit, stay, or double down(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>help()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?)Will you hit or stay(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>help()</send>
+  </trigger>
+
+  <trigger enabled="y" name="bj_auto_disable" keep_evaluating="y" match="^You do not have an item called \'voucher\'\.$" regexp="y" send_to="12" sequence="100">
+    <send>setDisabled()</send>
+  </trigger>
+
+</triggers>
+
+<script>
+
+<![CDATA[
+
+local is_enabled = false
+
+local current_total = 0
+local dealer_card = 0
+local is_soft = false
+local first_move = true
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+end
+
+function enter()
+  if is_enabled then
+    Note("Blackjack helper is on. Type 'blackjack off' to play manually.")
+  else
+    Note("Blackjack helper is OFF! Type 'blackjack on' before playing.")
+  end
+end
+
+function start()
+  first_move = true
+end
+
+function setEnabled()
+  is_enabled = true
+  EnableTrigger("bj_auto_disable", true)
+  Note("Blackjack helper is now ENABLED!")
+end
+
+function setDisabled()
+  is_enabled = false
+  Note("Blackjack helper is now disabled.")
+  EnableTrigger("bj_auto_disable", false)
+end
+
+function help()
+  decide()
+  first_move = false
+end
+
+function setDealerCard(card)
+  dealer_card = getCardValue(card)
+end
+
+function setCurrentTotal(total)
+  current_total, is_soft = getPlayerValue(total)
+end
+
+function decide()
+  local decision = getDecision()
+  if decision ~= nil and #decision > 0 then
+    if is_enabled then
+      Send("say " .. decision)
+    else
+      Note("Blackjack helper is disabled, but would have suggested you " .. decision .. ".")
+    end
+  end
+end
+
+function getDecision()
+    if is_soft then
+        if current_total <= 17 then
+            return first_move and "double down" or "hit"
+        elseif current_total == 18 then
+            if dealer_card >= 9 or dealer_card == 2 then
+                return "hit"
+            elseif dealer_card == 3 or dealer_card == 4 or dealer_card == 5 or dealer_card == 6 then
+                return first_move and "double down" or "stay"
+            else
+                return "stay"
+            end
+        else
+            return "stay"
+        end
+    else
+        if current_total <= 8 then
+            return "hit"
+        elseif current_total == 9 then
+            if dealer_card >= 3 and dealer_card <= 6 then
+                return first_move and "double down" or "hit"
+            else
+                return "hit"
+            end
+        elseif current_total == 10 then
+            if dealer_card <= 9 then
+                return first_move and "double down" or "hit"
+            else
+                return "hit"
+            end
+        elseif current_total == 11 then
+            return first_move and "double down" or "hit"
+        elseif current_total == 12 then
+            if dealer_card >= 4 and dealer_card <= 6 then
+                return "stay"
+            else
+                return "hit"
+            end
+        elseif current_total >= 13 and current_total <= 16 then
+            if dealer_card >= 2 and dealer_card <= 6 then
+                return "stay"
+            else
+                return "hit"
+            end
+        else
+            return "stay"
+        end
+    end
+end
+
+function getCardValue(card_str)
+    local lower = string.lower(card_str)
+    local rank = lower:match("a[n]? ([^ ]+)")
+
+    if rank == "ace" then
+        return 11
+    elseif rank == "two" then
+        return 2
+    elseif rank == "three" then
+        return 3
+    elseif rank == "four" then
+        return 4
+    elseif rank == "five" then
+        return 5
+    elseif rank == "six" then
+        return 6
+    elseif rank == "seven" then
+        return 7
+    elseif rank == "eight" then
+        return 8
+    elseif rank == "nine" then
+        return 9
+    elseif rank == "ten" or rank == "jack" or rank == "queen" or rank == "king" then
+        return 10
+    else
+        Note("Invalid card: " .. tostring(card_str))
+    end
+end
+
+function getPlayerValue(total_str)
+    local is_soft = string.find(total_str:lower(), "%(soft%)") ~= nil
+
+    local total = tonumber(total_str:match("%d+"))
+
+    if not total then
+        Note("Invalid total: " .. tostring(total_str))
+    end
+
+    return total, is_soft
+end
+
+]]>
+
+</script>
+
+</muclient>

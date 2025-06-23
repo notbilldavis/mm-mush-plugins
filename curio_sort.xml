@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="curio_sort"
+   author="Oona"
+   id="c8b8a228de108e21e43b9baf"
+   language="Lua"
+   purpose="sort your curios by expiration"
+   save_state="y"
+   date_written="2025-05-02 12:00:00"
+   requires="4.71"
+   version="1.0">
+
+<description trim="y">
+
+<![CDATA[
+
+Adds new commands to help with curio management.
+
+ * curio sort
+ * curio ignore <name>
+ * curio offset <number>
+
+Set the offset based on how many hours ahead or behind of system time you are.
+
+Altars will be sorted by expiration with the ones closest to expiring at the bottom.
+The expiration countdown will be yellow if there is less than 7 days left and will be
+red if there are less than 3 days left.
+
+Ignored altars wont be shown, useful for the RU and unknown altars.
+Ignore again to remove it from the ignore list.
+
+The location links will "run" or "mapper goto" where appropriate.
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+<alias match="^curio sort$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("get_curios", true)
+        clearAltars()
+        Send("curio")
+    </send>
+</alias>
+
+<alias match="^curio debug$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>
+        doDebug()
+    </send>
+</alias>
+
+<alias match="^curio[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setOffset("%1")</send>
+</alias>
+
+<alias match="^curio[ ]+ignore[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ignoreAltar("%1")</send>
+</alias>
+
+</aliases>
+
+<triggers>
+  <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="12" sequence="100" omit_from_output="y" match="^(.*?) altar not active\.$">
+    <send>addToAltar("%1", "[not active]", "")</send>
+  </trigger>
+
+  <trigger group="get_curios" keep_evaluating="y" regexp="y" send_to="12" sequence="101" omit_from_output="y" match="^(.*) (\d+) (.*)$">
+    <send></send>
+  </trigger>
+
+  <trigger group="get_curios" keep_evaluating="y" regexp="y" send_to="12" sequence="101" omit_from_output="y" match="^Expires on (.*)$">
+    <send></send>
+  </trigger>
+
+  <trigger group="get_curios" lines_to_match="2" keep_evaluating="n" multi_line="y" regexp="y" send_to="12" sequence="102" omit_from_output="n" match="^(.*) (\d+) (.*)\n(.*?)\n$">
+    <send>addToAltar("%1", "%2 %3", "%4")</send>
+  </trigger>  
+
+  <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^Type \'HELP CURIO\' for more information\.$">
+    <send>
+      EnableTriggerGroup("get_curios", false)
+      showSortedAltars()
+    </send>
+  </trigger>
+
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+altars = {}
+ignore = {}
+
+altar_locations = {
+  ["Curious Altar"] = { zone = "run runeforest", zone_label = "[Rune Forest]", room = "mapper goto 946163", room_label = "[A Misty Path]" },
+  ["Excited Altar"] = { zone = "mapper goto 15235", zone_label = "[Focault]", room = "", room_label = "[Focault]" },
+  ["Jealous Altar"] = { zone = "run wroth", zone_label = "[Wroth]", room = "mapper goto 7920", room_label = "[Gateway Portal]" },
+  ["Confused Altar"] = { zone = "run tavernoftheboars", zone_label = "[Tavern of the Boars]", room = "mapper goto 7998", room_label = "[A Dirt Path]" },
+  ["Triumphant Altar"] = { zone = "run avarice", zone_label = "[Avarice]", room = "", room_label = "[Dracolich]" },
+  ["Compassionate Altar"] = { zone = "run avarice", zone_label = "[Avarice]", room = "mapper goto 13957", room_label = "[Sacrifice]" },
+  ["Loving Altar"] = { zone = "run twinmoons", zone_label = "[Twin Moons]", room = "mapper goto 154884", room_label = "[An Old Outhouse]" },
+  ["Envious Altar"] = { zone = "run lonelydragon", zone_label = "[Lonely Dragon]", room = "mapper goto 155235", room_label = "[The Western Alcove]" },
+  ["Nostalgic Altar"] = { zone = "", zone_label = "[Aequtus]", room = "mapper goto 195862", room_label = "[Cargo Hold]" },
+  ["Joyful Altar"] = { zone = "run diocletian", zone_label = "[Diocletian]", room = "mapper goto 28952", room_label = "[Main Basilica Hallway]" },
+  ["Fearful Altar"] = { zone = "run sigil", zone_label = "[Sigil]", room = "mapper goto 28042", room_label = "[The Inner Sanctum]" },
+  ["Bored Altar"] = { zone = "run sigil", zone_label = "[Sigil]", room = "", room_label = "[Manticore]" },
+  ["Ambitious Altar"] = { zone = "run vesuvius", zone_label = "[Vesuvius]", room = "", room_label = "[Vyst]" },
+  ["Angry Altar"] = { zone = "run tellerium", zone_label = "[Tellerium]", room = "mapper goto 41205", room_label = "[Northwest Corner of Town Square]" },
+  ["Hopeful Altar"] = { zone = "", zone_label = "[Ogre Village]", room = "mapper goto 167051", room_label = "[Bentnose]" },
+  ["Suspicious Altar"] = { zone = "", zone_label = "[Begora's Sanctuary]", room = "mapper goto 96034", room_label = "[Sanctuary]" },
+  ["Sad Altar"] = { zone = "", zone_label = "[Jalur Lumber Camp]", room = "mapper goto 336837", room_label = "[The Camp Square]" },
+  ["Content Altar"] = { zone = "run pc", zone_label = "[Pirate's Cove]", room = "mapper goto 30301", room_label = "[Kraken's Throne Room]" },
+  ["Serene Altar"] = { zone = "run deceit", zone_label = "[Deceit]", room = "", room_label = "[Yourban]" },
+  ["Rebellious Altar"] = { zone = "", zone_label = "[Seelie]", room = "mapper goto 32503", room_label = "[The Spymaster's Armory]" },
+  ["Proud Altar"] = { zone = "", zone_label = "[Seelie]", room = "mapper goto 32109", room_label = "[The King's Chamber]" },
+  ["Regretful Altar"] = { zone = "", zone_label = "[Unseelie]", room = "mapper goto 33099", room_label = "[A High Throne]" },
+  ["Peaceful Altar"] = { zone = "", zone_label = "[Rahdiyr]", room = "", room_label = "[Lathimus]" },
+  ["Mischievous Altar"] = { zone = "run vir", zone_label = "[Vir]", room = "", room_label = "[Beyonder]" },
+  ["Vengeful Altar"] = { zone = "run vir", zone_label = "[Vir]", room = "mapper goto 146915", room_label = "[Inside the Forge]" },
+  ["Frustrated Altar"] = { zone = "run arienduth", zone_label = "[Arien'dyth]", room = "mapper goto 151274", room_label = "[East Side of the Gateguard's Tower]" },
+  ["Overwhelmed Altar"] = { zone = "", zone_label = "[Swiveling Hooks]", room = "mapper goto 12336", room_label = "[A Sphereical Habitat]" },
+  ["Determined Altar"] = { zone = "", zone_label = "[Sea Hag]", room = "mapper goto 152944", room_label = "[Musty Bedroom]" },
+  ["Grateful Altar"] = { zone = "", zone_label = "[Hellbent]", room = "mapper goto 107297", room_label = "[Hidden Alcove]" },
+  ["Lonely Altar"] = { zone = "run avarice", zone_label = "[Waylander's Retreat (SUG)]", room = "mapper goto 33869", room_label = "[A Babbling Brook]" },
+  ["Tranquil Altar"] = { zone = "", zone_label = "[Kalywak]", room = "mapper goto 153834", room_label = "[In The Coven Building Proper]" },
+  ["Inspired Altar"] = { zone = "", zone_label = "[Future Anguish (SUG)]", room = "mapper goto 24091", room_label = "[The Vivisection Chamber]" },
+  ["Breathtaking Altar"] = { zone = "", zone_label = "[Van Pelt]", room = "mapper goto 253834", room_label = "[Emporium]" },
+  ["Priceless Altar"] = { zone = "", zone_label = "[Van Pelt]", room = "mapper goto 353849", room_label = "[Tapestry-Lined Corridor]" },
+  ["Chemically Altered Altar"] = { zone = "", zone_label = "[Unknown]", room = "", room_label = "[Unknown]" }
+}
+
+hour_offset = 1
+
+function OnPluginConnect()
+  hour_offset = GetVariable("hour_offset") or 1
+  EnableTriggerGroup("get_curios", false)
+end
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTriggerGroup("get_curios", false)
+end
+
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  DoAfterSpecial(3, "showExpiringAltars()", sendto.script)
+end
+
+function setOffset(offset)
+  hour_offset = tonumber(offset)
+  SetVariable("hour_offset", hour_offset)
+  SaveState()
+end
+
+function clearAltars()
+  altars = {}
+end
+
+function parseDate(str)
+  if str == nil or str == "[not active]" or str == "" then
+    return nil
+  else
+    str = str:gsub("^Expires on ", ""):gsub("%s+", " "):gsub("%.$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local success, result = pcall(function()
+      local day_name, month_str, day, hour, min, sec, year = str:match("(%a+) (%a+) (%d+) (%d+):(%d+):(%d+) (%d+)")
+    
+      local months = {
+        Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6,
+        Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12
+      }
+
+      local month = months[month_str]
+
+      if not (month and day and hour and min and sec and year) then
+        Note("could not parse: " .. str)
+        return nil
+      end
+
+      return os.time({
+        year = tonumber(year),
+        month = month,
+        day = tonumber(day),
+        hour = tonumber(hour),
+        min = tonumber(min),
+        sec = tonumber(sec)
+      })
+    end)
+
+    if (success) then
+      return result
+    else
+      Note("Error parsing: " .. str);
+    end
+  end
+
+end
+
+function addToAltar(name, affect, expiration)
+  local altarName = getDisplayName(name)
+  
+  if altarName ~= nil then
+    local parsedExpiration = parseDate(expiration)
+    if (parsedExpiration ~= nil) then
+      parsedExpiration = parsedExpiration + (hour_offset * 3600)
+    end
+    table.insert(altars, { name = altarName, affect = affect, expiration = parsedExpiration })
+  end
+end
+
+function ignoreAltar(name)
+  local lower_name = name:lower()
+  if ignore[lower_name] then
+    ignore[lower_name] = nil
+    Tell("No longer ignoring ")
+    ColourTell("white", "black", name)
+    Tell(".")
+    Note("")
+  else
+    ignore[lower_name] = true
+    Tell("Now ignoring ")
+    ColourTell("white", "black", name)
+    Tell(".")
+    Note("")
+  end
+
+  SetVariable("ignored_altars", serialize(ignore))
+  SaveState()
+end
+
+function shouldShow(name)
+  local lower_name = name:lower()
+  return ignore[lower_name] ~= true
+end
+
+function getDisplayName(ogName)
+  local name = ogName:match("^%s*(.-)%s*$")
+  if (name == "Curious Altar:") then
+    return "Curious Altar"
+  elseif (name == "Excited Altar:") then    
+    return "Excited Altar"    
+  elseif (name == "Jealous Altar:") then    
+    return "Jealous Altar"
+  elseif (name == "Confused Altar:") then    
+    return "Confused Altar"
+  elseif (name == "Triumphant Alta") then    
+    return "Triumphant Altar"
+  elseif (name == "Compassionate A") then    
+    return "Compassionate Altar"
+  elseif (name == "Loving Altar:") then    
+    return "Loving Altar"
+  elseif (name == "Envious Altar:") then    
+    return "Envious Altar"
+  elseif (name == "Nostalgic Altar") then    
+    return "Nostalgic Altar"
+  elseif (name == "Joyful Altar:") then    
+    return "Joyful Altar"
+  elseif (name == "Fearful Altar:") then    
+    return "Fearful Altar"
+  elseif (name == "Bored Altar:") then    
+    return "Bored Altar"
+  elseif (name == "Ambitious Altar") then    
+    return "Ambitious Altar"
+  elseif (name == "Angry Altar:") then    
+    return "Angry Altar"
+  elseif (name == "Hopeful Altar:") then    
+    return "Hopeful Altar"
+  elseif (name == "Suspicious Altar") then    
+    return "Suspicious Altar"
+  elseif (name == "Sad Altar:") then    
+    return "Sad Altar"
+  elseif (name == "Content Altar:") then    
+    return "Content Altar"
+  elseif (name == "Serene Altar:") then    
+    return "Serene Altar"
+  elseif (name == "Rebellious Alta") then    
+    return "Rebellious Altar"
+  elseif (name == "Proud Altar:") then    
+    return "Proud Altar"
+  elseif (name == "Regretful Altar") then    
+    return "Regretful Altar"
+  elseif (name == "Peaceful Altar:") then
+    return "Peaceful Altar"
+  elseif (name == "Mischievous Alt") then
+    return "Mischievous Altar"
+  elseif (name == "Vengeful Altar:") then
+    return "Vengeful Altar"
+  elseif (name == "Frustrated Alta") then
+    return "Frustrated Altar"
+  elseif (name == "Overwhelmed Alt") then
+    return "Overwhelmed Altar"
+  elseif (name == "Determined Alta") then
+    return "Determined Altar"
+  elseif (name == "Grateful Altar:") then
+    return "Grateful Altar"
+  elseif (name == "Lonely Altar:") then
+    return "Lonely Altar"
+  elseif (name == "Tranquil Altar:") then
+    return "Tranquil Altar"
+  elseif (name == "Inspired Altar:") then
+    return "Inspired Altar"
+  elseif (name == "Breathtaking Al") then
+    return "Breathtaking Altar"
+  elseif (name == "Priceless Altar") then
+    return "Priceless Altar"
+  elseif (name == "Chemically Alte") then
+    return "Chemically Altered Altar"
+  end
+  return nil
+end
+
+function showSortedAltars()
+  table.sort(altars, function(a, b)
+
+    if (a.expiration == nil) then
+      return false
+    end
+
+    if (b.expiration == nil) then
+      return true
+    end
+
+    return b.expiration < a.expiration 
+  end)
+
+  for _, altar in ipairs(altars) do
+    if (shouldShow(altar.name)) then
+      Tell("* ")
+      doDisplayName(altar.name)
+      Tell(" - ")
+      doLocation(altar.name)
+      Note("")
+      Tell(" > ")
+      doExpiration(altar.expiration)
+      Tell(" - ")
+      doAffect(altar.affect)
+      Note("")
+    end
+  end
+
+  SetVariable("altars", serialize(altars))
+  SaveState()
+end
+
+function showExpiringAltars()
+  local ignore_text = GetVariable("ignored_altars") or ""
+  if ignore_text ~= "" then
+    ignore = deserialize(ignore_text)
+  end
+  
+  local altars_text = GetVariable("altars") or ""
+  if altars_text ~= "" then
+    local expired_altars = deserialize(altars_text)
+    local current_time = os.time()
+    local count = 0
+
+    for _, altar in ipairs(expired_altars) do
+      if shouldShow(altar.name) and altar.expiration ~= nil then
+        local diff = os.difftime(altar.expiration, os.time())
+        if math.floor(diff / 86400) <= 3 then
+          count = count + 1
+          Tell("* ")
+          doDisplayName(altar.name)
+          if (diff <= 0) then
+            ColourTell("red", "black", " has expired and needs to be renewed!")
+          else
+            Tell(" is expiring in ")
+            local color, timer_string = getTimerColorAndString(altar.expiration)
+            ColourTell(color, "black", timer_string)
+          end
+          Note("")
+        end
+      end
+    end
+
+    if count > 0 then
+      Note("See 'curio sort' for more details and to update this data.")
+      Note("")
+    end
+  else
+    Note("")
+    Note("--- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ---")
+    Note("--- be sure to 'curio offset <number>' ---")
+    Note("---  so countdown times are accurate   ---")
+    Note("---   then use 'curio sort' to show    ---")
+    Note("--- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ---")
+    Note("")
+  end
+end
+
+function doDisplayName(name)
+  if name == nil or name == "" then
+    return
+  end  
+
+  ColourTell("white", "black", name)
+end
+
+function doExpiration(time)
+  local color, timer_string = getTimerColorAndString(time)
+  ColourTell(color, "black", timer_string)
+end
+
+function getTimerColorAndString(time)
+  if (time == nil) then
+    return "red", "This altar is not active, go get it."
+  else
+    local now = os.time()
+    local diff = os.difftime(time, now)
+
+    if diff < 0 then
+      return "red", "EXPIRED"
+    else
+      local seconds = diff % 60
+      local minutes = math.floor(diff / 60) % 60
+      local hours = math.floor(diff / 3600) % 24
+      local days = math.floor(diff / 86400)
+  
+      local color = "green"
+      if (days < 3) then
+        color = "red"
+      elseif (days < 7) then
+        color = "yellow"
+      end
+
+      local expiration = string.format("%d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
+
+      return color, expiration
+    end
+  end
+end
+
+function doLocation(name)
+  if name == nil or name == "" or altar_locations[name] == nil then
+    return
+  end  
+
+  local zone = altar_locations[name]["zone"]
+  local room = altar_locations[name]["room"]
+  local zone_label = altar_locations[name]["zone_label"]
+  local room_label = altar_locations[name]["room_label"]
+
+  if zone ~= nil and zone ~= "" then
+    Hyperlink(zone, zone_label, zone, "silver", "black", false)
+  else
+    ColourTell("silver", "black", zone_label)
+  end
+  Tell(" - ")
+  if room ~= nil and room ~= "" then
+    Hyperlink(room, room_label, room, "silver", "black", false)
+  else
+    ColourTell("silver", "black", room_label)
+  end
+end
+
+function doAffect(affect)
+  ColourTell("blue", "black", affect)  
+end
+
+function doDebug()
+  for k, v in pairs(altars) do
+    if v["expiration"] ~= nil then
+      Note(k .. " : " .. v["name"] .. " - " .. v["affect"] .. " - " .. v["expiration"])
+    else
+      Note(k .. " : " .. v["name"] .. " - " .. v["affect"])
+    end
+  end
+end
+
+function serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>

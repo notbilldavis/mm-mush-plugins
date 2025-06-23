@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="collectables"
+   author="Oona"
+   id="6d95769ff89eeb36abd3672b"
+   language="Lua"
+   purpose="keep track of plushies, plates, and stamps"
+   save_state="y"
+   date_written="2025-03-16 16:57:37"
+   requires="4.71"
+   version="1.0"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+  <alias match="^collectables add plushie (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>addPlushies("%1")</send>
+  </alias>
+  <alias match="^collectables add plate (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>addPlates("%1")</send>
+  </alias>  
+  <alias match="^collectables add stamp (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>addStamps("%1")</send>
+  </alias>
+
+  <alias match="^collectables plushies$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showPlushies()</send>
+  </alias>
+  <alias match="^collectables plates$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showPlates()</send>
+  </alias>  
+  <alias match="^collectables stamps$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showStamps()</send>
+  </alias>
+
+  <alias match="^collectables plushies needed$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showNeededPlushies()</send>
+  </alias>
+  <alias match="^collectables plates needed$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showNeededPlates()</send>
+  </alias>  
+  <alias match="^collectables stamps needed$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showNeededStamps()</send>
+  </alias>
+
+  <alias match="^collectables clean plushies$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>cleanPlushies()</send>
+  </alias>
+  <alias match="^collectables clean plates$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>cleanPlates()</send>
+  </alias>  
+  <alias match="^collectables clean stamps$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>cleanStamps()</send>
+  </alias>
+
+  <alias match="^collectables clear plushies$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>clearPlushies()</send>
+  </alias>
+  <alias match="^collectables clear plates$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>clearPlates()</send>
+  </alias>  
+  <alias match="^collectables clear stamps$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>clearStamps()</send>
+  </alias>
+</aliases>
+
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?)A(.*?) plushie sits on the ground(.*?)$">
+    <send>processPlushie("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^^(.*?) decorative plate depicting (.*?) sits on the ground(.*?)$">
+    <send>processPlate("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) stamp commemorating (.*?) has been left here(.*?)$">
+    <send>processStamp("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You take a(.*?) plushie.$">
+    <send>addPlushie("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You take a decorative plate depicting (.*?).$">
+    <send>addPlate("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You take a stamp commemorating (.*?).$">
+    <send>addStamp("%1")</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "tableshelper"
+
+plushies = {}
+plates = {}
+stamps = {}
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnsureTables()
+end
+
+function OnPluginEnable()
+  EnsureTables()
+end
+
+function OnPluginConnect()
+  EnsureTables()
+end
+
+function EnsureTables()
+  local plushies_text = GetVariable("plushies_list") or ""
+  if plushies_text ~= "" then
+    plushies = Deserialize(plushies_text)
+  end
+  local plates_text = GetVariable("plates_list") or ""
+  if plates_text ~= "" then
+    plates = Deserialize(plates_text)
+  end
+  local stamps_text = GetVariable("stamps_list") or ""
+  if stamps_text ~= "" then
+    stamps = Deserialize(stamps_text)
+  end
+end
+
+function processPlushie(name)
+  --name = Trim(name)
+  if getTableIndex(plushies, name) == nil then
+    Execute("mapper stop")
+    local true_name = "a" .. name .. " plushie"
+    Send("get \"" .. true_name .. "\"")
+    Execute("mapper resume")
+  end
+end
+
+function processPlate(name)
+  name = Trim(name)
+  if getTableIndex(plates, name) == nil then
+    Execute("mapper stop")
+    Send("get \"a decorative plate depicting " .. name .. "\"")
+    Execute("mapper resume")
+  end
+end
+
+function processStamp(name)
+  name = Trim(name)
+  if getTableIndex(stamps, name) == nil then
+    Execute("mapper stop")
+    Send("get \"a stamp commemorating " .. name .. "\"")
+    Execute("mapper resume")
+  end
+end
+
+function addPlushie(name)
+  addCollectable("plushies", plushies, possiblePlushies, name, "a")
+end
+
+function addPlate(name)
+  addCollectable("plates", plates, possiblePlates, name)
+end
+
+function addStamp(name)
+  addCollectable("stamps", stamps, possibleStamps, name)
+end
+
+function addPlushies(name)
+  addCollectables("plushies", plushies, possiblePlushies, name, "a")
+end
+
+function addPlates(name)
+  addCollectables("plates", plates, possiblePlates, name)
+end
+
+function addStamps(name)
+  addCollectables("stamps", stamps, possibleStamps, name)
+end
+
+function addCollectables(what, owned, possible, collectable, prefix)
+  local names = Split(collectable, ", ")
+  for _, name in ipairs(names) do
+    addCollectable(what, owned, possible, name, prefix)
+  end
+end
+
+function addCollectable(what, owned, possible, collectable, prefix)
+  if prefix == nil then prefix = "" end  
+  local idx = tonumber(collectable) or getTableIndex(possible, collectable)
+  if idx ~= nil then
+    local found = possible[idx]
+    Note("Adding '" .. prefix .. found .. "' (" .. idx .. ") to owned " .. what .. ".")
+    addToTable(owned, found)
+  else
+    Note("Unknown collectable: " .. prefix .. collectable)
+    if what == "plates" then
+      Note("If this is plate 77 then add it to the wiki and script.")
+    end
+  end
+
+  SetVariable(what .. "_list", Serialize(owned))
+  SaveState()
+end
+
+function showPlushies()
+  displayCollectables("plushies", plushies, possiblePlushies, "a")
+end
+
+function showPlates()
+  displayCollectables("plates", plates, possiblePlates, "")
+end
+
+function showStamps()
+  displayCollectables("stamps", stamps, possibleStamps, "")
+end
+
+function showNeededPlushies()
+  displayNeededCollectables("plushies", plushies, possiblePlushies, "a")
+end
+
+function showNeededPlates()
+  displayNeededCollectables("plates", plates, possiblePlates)
+end
+
+function showNeededStamps()
+  displayNeededCollectables("stamps", stamps, possibleStamps)
+end
+
+function cleanPlushies()
+  cleanCollectables("plushies", plushies, possiblePlushies)
+end
+
+function cleanPlates()
+  cleanCollectables("plates", plates, possiblePlates)
+end
+
+function cleanStamps()
+  cleanCollectables("stamps", stamps, possibleStamps)
+end
+
+function displayCollectables(what, owned, possible, prefix)
+  local valid = {}
+  local invalid = {}
+
+  if prefix == nil then prefix = "" end
+
+  for idx, name in ipairs(owned) do 
+    local i = getTableIndexForContains(possible, name)
+    if i ~= nil then
+      valid[#valid + 1] = { id = i, name = name }
+    else
+      invalid[#invalid + 1] = { id = idx, name = name }
+    end
+  end
+
+  table.sort(valid, function(a, b) return a["id"] < b["id"] end)
+
+  Note("All owned " .. what .. ":")
+  for idx, collectable in ipairs(valid) do 
+    ColourTell("cyan", "black", " * ")
+    Tell("[")
+    if collectable["id"] < 10 then
+      ColourTell("cyan", "black", "0" .. collectable["id"])
+    else
+      ColourTell("cyan", "black", collectable["id"])
+    end
+    Tell("] ")
+    ColourNote("white", "black", prefix .. collectable["name"])
+  end
+  Note("A total of " .. #valid .. " out of " .. #possible .. ".")
+  Note("Type 'collectables " .. what .. " needed' to see what you need.")
+
+  if #invalid > 0 then
+    Note("There were " .. #invalid .. " invalid " .. what .. " found:")
+    for idx, collectable in ipairs(invalid) do
+      ColourTell("cyan", "black", " * ")
+      ColourNote("white", "black", prefix .. collectable["name"])
+      invalid[#invalid + 1] = idx
+    end
+    if del ~= nil and del ~= "" then
+      table.sort(invalid, function(a, b) return b > a end)
+      for _, ii in ipairs(invalid) do
+        table.remove(plushies, ii)
+      end
+    else
+      Note("Type 'collectables clean " .. what .. "' to remove them.")
+    end
+  end
+end
+
+function displayNeededCollectables(what, owned, possible, prefix)
+  local valid = {}
+
+  if prefix == nil then prefix = "" end
+
+  for idx, name in ipairs(possible) do 
+    local i = getTableIndexForContains(owned, name)
+    if i == nil then
+      valid[#valid + 1] = { id = idx, name = name }
+    end
+  end
+
+  table.sort(valid, function(a, b) return a["id"] < b["id"] end)
+
+  Note("Needed " .. what .. ":")
+  for idx, collectable in ipairs(valid) do 
+    if idx == 77 and what == "plates" then
+      collectable["name"] = "Plate 77 is not on the wiki."
+    end
+    ColourTell("cyan", "black", " * ")
+    Tell("[")
+    if collectable["id"] < 10 then
+      ColourTell("cyan", "black", "0" .. collectable["id"])
+    else
+      ColourTell("cyan", "black", collectable["id"])
+    end
+    Tell("] ")
+    ColourNote("white", "black", prefix .. collectable["name"])
+  end
+  Note("A total of " .. #valid .. " out of " .. #possible .. ".")
+  Note("Type 'collectables " .. what .. "' to see what you have.")
+end
+
+function cleanCollectables(what, owned, possible)
+  local invalid = {}
+  for idx, name in ipairs(owned) do 
+    local i = getTableIndexForContains(possible, name)
+    if i == nil then
+      invalid[#invalid + 1] = { id = idx, name = name }
+    end
+  end
+
+  table.sort(invalid, function(a, b) return a > b end)
+  for _, ii in ipairs(invalid) do
+    table.remove(owned, ii)
+  end
+
+  Note("Removed " .. #invalid .. " invalid " .. what .. ".")
+end
+
+function clearPlushies()
+  plushies = {}
+  SetVariable("plushies_list", "")
+  SaveState()
+end
+
+function clearPlates()
+  plates = {}
+  SetVariable("plates_list", "")
+  SaveState()
+end
+
+function clearStamps()
+  stamps = {}
+  SetVariable("stamps_list", "")
+  SaveState()
+end
+
+function Serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return Serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function Deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
+end
+
+function Split(inputstr, sep)
+  if sep == nil then
+    sep = "%s"
+  end
+  
+  local t={}
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+    table.insert(t, str)
+  end
+
+  if #t == 0 then
+    table.insert(t, inputstr)
+  end
+
+  return t
+end
+
+possiblePlushies = {
+  " velvety Lady Saresyn",
+  " fuzzywuzzy cow",
+  " squeaky field mouse",
+  "n animated mushroofalo",
+  " sparkly King Sandoval",
+  " feathery swan",
+  " puffy emperor penguin",
+  " soft bunny rabbit",
+  " sweet heart-shaped",
+  " soft kitty",
+  " smiling Brother Rufus",
+  " star-speckled Balthazar",
+  " laughing walrus",
+  " cackling Baba Yaga",
+  " singing Perlin Noise",
+  " playful pony",
+  "n elegant Lady Telleri",
+  " regal Lord Agrippa",
+  " beautiful butterfly",
+  " huggable caterpillar",
+  " goofy-looking wiener dog",
+  " sensually soft Pynai",
+  " glowering Ghryzhrymydyon",
+  " fiery Vyst",
+  " bloody Prince Galzmati",
+  " pretty Princess Paenyr",
+  " miniscule kitten",
+  " fluffy sheep",
+  " floppy-eared puppy",
+  " sad-eyed beagle" -- zero?!
+}
+
+possiblePlates = {
+  "Lord Vendredi in his toyshop",
+  "Lord Vashir's infamous harem",
+  "the defeat of the dread lava wyrm by Sir Tristan",
+  "the mythical Bearded Gnome, delivering presents",
+  "the destruction and rebuilding of Kolvir",
+  "the destruction of Twilyght Downes",
+  "the destruction of the dwarven city",
+  "the destroyed demigod, Cernunnos",
+  "the first day of the Ithrix onslaught",
+  "the unhurried existence of the incarnation of death",
+  "the founding of the Alyrian banking system",
+  "the founding of the Alyrian postal system",
+  "the rule of Glamdrung, father of the forest trolls",
+  "the bravery of the avian Captain Iglor",
+  "the documentary work performed by Servos the naturist",
+  "the mythic battle between the Jellyfish of the Universe and Metonychoseuthis, with Swiveling Hooks",
+  "the heaving horror of the Dracolich",
+  "the leader of the virgin-sacrificing cult of Dungeon Avarice",
+  "the ingenious inventions of the wizards of Focault",
+  "Lord Cronus of Lowangen, virile and handsome",
+  "the self-proclaimed master of all evil, the devil Yourban",
+  "the miracles performed by the seeress Quenya Stardust",
+  "the long-lived Triton monarchy, ever the rulers of Atlantis",
+  "the usage and fall of Rune's graveyard",
+  "the settling and expansion of Lasler village",
+  "the diplomatic tolerance of the Sorceress of Shadows mountain castle",
+  "the otherworldly destinations reachable via the dimension-traveling Wandering Sidhe",
+  "the kauri-treant peace treaties",
+  "the mad creations of Rune's prodigal son, Alpheus Winterborn",
+  "the otherworldly destinations reachable via the dimension-spanning mirrors in Ilandrama Library",
+  "the tyrannical rule of Lord Simon Bloodbane over his island",
+  "the wild, unexplored frontiers of Alyria's underground caverns",
+  "the nomadic monstrosity of the Miannas mountains, unnamed and outcast",
+  "the hidden Unseelie catacombs, buried deep below Templeton",
+  "the mysterious, transplanar Hellbent Mountain",
+  "the annual invasion of Rune, and attempted hostilities towards Lord Agrippa",
+  "the ancient King Solomon's defeat of the Soceror's Guild, millennia ago",
+  "the destruction of Heresy Harbor by the feuding clans Wyrm and Wolverine",
+  "the glory of the Archipelago's islands; Heresy, Lacerta, Numal and Simia",
+  "the shopping frenzies and bargains of the Alyrian Bazaar",
+  "the inimitable ingenuity of the archmage Vandemaar",
+  "constant progress by the magical scholars of Alyria, researching new spells",
+  "the inescapable horrors of the interior of Xazra's accursed chest",
+  "Pip, the execrable and unsavory mascot of the Alyrian Bazaar",
+  "the delectable confections crafted by Tuvo Al'Sweetis",
+  "the discovery and execution of the Runic slavers",
+  "the epic, otherworldly tales of Baron Nezak",
+  "the steel ruins of the otherworldly oil derricks",
+  "massacres and bodies and statues littering the lair of the ice witch",
+  "the architectural curiosities that are Arien'dyths watchposts",
+  "the dusty wasteland that Smuggler's Gulch resides upon",
+  "the long-buried canyons of the elementals",
+  "the glorious and ephemeral palace of lights",
+  "mummies and jackals loping about a pyramid's interior",
+  "the repulsion of an invasionary force by the Sigilian alliance",
+  "the repulsion of an invasionary force by the Templetonian alliance",
+  "the repulsion of an invasionary force by Xaventry's alliance",
+  "the repulsion of an invasionary force by the Covian alliance",
+  "elves' capital city",
+  "assorted fishing, hunting and mining-based villages around Alyria",
+  "an imagined scene of the lethal Ithrix' home dimension",
+  "the Faeries' home on the Ethereal Plane",
+  "the ancient war for the Ethereal Plane between Angels and Demons",
+  "the many hospitable Inns and Taverns around Alyria",
+  "the first magical researcher to discover resurrection, upon his rebirth",
+  "the splitting of the Druids from the Grey Wizards",
+  "the birth of the dracon race by ancient druids",
+  "the birth of the minotaur race by ancient druids",
+  "the Age of Silence under the yoke of the dreadful Riga",
+  "a spellbook containing the forbidden spells of man",
+  "the betrayal of Riga by his apprentice Cassandra",
+  "the twin moons, Trigael and Marabah",
+  "the Sirchade galaxy, within which Alyria resides",
+  "a couple exchanging wedding vows on the resort island Complex d'Amour",
+  "the Power of water and moisture, Ithrilis",
+  "the Power of air and wind, Dira",
+  "Plate 77 is not on the wiki",
+  "the Power of ether and void, Vandyne",
+  "the lesser Power of smoke, Vehja",
+  "the lesser Power of ice, Graph",
+  "the lesser Power of ooze, Gonur",
+  "the lesser Power of magma, Talur",
+  "the demipower of lightning, Zanct",
+  "the demipower of steam, Gerdun",
+  "the demipower of radiance, Orth",
+  "the demipower of vacuum, Malfat",
+  "the demipower of salt, Ethgon",
+  "the demipower of dust, Vaugal",
+  "the demipower of ash, Unter",
+  "precious tourmalines, valued by the Lords and Ladies of Alyria",
+  "precious maleficarum roots at the bottom of the Proving Grounds",
+  "the magical Worldgates that appear throughout the land",
+  "a family immigrating from Auryn to Beltane on the Medraco",
+  "the Power of land and terrain, Maradas",
+  "an adventurer being rewarded by the Powers for doing something heroic",
+  "a group of teenaged clerics, in the city of Xaventry",
+  "a group of impressionable thieves, in the city of New Rigel",
+  "a group of young mages, in the city of Sigil",
+  "a group of youthful warriors, in the city of Tellerium",
+  "the crown jewels of Agrippa"
+}
+
+possibleStamps = {
+  "the Cataclysm defense force",
+  "Lord Agrippa's coronation",
+  "the Battle of Istani",
+  "the disappearance of Fiddle Yaksnaps",
+  "the erection of the Wandering Sidhe",
+  "the repulsion of Divusmors",
+  "the use of the Bazani Orb",
+  "the reign of Grandmistress Tashimitia",
+  "the death of Lord Templeton",
+  "the construction of Xazra's temple",
+  "the Telleri-Hypolana peace accords",
+  "the grounding of the Magencia",
+  "the construction of Tellerium's obelisks",
+  "the Golden Era of Seafaring",
+  "those slain by the Ithrix invasion",
+  "the crash of the Fiesty Wench",
+  "the excommunication of the Sigilian pantsomancer",
+  "the lost clans of Alyria",
+  "the death of the Sorceror Riga",
+  "the first Alyrian Council",
+  "the formation of the Council of Arcane",
+  "the storied life of Perlin Noise",
+  "the storied life of Vauldroth, the Kung Fu dracon",
+  "the storied life of the high priest Kalak",
+  "the storied life of Rahja",
+  "the storied life of Tanuk",
+  "the storied life of Prince Raymatus Galzmati",
+  "the Seelie-Unseelie war",
+  "the first capture of a Thesurbrian sasquatch",
+  "Lady Saresyn"
+}
+
+]]>
+
+</script>
+
+</muclient>

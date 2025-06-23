@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="goto_aliases"
+   author="Oona"
+   id="53d6e7a37b664265be58ab00"
+   language="Lua"
+   purpose="aliases to goto places you are in"
+   save_state="y"
+   date_written="2025-03-15 17:23:48"
+   requires="4.71"
+   version="1.0">
+
+<description trim="y">
+
+<![CDATA[
+
+Aliases to get you where you wanna go. Takes into account your current location.
+
+Auto run to the exit of the city you are in:
+
+ * goto <north|east|south|west>
+
+ Won't do anything if you try to go to an exit that doesn't exist.
+
+Go to the next logical city when you are outside an exit:
+
+ * goto next
+
+ This is subjective, but mostly obvious. Rune east to New Rigel, west to Xav, etc.
+
+Go to the quest master if there is one:
+
+ * goto qm
+
+Go to the tourist rep if there is one:
+
+ * goto rep
+
+ It will try to say yes to the rep if you are already there.
+
+Go to the crystal quest office in Rune:
+
+ * goto crystal
+
+ If you are already there it will buy the first map for you.
+ If you aren't in Rune it will to "run rune"
+
+Go to the orc pursuer in wroth:
+  
+  * goto pursuer
+
+  If you aren't at Wroth it will try to "run wroth"
+  If you are in Wroth it will run you to the portal.
+  If you are at the portal it will enter it and go south.
+  The pursuer will have some links to click for convenience.
+  
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+<alias match="^goto[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doDebug()</send>
+</alias>
+
+<alias match="^goto[ ]+north$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doNorthGate()</send>
+</alias>
+
+<alias match="^goto[ ]+south$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doSouthGate()</send>
+</alias>
+
+<alias match="^goto[ ]+west$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doWestGate()</send>
+</alias>
+
+<alias match="^goto[ ]+east$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doEastGate()</send>
+</alias>
+
+<alias match="^goto[ ]+next$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doNextCity()</send>
+</alias>
+
+<alias match="^goto[ ]+qm$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doQuestMaster()</send>
+</alias>
+
+<alias match="^goto[ ]+rep$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doTownRep()</send>
+</alias>
+
+<alias match="^goto[ ]+crystal$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doCrystal()</send>
+</alias>
+
+<alias match="^goto[ ]+pursuer$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>doPursuer()</send>
+</alias>
+
+<alias match="^goto[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
+</alias>
+
+<!-- <alias match="^([0-4]?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>tryChoice("%1")</send>
+</alias> -->
+
+</aliases>
+
+<triggers>
+
+<trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) savage\-looking orc stands here\, his every limb chained to the wall\.$">
+  <send>
+    Tell("Orc Pursuer: ")
+    Hyperlink("!!" .. GetPluginID() .. ":getPursuerTarget()", "[get target]", "", "silver", "black", false)
+    Tell(" - ")
+    Hyperlink("give head orc", "[give head orc]", "", "silver", "black", false)
+    Tell(" - ")
+    Hyperlink("give leg orc", "[give leg orc]", "", "silver", "black", false)
+    Tell(" - ")
+    Hyperlink("give arm orc", "[give arm orc]", "", "silver", "black", false)
+  </send>
+</trigger>
+
+<!-- <trigger enabled="y" keep_evaluating="y" match="^(.*)A weatherbeaten signpost is firmly planted here\.$" regexp="y" send_to="12" sequence="100">
+  <send>trySignPost()</send>
+</trigger> -->
+
+<trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+  <send>OnFirstPrompt()</send>
+</trigger>
+
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+require "serializationhelper"
+
+local init = false
+
+locations = {
+    rune = { north = "10435", south = "2832529", east = "2816440", west = "2809518", qm = "31323", rep = nil },
+    sigil = { north = "3881069", south = "3908670", east = nil, west = nil, qm = "28450", rep = "27890" },
+    newrigel = { north = "2315135", south = "2358832", east = nil, west = nil, qm = "62566", rep = "62036" },
+    xaventry = { north = "2066541", south = "2105636", east = "2084947", west = "2087227", qm = "73968", rep = "73100" },
+    tellerium = { north = "2638058", south = "2656450", east = nil, west = nil, qm = "41852", rep = "41790" },
+    templeton = { north = "47337", south = nil, east = nil, west = "2309054", qm = "47421", rep = nil },
+    piratescove = { north = "3288425", south = "3318326", east = "3295329", west = "3304508", qm = nil, rep = nil },
+    vospire = { north = nil, south = nil, east = "3765964", west = "3768246", qm = nil, rep = nil },
+    diocletian = { north = nil, south = "4189387", east = nil, west = nil, qm = nil, rep = nil },
+    lowangen = { north = nil, south = "2030293", east = nil, west = nil, qm = nil, rep = nil },
+    maldra = { north = nil, south = "3573738", east = nil, west = nil, qm = "67947", rep = nil },
+    thorn = { north = nil, south = nil, east = "1807082", west = "1788665", qm = nil, rep = nil},
+    decara = { north = nil, south = nil, east = "11125213", west = nil, qm = "116546", rep = nil},
+    vir = { north = nil, south = nil, east = "12426873", west = nil, qm = nil, rep = nil}
+}
+
+signposts = {
+  s2809518 = {  -- rune west
+    { name = "Xaventry", command = "run xaventry" },
+    { name = "New Kolvir", command = "run newkolvir" },
+    { name = "Mandrake", command = "run mandrake" },
+    { name = "Lonely Dragon", command = "run lonelydragon" }
+  },
+  s2816440 = {  -- rune east
+    { name = "New Rigel", command = "run newrigel" },
+    { name = "Traveler's Retreat", command = "run travelersretreat" },
+    { name = "Lasler", command = "run lasler" },
+    { name = "Avarice", command = "run avarice" }
+  },
+  s3908670 = {  -- sigil south
+    { name = "Diocletian", command = "run diocletian" },
+    { name = "Emperor's Crossroads", command = "run emperorscrossroads" }
+  },
+  s4072040 = { -- emperors
+    { name = "Sigil", command = "run sigil" },
+    { name = "Shlarksh", command = "run shlarksh" },
+    { name = "Takhtin", command = "run takhtin" }
+  },
+  s4072040 = { -- new rigel north
+    { name = "Wroth", command = "run wroth" },
+    { name = "Tavern of the Boars", command = "run tavernoftheboars" },
+    { name = "Thorn", command = "run desertthorn" },
+    { name = "Gilvery", command = "run gilvery" }
+  },
+  s2638058 = { -- tellerium north
+    { name = "Templeton", command = "run templeton" },
+    { name = "Dorathon", command = "run dorathon" },
+    { name = "Winton", command = "run winton" },
+    { name = "Oil Wells", command = "run oilwells" }
+  },
+  s230905 = { -- templeton
+    { name = "Tellerium", command = "run tellerium" },
+    { name = "Dorathon", command = "run dorathon" },
+    { name = "Winton", command = "run winton" }
+  },
+  s3304508 = { -- PC
+    { name = "Maldra's Keepo", command = "run keep" },
+    { name = "Deceit", command = "run deceit" },
+    { name = "Vandemaar", command = "run vandemaar" },
+    { name = "Xalt", command = "run xalt" }
+  }
+}
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  Note("")
+  Note(" > Added aliases for: goto <direction>, goto qm, goto rep, goto crystal, and goto pursuer")
+  Note(" > See goto help for more information!")
+  Note("")
+end
+
+function OnFirstPrompt()
+  init = true
+end
+
+function doDebug() -- Debug
+    get_gmcp_room()
+    local num = gmcpval("num")
+    local zone = gmcpval("zone")
+    Note(zone .. " (" .. num .. ")")
+end
+
+function getZoneKey()
+    get_gmcp_room()
+    local zone = gmcpval("zone")
+    local room = gmcpval("num")
+
+    if (isRune(zone, room)) then
+        return "rune"
+    elseif (isSigil(zone, room)) then
+        return "sigil"
+    elseif (isNewRigel(zone, room)) then
+        return "newrigel"
+    elseif (isXaventry(zone, room)) then
+        return "xaventry"
+    elseif (isTellerium(zone, room)) then
+        return "tellerium"
+    elseif (isTempleton(zone, room)) then
+        return "templeton"
+    elseif (isPiratesCove(zone, room)) then
+        return "piratescove"
+    elseif (isVospire(zone, room)) then
+        return "vospire"
+    elseif (isDiocletian(zone, room)) then
+        return "diocletian"
+    elseif (isLowangen(zone, room)) then
+        return "lowangen"
+    elseif (isMaldra(zone, room)) then
+        return "maldra"
+    elseif (isDesertThorn(zone, room)) then
+        return "thorn"
+    elseif (isDecara(zone, room)) then
+        return "decara"
+    elseif (isVir(zone, room)) then
+        return "vir"
+    else
+        Note("Unknown zone: " .. zone .. " (room: " .. room .. ")")
+        return nil
+    end
+end
+
+function getDestinationRoom(destination)
+    local zone_key = getZoneKey()
+    if (zone_key ~= nil) then
+        local room_number = locations[zone_key][destination]
+        if (room_number ~= nil) then
+            return room_number
+        end
+    end
+
+    return nil
+end
+
+function doLocation(destination)
+  local room_number = getDestinationRoom(destination)
+  if (room_number ~= nil) then
+    Execute("mapper goto " .. room_number)
+  else
+    Note("There is no " .. destination .. " for this location.")
+  end
+end
+
+function doNorthGate() -- North Gate
+  doLocation("north")    
+end
+
+function doSouthGate() -- South Gate
+    doLocation("south")
+end
+
+function doWestGate() -- West Gate
+    doLocation("west")
+end
+
+function doEastGate() -- East Gate
+    doLocation("east")
+end
+
+function doQuestMaster() -- Quest Master
+  local room_number = getDestinationRoom("qm")
+  if (room_number ~= nil) then
+    local current_room_number = gmcpval("num")
+    if (current_room_number == room_number) then
+      Send("quest request 'rewarding'")
+    else
+      Execute("mapper goto " .. room_number)
+    end
+  else
+    Note("There is no quest master for this location.")
+  end
+end
+
+function doTownRep() -- Daily Lady
+  local room_number = getDestinationRoom("rep")
+  if (room_number ~= nil) then
+    local current_room_number = gmcpval("num")
+    if (current_room_number == room_number) then
+      Send("sayto representative yes")
+    else
+      Execute("mapper goto " .. room_number)
+    end
+  else
+    Note("There is no town rep for this location.")
+  end
+end
+
+function doNextCity() -- Next City
+    get_gmcp_room()
+    local num = gmcpval("num")
+
+    if num == locations["rune"]["east"] then
+      Send("run newrigel")
+    elseif num == locations["rune"]["west"] then
+      Send("run xaventry")
+    elseif num == locations["sigil"]["south"] then
+      Send("run diocletian")
+    elseif num == locations["sigil"]["north"] then
+      Send("run vospire")
+    elseif num == locations["piratescove"]["west"] or
+           num == locations["piratescove"]["east"] or
+           num == locations["piratescove"]["south"] then
+      Send("run keep")
+    elseif num == locations["newrigel"]["south"] or
+           num == locations["xaventry"]["south"] then
+      Send("run rune")
+    elseif num == locations["newrigel"]["north"] then
+      Send("run wroth")
+    elseif num == locations["tellerium"]["north"] then
+      Send("run templeton")
+    elseif num == locations["templeton"]["west"] then
+      Send("run tellerium")
+    elseif num == locations["diocletian"]["south"] or
+           num == locations["vospire"]["east"] then
+      Send("run sigil")
+    elseif num == locations["vospire"]["west"] then
+      Send("run vesuvius")
+    elseif num == locations["maldra"]["south"] then
+      Send("run pc")
+    elseif num == locations["decara"]["east"] then
+      Send("run vir")
+    elseif num == locations["vir"]["east"] then
+      Send("run decara")
+    elseif num == "1960870" then -- wroth
+      Send("run newrigel")
+    else
+        Note("You are not in an expected room!")
+    end
+end
+
+function doCrystal() -- Crystal Quests
+  get_gmcp_room()
+  local zone = gmcpval("zone")
+  local room = gmcpval("num")
+
+  if isRune(zone, room) then
+    if room == "10407" then
+      Send("shop buy 1")
+    else
+      Execute("mapper goto 10407")
+    end
+  elseif zone == "Alyria" then
+      Send("run rune")
+  elseif isXaventry(zone, room) then
+    Execute("mapper goto " .. locations["xaventry"]["south"])
+  elseif isNewRigel(zone, room) then
+    Execute("mapper goto " .. locations["newrigel"]["south"])
+  end
+end
+
+function doPursuer() -- Orc Pursuer
+  get_gmcp_room()
+  local zone = gmcpval("zone")
+  local room = gmcpval("num")
+
+  if zone == "Dungeon Wroth" or room == "1960870" then
+    if room == "7682" then
+      Send("enter portal")
+      Send("south")
+    else
+      Execute("mapper goto 7682")
+    end
+  elseif zone == "Alyria" then
+      Send("run wroth")
+  elseif isRune(zone, room) then
+    Execute("mapper goto " .. locations["rune"]["west"])
+  elseif isNewRigel(zone, room) then
+    Execute("mapper goto " .. locations["newrigel"]["north"])
+  end
+end
+
+function getPursuerTarget()
+  Send("sayto orc yes")
+  Send("nod orc")
+end
+
+function tryChoice(choice)
+  if not init then
+    Send(choice)
+  else
+    get_gmcp_room()
+    local room = gmcpval("num")
+    local sign = signposts["s" .. room]
+    if sign ~= nil then
+      local room_choice = sign[tonumber(choice)]
+      if room_choice ~= nil then
+        Send(room_choice["command"])
+      else
+        Send(choice)
+      end
+    elseif room == "7461" then
+      if choice == "1" then
+        getPursuerTarget()
+      elseif choice == "2" then
+        Send("give head orc")
+      elseif choice == "3" then
+        Send("give leg orc")
+      elseif choice == "4" then
+        Send("give arm orc")
+      end
+    else
+      Send(choice)
+    end
+  end
+end
+
+function trySignPost()
+  get_gmcp_room()
+  local room = gmcpval("num")
+  local sign = signposts["s" .. room]
+  if sign ~= nil then
+    for i, sign in ipairs(sign) do
+      Hyperlink(sign["command"], "[" .. i .. "] " .. sign["name"], "", "silver", "black", false)
+      Tell(" - ")
+    end
+    Note("")
+  end
+end
+
+function isRune(zone, room)
+    return zone == "Towne of Rune" or 
+           zone == "Runic Castle" or 
+           zone == "Player Homes - Rune" or 
+           zone == "Rune Condominiums" or
+           zone == "Rune Estates" or 
+           zone == "Rune Realty" or 
+           zone == "Temple Crypt" or
+           zone == "Temple of Sumter" or 
+           zone == "Winterborn Mansion" or 
+           zone == "Focault Magic Equipment Company" or 
+           zone == "Focault's Residence" or
+           zone == "Van Pelt's Emporium" or 
+           room == locations["rune"]["south"] or
+           room == locations["rune"]["east"] or
+           room == locations["rune"]["west"]
+end
+
+function isSigil(zone, room)
+    return zone == "Sigil" or 
+           zone == "The Sigilian Stronghold" or
+           zone == "Sigil Castle" or
+           zone == "Player Homes - Sigil" or 
+           zone == "Sigil Condominiums" or 
+           zone == "Sigil Realty" or
+           room == locations["sigil"]["north"] or
+           room == locations["sigil"]["south"]
+end
+
+function isNewRigel(zone, room)
+    return zone == "The Towne of New Rigel" or 
+           zone == "New Rigel Condominiums" or 
+           zone == "New Rigel Gardens" or 
+           zone == "New Rigel Realty" or
+           zone == "Player Homes - New Rigel" or
+           room == locations["newrigel"]["north"] or
+           room == locations["newrigel"]["south"]
+end
+
+function isXaventry(zone, room)
+    return zone == "The Towne of Xaventry" or
+           zone == "The Xaventry Stronghold" or 
+           zone == "Xaventry Condominiums" or 
+           zone == "Xaventry Realty" or 
+           room == locations["xaventry"]["north"] or
+           room == locations["xaventry"]["south"] or
+           room == locations["xaventry"]["east"] or
+           room == locations["xaventry"]["west"]
+end
+
+function isTellerium(zone, room)
+    return zone == "Tellerium" or
+           zone == "Player Homes - Tellerium" or
+           zone == "Tellerium Condominiums" or 
+           zone == "Tellerium Realty" or
+           room == locations["tellerium"]["north"] or
+           room == locations["tellerium"]["south"]
+end
+
+function isTempleton(zone, room)
+    return zone == "Templeton" or
+           zone == "The Templetonian Stronghold" or 
+           room == locations["templeton"]["west"]
+end
+
+function isLowangen(zone, room)
+    return zone == "Lowangen" or 
+           room == locations["lowangen"]["south"]
+end
+
+function isPiratesCove(zone, room)
+    return zone == "Pirate's Cove" or 
+           zone == "Pirate's Cove Realty" or
+           zone == "Player Homes - Pirates Cove" or 
+           room == locations["piratescove"]["north"] or
+           room == locations["piratescove"]["south"] or
+           room == locations["piratescove"]["east"] or
+           room == locations["piratescove"]["west"]
+end
+
+function isVospire(zone, room)
+    return zone == "Vospire" or
+           room == locations["vospire"]["east"] or
+           room == locations["vospire"]["west"]
+end
+
+function isDiocletian(zone, room)
+    return zone == "Palace of Diocletian" or
+           room == locations["diocletian"]["south"]
+end
+
+function isMaldra(zone, room)
+    return zone == "Maldra Keep" or
+           room == locations["maldra"]["south"]
+end
+
+function isDesertThorn(zone, room)
+    return zone == "Desert Thorn" or
+           room == locations["thorn"]["east"] or
+           room == locations["thorn"]["west"]
+end
+
+function isDecara(zone, room)
+    return zone == "Towne of Decara" or 
+           zone == "Decara Condominiums" or 
+           zone == "Decara Realty" or 
+           zone == "Player Homes - Decara" or
+           room == locations["decara"]["east"]
+end
+
+function isVir(zone, room)
+    return zone == "Vir" or 
+           zone == "Vir Condominiums" or
+           room == locations["vir"]["east"]
+end
+
+function get_gmcp_room()
+    local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
+    luastmt = "gmcpdata = " .. gmcparg
+    assert(loadstring(luastmt or ""))()
+end
+
+]]>
+
+</script>
+
+</muclient>

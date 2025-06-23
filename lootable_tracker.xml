@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="lootable_tracker"
+   author="Oona"
+   id="804c9c1100a17f8052e79118"
+   language="Lua"
+   purpose="track when you can loot stuff again"
+   save_state="y"
+   date_written="2025-03-16 13:57:37"
+   date_modified="2025-04-26 01:44:44"
+   requires="4.71"
+   version="1.1"
+   >
+
+<description trim="y">
+
+</description>
+
+</plugin>
+
+<aliases>
+  <alias match="^lootables?$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ShowLootables(false)</send>
+  </alias>
+
+  <alias match="^lootables? -i$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ShowLootables(true)</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+add[ ]+n:(.*?) z:(.*?) r:(.*?) rn:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>AddLootable("%1", "%2", "%3", "%4")</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+remove[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>RemoveLootable("%1")</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>SetOffset("%1")</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+rename[ ]+(.*?) (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>RenameLootable("%1", "%2")</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+force[ ]+(.*?) (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ForceLootable("%1", "%2")</send>
+  </alias>
+</aliases>
+
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You can loot this again at (.*?)\.$">
+    <send>UpdateLootableTime("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You gently pry (.*?) out of (.*?)\.$">
+    <send>SetLootable("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+
+  <trigger group="gag_lootable" enabled="n" keep_evaluating="y" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^Y(.*?) is bare- someone must have already gotten to whatever was in here.$">
+  </trigger>
+
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+
+lootables = { }
+
+hour_offset = 1
+last_set_check = nil
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnsureTables()
+end
+
+function OnPluginEnable()
+  EnsureTables()
+end
+
+function OnPluginConnect()
+  EnsureTables()
+end
+
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  hour_offset = GetVariable("hour_offset") or 1
+  DoAfterSpecial(3, "ShowValidLootables()", sendto.script)
+end
+
+function EnsureTables()
+  last_set_check = nil
+
+  table.insert(lootables, { name = "Archon Box", zone = "Lowangen", room = "Far End of the Dungeon", room_number = "16149", next_available = nil })
+  table.insert(lootables, { name = "Archon Box", zone = "Palace of Diocletian", room = "Exploring the Confusing Catacomb Passages", room_number = "29314", next_available = nil })
+  table.insert(lootables, { name = "Archon Box", zone = "Beneath A Trellis", room = "A Poorly-Concealed Cache", room_number = "80434", next_available = nil })
+  table.insert(lootables, { name = "Manuals Shelf", zone = "Genauras", room = "A Dirty House", room_number = "235989", next_available = nil })
+
+  local lootables_text = GetVariable("lootables_list") or ""
+  if lootables_text ~= "" then
+    lootables = Deserialize(lootables_text)
+  end
+end
+
+function SetOffset(offset)
+  hour_offset = tonumber(offset)
+  SetVariable("hour_offset", hour_offset)
+  SaveState()
+end
+
+function UpdateLootableTime(time)
+  get_gmcp_room()
+  local zone = gmcpval("zone")
+  local room_number = gmcpval("num")
+  local room_name = gmcpval("name")
+  local found = false
+
+  for idx, lootable in ipairs(lootables) do
+    if room_number == lootable["room_number"] then
+      found = true
+      -- if we are in the room with the lootable, set the next available
+      local parsed_time = parseDate(time)
+      lootable["next_available"] = parsed_time
+      local _, str = getTimerColorAndString(parsed_time)
+      Note("Lootable '" .. lootable["name"] .. "' can be looted again in " ..  str .. ".")
+    end
+  end
+
+  if not found then
+    Hyperlink("lootables add n: z:" .. zone .. " r:" .. room_name .. " rn:" .. room_number, "[Click to track this lootable]", "", "silver", "black", false)
+    Note("")
+  end
+
+  SetVariable("lootables_list", Serialize(lootables))
+  SaveState()
+end
+
+function SetLootable(container)
+  if container == "a lost wallet" then
+    return
+  end
+
+  -- this will be called multiple times, check the time to only do it once
+  local now = os.time()
+  local can_continue = false
+  if last_set_check == nil then
+    can_continue = true
+  end
+
+  if not can_continue then
+    local check_diff = os.difftime(now, last_set_check)
+    -- if we checked already within the last second don't continue
+    can_continue =  check_diff > 1000
+  end
+
+  if can_continue then
+    get_gmcp_room()
+    local zone = gmcpval("zone")
+    local room_number = gmcpval("num")
+    local room_name = gmcpval("name")
+  
+    local found = false
+
+    last_set_check = now
+  
+    for idx, lootable in ipairs(lootables) do
+      if room_number == lootable["room_number"] then
+        found = true
+        -- turn on gagging triggers and get again to update
+        DoAfterSpecial(.5, "TryUpdateWithGag(\"" .. container .. "\")", sendto.script)
+        break
+      end
+    end
+
+    if not found then
+      -- create a hyperlink to add this lootable
+      Hyperlink("lootables add n:" .. container .. " z:" .. zone .. " r:" .. room_name .. " rn:" .. room_number, "[Click to track this lootable]", "", "silver", "black", false)
+      Note("")
+    end
+  end
+end
+
+function TryUpdateWithGag(lootable_name)
+  EnableTriggerGroup("gag_lootable", true)
+  SendNoEcho("take stuff '" .. lootable_name .. "'")
+  DoAfterSpecial(.5, "EnableTriggerGroup(\"gag_lootable\", false)", sendto.script)
+end
+
+function AddLootable(name, zone, room_name, room_number)
+  local new_name = utils.inputbox(name, "Name this lootable", name)
+  table.insert(lootables, { name = name, zone = zone, room = room_name, room_number = room_number, next_available = nil })
+  Note("New lootable '" .. name .. "' has been added.")
+  DoAfterSpecial(.5, "TryUpdateWithGag(\"lootable\")", sendto.script)
+end
+
+function ShowLootables(show_indexes)
+  local count = 0
+
+  if not show_indexes then
+    table.sort(lootables, function(a, b)
+      if (a.next_available == nil) then
+        return false
+      end
+
+      if (b.next_available == nil) then
+        return true
+      end
+
+      return b.next_available < a.next_available 
+    end)
+  end
+  
+  Note("All tracked lootables:")
+
+  for idx, lootable in ipairs(lootables) do
+    if show_indexes then
+      Tell("* " .. idx .. " > ")
+    else
+      Tell("* ")
+    end
+    ColourTell("white", "black", lootable["name"])
+    Tell(" in ")
+    ColourTell("white", "black", lootable["zone"] .. " ")
+    Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+    Tell(" > ")
+    doTimeString(lootable["next_available"])
+    if show_indexes then
+      Tell(" [" .. lootable["next_available"] .. "]")
+    end
+    Note("")
+    count = count + 1
+  end
+
+  if (count == 0) then
+    Note("No lootables are being tracked yet.")
+  elseif not show_indexes then
+    Note("Use 'lootables -i' to see indexes for rename/remove.")
+  end
+  
+  Note("")
+end
+
+function ShowValidLootables()
+  local count = 0
+  table.sort(lootables, function(a, b)
+
+    if (a.next_available == nil) then
+      return false
+    end
+
+    if (b.next_available == nil) then
+      return true
+    end
+
+    return b.next_available < a.next_available 
+  end)
+  
+  for _, lootable in ipairs(lootables) do
+    local color, _ = getTimerColorAndString(lootable["next_available"])
+    if color == "green" or lootable["next_available"] == nil then
+      Tell("* ")
+      ColourTell("white", "black", lootable["name"])
+      Tell(" in ")
+      ColourTell("white", "black", lootable["zone"] .. " ")
+      Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+      if lootable["next_available"] == nil then
+        Note(" has no last looted time, so it could be ready.")
+      else
+        Note(" is ready to be looted again.")
+      end
+      count = count + 1
+    end
+  end
+
+  if (count == 0) then
+    Note("There are no tracked lootables ready to be looted.")
+  end
+end
+
+function RemoveLootable(idx)
+  table.remove(lootables, tonumber(idx))
+  ShowLootables()
+
+  SetVariable("lootables_list", Serialize(lootables))
+  SaveState()  
+end
+
+function RenameLootable(idx, new_name)
+  local i = tonumber(idx)
+  if i == nil then
+    Note("Use syntax lootables rename <index> <new name> where index is the number index from the 'lootables -i' list.")
+  elseif new_name == nil or new_name == "" then
+    new_name = utils.inputbox(lootables[i]["name"], "Rename Lootable", lootables[i]["name"])
+  end
+
+  if i ~= nil and new_name ~= nil and new_name ~= "" then
+    lootables[i]["name"] = new_name
+
+    SetVariable("lootables_list", Serialize(lootables))
+    SaveState()  
+  end
+end
+
+function ForceLootable(idx, new_available)
+  local i = tonumber(idx)
+  local d = tonumber(new_available)
+  if i == nil then
+    Note("Use syntax lootables force <index> <new date> where index is the number index from the 'lootables -i' list.")
+  elseif d == nil then
+    Note("Invalid date.")
+    return
+  end
+
+  if i ~= nil and d ~= nil then
+    lootables[i]["next_available"] = d
+
+    Note("Date changed.")
+
+    SetVariable("lootables_list", Serialize(lootables))
+    SaveState()  
+  end
+end
+
+function parseDate(str)
+  if str == nil or str == "" then
+    return nil
+  else
+    str = str:gsub("%s+", " "):gsub("%.$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local success, result = pcall(function()
+      local day_name, month_str, day, hour, min, sec, year = str:match("(%a+) (%a+) (%d+) (%d+):(%d+):(%d+) (%d+)")
+    
+      local months = {
+        Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6,
+        Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12
+      }
+
+      local month = months[month_str]
+
+      if not (month and day and hour and min and sec and year) then
+        Note("could not parse: " .. str)
+        return nil
+      end
+
+      return os.time({
+        year = tonumber(year),
+        month = month,
+        day = tonumber(day),
+        hour = tonumber(hour) + 1,
+        min = tonumber(min),
+        sec = tonumber(sec)
+      })
+    end)
+
+    if (success) then
+      return result
+    else
+      Note("Error parsing: " .. str);
+    end
+  end
+end
+
+function doTimeString(time)
+  local color, timer_string = getTimerColorAndString(time)
+  ColourTell(color, "black", timer_string)
+end
+
+function getTimerColorAndString(time)
+  if (time == nil) then
+    return "red", "no data for this lootable"
+  else
+    local now = os.time()
+    local diff = os.difftime(time, now)
+
+    if diff < 0 then
+      return "green", "You can get this lootable now!"
+    end
+
+    local seconds = diff % 60
+    local minutes = math.floor(diff / 60) % 60
+    local hours = math.floor(diff / 3600) % 24
+    local days = math.floor(diff / 86400)
+  
+    local color = "red"
+    if days < 1 and hours < 3 then
+      color = "yellow"
+    elseif (days < 1) then
+      color = "orange"
+    end
+
+    local expiration = string.format("%d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
+
+    return color, expiration
+  end
+end
+
+function get_gmcp_room()
+  local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
+  luastmt = "gmcpdata = " .. gmcparg
+  assert(loadstring(luastmt or ""))()
+end
+
+---------------------
+-- serialization
+---------------------
+
+function Serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return Serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function Deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin name="hangman_solver" author="Oona" id="40f5adf6b2602bb7401add60"
+   language="Lua" date_written="2025-06-08 12:56:51" version="1.0">
+</plugin>
+
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You hold a game of hangman (.*?)$" send_to="12" sequence="100">
+    <send>startHangman()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Progress thus far: (.*?)$" send_to="12" sequence="100">
+    <send>setWord("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Failed letters: (.*?)$" send_to="12" sequence="100">
+    <send>solveHangman("%1")</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "json"
+
+local https = require("ssl.https")
+local ltn12 = require("ltn12")
+
+local hangman_word = ""
+local possible_guesses = {}
+
+function startHangman()
+  Send("hangman start")
+  Send("hangman e")
+end
+
+function setWord(word)
+  hangman_word = word
+end
+
+function solveHangman(wrong_guesses)
+  if hangman_word == nil or hangman_word == "" then
+    Note("Unknown starting length?")
+  elseif possible_guesses ~= nil and #possible_guesses == 1 then
+    Note("Possible guesses: " .. table.concat(possible_guesses, ", "))
+  elseif string.find(hangman_word, "_", 1, true) == nil then
+    -- we done, good job
+  elseif hangman_word == "e____" then
+    Send("m")
+  elseif hangman_word == "em___" then
+    Send("p")
+  elseif hangman_word == "emp__" then
+    Send("t")
+  elseif hangman_word == "empt_" then
+    Send("y")
+  else
+    local url = "https://www.hangman-solver.com/.netlify/functions/answers?word=" .. hangman_word .. "&guesses=" .. string.gsub(wrong_guesses, " ", "")
+
+    local response = {}
+    local _, status = https.request{
+        url = url,
+        sink = ltn12.sink.table(response)
+    }
+  
+    if (status == 200) then
+      possible_guesses = extractWords(table.concat(response))
+      Note("Possible guesses: " .. table.concat(possible_guesses, ", "))
+    else
+      Note("error accessing solver - code: " .. status)
+    end
+  end
+end
+
+function extractWords(json_string)
+  local data = json.decode(json_string)
+
+  local words = {}
+  for _, entry in ipairs(data) do
+    if entry.word then
+      table.insert(words, entry.word)
+    end
+  end
+  
+  return words
+end
+
+]]>
+
+</script>
+
+</muclient>

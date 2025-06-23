@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+  name="split_scroll"
+  author="Oona"
+  id="f453be8f0a2cd84fb3f9ff8a"
+  language="Lua"
+  purpose="show a splitter when scrolling to always display the last 10 lines"
+  save_state="y"
+  date_written="2025-06-01 12:00:00"
+  requires="4.71"
+  version="1.0"
+>
+
+<description trim="y">
+
+<![CDATA[
+
+Does what it says on the tin, when you scroll up in your output window you will
+still see the latest 15 or so lines at the bottom so you can go look at stuff
+with out needing to worry about new stuff happening without your knowledge.
+
+Click the down arrow button to shoot back down.
+
+Only really tested with my own layout so let me know if it acts weird for you.
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+  <alias match="^split[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ShowDebug()</send>
+  </alias>
+</aliases>
+
+<triggers>
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+local WIN = GetPluginID()
+local FONT = "font" .. WIN
+local ROWS = 15
+
+local LINE_HEIGHT
+local BORDER
+local LEFT
+local RIGHT
+local TOP
+local WINDOW_HEIGHT
+
+counter = 0
+init = false
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+end
+
+function OnPluginEnable()
+  showWindow()
+end
+
+function OnPluginClose()
+  hideWindow()
+end
+
+function OnPluginDisable()
+  hideWindow()
+end
+
+function doOnHelp()
+  ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
+end
+
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+
+  FONT = "font" .. WIN
+
+  local font_name = GetInfo(20) or "Lucida Console"
+  local font_size = GetInfo(213) or 10
+
+  check(WindowCreate(WIN, 0, 0, 1, 1, 0, 0, ColourNameToRGB("black")))
+  check(WindowFont(WIN, FONT, font_name, font_size))
+  LINE_HEIGHT = (WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 1) + 1
+  BORDER = GetInfo(277)
+  WINDOW_HEIGHT = LINE_HEIGHT * (ROWS + 1) + BORDER + 4
+
+  local bottom = GetPluginVariable("cb6469228f9f7e26129c1ebc", "trbottom") or GetInfo(293)
+  TOP =  (bottom - LINE_HEIGHT * (ROWS + 1)) - BORDER  
+  LEFT = (GetPluginVariable("cb6469228f9f7e26129c1ebc", "trleft") or GetInfo(290)) - BORDER
+  RIGHT =(GetPluginVariable("cb6469228f9f7e26129c1ebc", "trright") or GetInfo(292)) + BORDER + 2
+
+  init = true
+end
+
+function OnPluginTick()
+  if not init then return end
+
+  counter = counter + 1
+  if counter % 13 == 0 then
+    counter = 0
+    return
+  end
+
+  WindowCreate(WIN, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
+  WindowAddHotspot(WIN, "textarea", 0, 0, RIGHT - LEFT, WINDOW_HEIGHT, "", "", "", "", "", "", miniwin.cursor_ibeam, 0)
+  WindowScrollwheelHandler(WIN, "textarea", "OnWheelScroll")
+
+  local scroll = GetInfo(296)
+  local total_height = GetLinesInBufferCount() * GetInfo(212)
+
+  if scroll < total_height - 800 then
+    WindowRectOp(WIN, miniwin.rect_fill, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, ColourNameToRGB("black"))
+    WindowLine(WIN, 0, 0, RIGHT, 0, ColourNameToRGB("silver"), miniwin.pen_solid, 2)
+    
+    local cnt = 0
+    local lines_in_buffer = GetLinesInBufferCount()
+    for line = lines_in_buffer - ROWS, lines_in_buffer do
+      drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
+      cnt = cnt + 1
+    end
+
+    local btn_left = RIGHT - 250
+    local btn_top = WINDOW_HEIGHT - 100
+    local btn_right = btn_left + 50
+    local btn_bottom = btn_top + 50
+
+    WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, ColourNameToRGB("dimgray"))
+
+    local centerX = (btn_left + btn_right) / 2
+    local point1 = { x = centerX, y = btn_bottom - 10 }
+    local point2 = { x = btn_left + 10, y = btn_top + 10 }
+    local point3 = { x = btn_right - 10, y = btn_top + 10 }
+
+    local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
+
+    WindowPolygon(WIN, downArrow, ColourNameToRGB("darkgray"), miniwin.pen_solid, 1, ColourNameToRGB("darkgray"), miniwin.brush_solid, true, false)
+    WindowAddHotspot(WIN, "scroll_to_bottom", btn_left, btn_top, btn_right, btn_bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
+
+    WindowShow(WIN, true)
+  else
+    WindowShow(WIN, false)
+  end
+end
+
+function OnScrollToBottom()
+  SetScroll(-1, true)
+end
+
+function drawLine(i, y)
+  --Note(y)
+  --if y > WINDOW_HEIGHT then Note("y (" .. y .. ") is greater than window height (" .. WINDOW_HEIGHT .. ")") end
+
+  local x = BORDER
+  local style_count = GetLineInfo (i, 11)
+  if style_count == nil then 
+    WindowText(WIN, FONT, "there was a problem with line " .. i .. ", sorry", x, y, 0, 0, ColourNameToRGB("white"))
+    return 
+  end
+  for s = 1, style_count do
+    local fgcol = GetStyleInfo(i, s, 14)
+    local bgcol = GetStyleInfo(i, s, 15) or ColourNameToRGB("black")
+    local txt = GetStyleInfo(i, s, 1)
+    local w = WindowTextWidth(WIN, FONT, txt)
+
+    if bgcol then
+      WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, bgcol)
+    end
+
+    WindowText(WIN, FONT, txt, x, y, 0, 0, fgcol)
+    x = x + w
+  end
+end
+
+function OnWheelScroll(flags, hotspot_id)
+  local newPos = GetInfo(296)
+  
+  if bit.band(flags, miniwin.wheel_scroll_back) ~= 0 then
+    newPos = newPos + (LINE_HEIGHT * 3)
+  else
+    newPos = newPos - (LINE_HEIGHT * 3)
+  end
+
+  SetScroll(newPos, true)
+end
+
+function showWindow()
+  WindowShow(WIN, true)
+end
+
+function hideWindow()
+  WindowShow(WIN, false)
+end
+
+function ShowDebug()
+  local buffer_count = GetLinesInBufferCount()
+  Note("scroll: " .. GetInfo(296))
+  Note("last line: " .. buffer_count)
+  Note("height: " .. buffer_count * GetInfo(212))
+  Note("top: " .. TOP)
+  Note("left: " .. LEFT)
+  Note("right: " .. RIGHT)
+end
+
+]]>
+
+</script>
+
+</muclient>

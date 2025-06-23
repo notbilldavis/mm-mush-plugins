@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="affects_buttons"
+   author="Oona"
+   id="3a8348c0204a529dc99c2ba8"
+   language="Lua"
+   purpose="clickable buttons list that changes colors for your affects"
+   save_state="y"
+   date_written="2025-03-16 13:57:37"
+   date_modified="2025-06-21 07:31:05"
+   requires="4.71"
+   version="2.0"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+Adds a panel you can add buttons to that will perform commands when clicked.
+Buttons with an affect associated will be color-coded based on its status
+This affect is typically the name of the skill/spell in lower case
+Buttons without an affect will just be gray
+
+ * affects add <title> a:<affect> c:<command>
+ * affects edit <title> a:<affect> c:<command>
+ * affects delete <title>
+
+<title> is what the button will say
+<affect> is the affect it will try to track, it can be empty
+<command> is the command to send when clicked
+
+ * affects move up <title>
+ * affects move down <title>
+
+This will move the button around.
+
+ * affects width <new_width>
+
+Set your buttons to this width explicitly if you have small or larger buttons.
+
+ * affects font
+
+Change the font characteristics of the buttons
+
+ * affects header
+ * affects header <new_header>
+
+Toggle the header on and off or change what it says completely.
+
+ * affects lock
+
+Lock the position of the buttons window so it can't be moved around
+
+ * affects stretch
+
+Force the entire window to stretch to max height
+
+ * affects broadcast <affect>
+
+When this affect is applied we can broadcast it for other plugins to pick it up
+
+Some notes:
+
+Druid affects are usually translated to non-druid spells that are exclusive so 
+having a ring that gives stone skin will still show your invoke ooze as casted
+
+I haven't done this completely. I have just done the ones that pertain to me
+
+This isn't 100% accurate. Some spells don't fire off events when they expire so
+to be certain you are up to date you can view your affects manually at anytime
+which will update the buttons
+
+When recasting something before it expires it will try to guess the duration
+based on the highest duration it's been casted. This can get weird when you do
+something like cast levitation on your horse. It will think it was casted on you
+and reset your meter thingy. Manually check affects to fix it.
+
+Examples:
+
+affects add Whirlwind a:whirlwind c:cast whirlwind
+affects add Invoke Ooze / Stone Skin a:stone skin c:invoke ooze
+affects add Summon Mount a: c:cast 'summon mount'
+
+
+MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+  <alias match="^affects[ ]+add[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>AddButton("%1", "%2", "%3")</send>
+  </alias>
+
+  <alias match="^affects[ ]+edit[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>EditButton("%1", "%2", "%3")</send>
+  </alias>
+
+  <alias match="^affects[ ]+delete[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.DeleteButton("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+rename[ ]+(.*?)[ ]+n:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.RenameButton("%1", "%2")</send>
+  </alias>
+
+  <alias match="^affects[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
+  </alias>
+
+  <alias match="^affects[ ]+move[ ]+up[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.MoveButtonUp("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+move[ ]+down[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.MoveButtonDown("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+buttons[ ]+width[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.SetWidth("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+buttons[ ]+font$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.SetFont()</send>
+  </alias>
+
+  <alias match="^affects[ ]+header$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.ToggleHeader()</send>
+  </alias>
+
+  <alias match="^affects[ ]+header[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.SetHeaderText("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+buttons[ ]+lock$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.ToggleLockPosition()</send>
+  </alias>
+
+  <alias match="^affects[ ]+stretch$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.ToggleStretchHeight()</send>
+  </alias>
+
+  <alias match="^affects[ ]+broadcast[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.ToggleBroadcastAffect("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setCharacterName("%1")</send>
+  </alias>
+
+  <alias match="^affects[ ]+negative$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>BadAffects.ToggleEnabled()</send>
+  </alias>
+
+  <alias match="^affects[ ]+configure$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure()</send>
+  </alias>
+  
+  <alias match="^affects[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>
+      Buttons._debug()
+      BadAffects._debug()
+    </send>
+  </alias>
+
+</aliases>
+
+<triggers>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) knocks (.*?) from your grip\.$">
+    <send>DisarmedBroadcast("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" name="start_affects" keep_evaluating="y" match="^You are affected by the following\:$" regexp="y" send_to="12" sequence="100">
+    <send>
+        notify = false
+        EnableTriggerGroup("get_affects", true)
+        BadAffects.ClearMiniWindow()
+        Buttons.ClearMiniWindow()
+    </send>
+  </trigger>
+
+  <trigger enabled="y" name="stop_affects1" keep_evaluating="y" match="^Total of (.*?) magical and (.*?) non\-magical affects\.$" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("get_affects", false)
+        Buttons.DrawMiniWindow()
+        notify = true
+    </send>
+  </trigger>
+
+  <trigger enabled="y" name="stop_affects2" keep_evaluating="y" match="^Total of (.*?) magical affects\.$" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("get_affects", false)
+        Buttons.DrawMiniWindow()
+        notify = true
+    </send>
+  </trigger>
+
+  <trigger enabled="y" name="stop_affects3" keep_evaluating="y" match="^Total of (.*?) non\-magical affects\.$" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("get_affects", false)
+        Buttons.DrawMiniWindow()
+        notify = true
+    </send>
+  </trigger>
+
+  <!-- casted affects with timer -->
+
+  <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "%4")</send>
+  </trigger>  
+
+  <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "%4")</send>
+  </trigger>
+
+  <!-- estimate duration when recasted before expiration -->
+
+  <trigger enabled="y" keep_evaluating="n" match="^You have increased the duration of the spell \'(.*?)\'\.$" regexp="y" send_to="12" sequence="100">
+    <send>RecastAffect("%1")</send>
+  </trigger>
+  
+  <!-- permanent affects -->
+
+  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "-1")</send>
+  </trigger>
+
+  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "-1")</send>
+  </trigger>
+
+  <!-- removals -->
+
+  <trigger enabled="y" keep_evaluating="y" match="^\[Off\: You lose (.*?)\] (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("%1")</send>
+  </trigger>
+
+  <!-- on first prompt -->
+
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("wolf_familiar", "120")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^There is a slight \*poof\* as an alert wolf vanishes\.$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("wolf_familiar")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You feel relieved as the plague is burned from your body\.$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("plague")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You feel relieved as the poison is burned from your body\.$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("poison")</send>
+  </trigger>
+</triggers>
+
+<timers>
+
+  <timer name="affects_timer" enabled="y" second="10" offset_second="0.00" send_to="12" active_closed="y">
+    <send>
+      Buttons.DrawMiniWindow()
+      BadAffects.DrawMiniWindow()
+    </send>
+  </timer>
+
+</timers>
+
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+
+BadAffects = require("badaffects_miniwindow")
+Buttons = require("affectsbuttons_miniwindow")
+Configuration = require("configuration_miniwindow")
+
+local CHARACTER_NAME
+
+negative_affects = {}
+notify = true
+
+-----------------
+-- plugin stuff
+-----------------
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTriggerGroup("get_affects", false)
+  Buttons.PrepareMiniWindow()
+end
+
+function OnPluginEnable()
+  EnableTriggerGroup("get_affects", false)
+  Buttons.PrepareMiniWindow()
+end
+
+function OnPluginConnect()
+  EnableTriggerGroup("get_affects", false)
+  Buttons.PrepareMiniWindow()
+end
+
+function OnPluginClose()
+  BadAffects.CloseMiniWindow()
+  Buttons.CloseMiniWindow()
+  Configuration.Hide()
+end
+
+function OnPluginDisable()
+  BadAffects.CloseMiniWindow()
+  Buttons.CloseMiniWindow()
+  Configuration.Hide()
+end
+
+function OnPluginSaveState()
+  BadAffects.SaveMiniWindow()
+  Buttons.SaveMiniWindow()
+end
+
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  if (CHARACTER_NAME == nil or CHARACTER_NAME == "") then
+    Execute("sendgmcp char.base")
+  end  
+end
+
+function setCharacterName(name)
+  if name == nil or name == "" then
+    Note("Unknown character name, set with 'affects setchar <name>'") 
+  else
+    CHARACTER_NAME = name
+    initializeNegativeAffects()
+    Buttons.InitializeMiniWindow(name)
+    BadAffects.InitializeMiniWindow(name)
+    if Buttons.CURRENT_AFFECTS == nil then
+      Send("affects")
+    end
+  end
+end
+
+function initializeNegativeAffects()
+  local bad = { "blindness", "confusion", "deafen", "etheric pollution",
+    "hinder", "mental disruption", "web", "pestilence", "silence", "sleep", 
+    "slow magic", "slow", "stone curse", "paralysis", "extinction", "amnesia",
+    "energy orb", "plague", "poison", "memory drain", "binding curse",
+    "finality of the ender", "gangrene", "malignancy", "hex", "blue cough disease",
+    "subdue", "condemn", "traumatize", "instanity", "with swiveling hooks",
+    "jinx", "hobble", "bleeding", "disjunction", "decrepify", "vacuum web",
+    "poverty of maradas", "pressure points", "unraveling", "dull wits",
+    "withering touch", "scarify", "dampening field", "malediction", "paralyze",
+    "impede movement", "strike of death", "poverty of ether", "immobilize",
+    "damnation", "spider incubator", "entomb", "contagion", "faerie fire",
+    "giant grasping hand", "existential horror", "slurping proboscis",
+    "harrow", "excommunicate", "boreworms disease", "irk", "nightmares",
+    "hotfoot", "burning ember", "cavern sickness disease", "mesmerize",
+    "fatigue", "ash evocation" }
+
+  for _, aff in ipairs(bad) do
+    negative_affects[aff] = true
+  end
+end
+
+-----------------
+-- affects dict
+-----------------
+
+function SetAffect(affect, time_str)
+  local parsed_affect = ParseAffect(affect)
+  local converted_time = tonumber(time_str or 0) or 0  
+  Buttons.SetAffect(parsed_affect, converted_time, notify)
+
+  if negative_affects[parsed_affect] then
+    BadAffects.AddNegativeAffect(parsed_affect, converted_time)
+  end
+end
+
+function RecastAffect(affect)
+  local parsed_affect = ParseAffect(affect)
+  local est_duration = Buttons.GetDuration(parsed_affect)
+  if est_duration ~= nil then
+    local converted = est_duration / 60 * 4
+    local converted_str = tostring(converted)
+    SetAffect(affect, converted_str, notify)
+  end
+end
+
+function RemoveAffect(affect)
+  local parsed_affect = ParseAffect(affect)
+  Buttons.RemoveAffect(parsed_affect, notify)
+
+  if negative_affects[parsed_affect] then
+    BadAffects.RemoveNegativeAffect(parsed_affect)
+  end
+end
+
+function DisarmedBroadcast(weapon)
+  BroadcastPlugin(1, "!!! YOU WERE DISARMED! RE-EQUIP " .. weapon:upper() .. " !!!")
+end
+
+function AddButton(title, affect, command)
+  local parsed_affect = ParseAffect(affect)
+  Buttons.AddButton(title, parsed_affect, command)
+end
+
+function EditButton(title, new_affect, new_command)
+  local parsed_affect = ParseAffect(parsed_affect)
+  Buttons.EditButton(title, parsed_affect, new_command)
+end
+
+function ParseAffect(affect)
+  affect = affect:match("^%s*(.-)%s*$"):lower()
+
+  if affect == "ice invocation" or affect == "force field" then
+    affect = "shield"
+
+  elseif affect == "ooze invocation" then
+    affect = "stone skin"
+  
+  elseif affect == "steam invocation" or affect == "wind walk" then
+    affect = "pass door"
+
+  elseif affect == "magma invocation" or affect == "frostborne" then
+    affect = "fireshield"
+  
+  elseif (affect == "guise of nature") then
+    affect = "armor"
+  
+  elseif affect == "whirlwind" or affect =="lightning invocation" or affect == "zeal" then
+    affect = "haste"
+  
+  elseif affect == "disrupt sight" or affect == "flare" or affect == "color spray" or affect == "smoke evocation" then
+    affect = "blindness"
+  
+  elseif affect == "mesmerize" or affect == "earth evocation" then
+    affect = "web"
+
+  elseif affect == "air invocation" or affect == "float" then
+    affect = "levitation"
+
+  elseif affect == "irritation" then
+    affect = "plague"
+  end
+
+  return affect
+end
+
+---------------
+-- Configuration
+---------------
+
+function Configure()
+  local config = {
+    Button_Options = Buttons.GetConfiguration(),
+    Negative_Affects_Options = BadAffects.GetConfiguration()
+  }
+  
+  Configuration.Show(config, configureDone)
+end
+
+
+function configureDone(group_id, option_id, config)
+  if group_id == "Button_Options" then
+    Buttons.SaveConfiguration(option_id, config)
+  elseif group_id == "Negative_Affects_Options" then
+    BadAffects.SaveConfiguration(option_id, config)
+  end
+end
+
+function Serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return Serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+---------------
+-- GMCP stuff
+---------------
+
+function OnPluginBroadcast(msg, id, name, text)
+  if (id == "f67c4339ed0591a5b010d05b") then -- GMCP message
+    if (text == "char.affect_application_msg") then
+      HandleGmcpAdd()
+    elseif (text == "char.affect_removal_msg") then
+      HandleGmcpRemove()
+    elseif (text == "char.base") then
+      HandleGmcpCharacterBase()
+    end
+  end
+end
+
+function HandleGmcpAdd()
+  GetGmcpAffectApplication()
+  who = gmcpval("target")
+  spell = gmcpval("skill"):lower()
+  duration = gmcpval("duration")
+  handleGmcpAffect(who, spell, true, duration)
+end
+
+function HandleGmcpRemove()
+  GetGmcpAffectApplication()
+  who = gmcpval("target")
+  spell = gmcpval("skill"):lower()
+  handleGmcpAffect(who, spell, false, 0)
+end
+
+function HandleGmcpCharacterBase()
+  if CHARACTER_NAME == nil or CHARACTER_NAME == "" then
+    local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
+    luastmt = "gmcpdata = " .. gmcparg
+    assert(loadstring(luastmt or ""))()
+    local name = gmcpval("name")
+    setCharacterName(name)
+  end
+end
+
+function GetGmcpAffectApplication()
+  local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.affect_application_msg")
+  luastmt = "gmcpdata = " .. gmcparg
+  assert(loadstring(luastmt or ""))()
+end
+
+function handleGmcpAffect(who, spell, isOn, duration)
+  if show_debug then Note("affects_buttons debug: gmcp for '" .. who .. "' for '" .. spell .. "'") end
+  if (who == "you") then
+    if (isOn) then
+      SetAffect(spell, tonumber(duration or 0))
+    else
+      RemoveAffect(spell)
+    end
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>

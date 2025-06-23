@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="cooking_helper"
+   author="Oona"
+   id="853dc761db5b4b38b3e42167"
+   language="Lua"
+   purpose="help with cooking, tracking who eats your stuff, etc"
+   save_state="y"
+   date_written="2025-05-27 11:28:11"
+   requires="4.71"
+   version="1.0"
+   >
+
+<description trim="y">
+
+</description>
+
+</plugin>
+
+<aliases>
+  <alias match="^cooking$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showCooking()</send>
+  </alias>
+
+  <alias match="^cooking[ ]+track (.*?) r:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>addConsumer("%1", "%2")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+clear (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>clearCooking("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+clean(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>cleanCooking("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+(npcs|trucks|foodtrucks)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showFoodTrucks()</send>
+  </alias>
+
+  <alias match="^cooking[ ]+search$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>search()</send>
+  </alias>
+
+  <alias match="^cooking[ ]+getall[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>getAll("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+find[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>findIngredient("%1")</send>
+  </alias>
+</aliases>
+
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) hungrily gobbles (.*?) down\.$">
+    <send>addNpcTracking("%1", "%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^The recipe for (.*?)\:$">
+    <send>
+      EnableTriggerGroup("get_recipe", true)
+      clearRecipe()
+    </send>
+  </trigger>
+
+  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(\s+)\[(.*?)\]$">
+    <send>addToRecipe("%2")</send>
+  </trigger>
+
+  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^cooking recipe that you do not already have the mark for\.  $">
+    <send>
+      EnableTriggerGroup("get_recipe", false)
+      displayHelperOptions()
+    </send>
+  </trigger>
+
+  <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?) found in(.*?)$">
+    <send>found("%1")</send>
+  </trigger>
+
+  <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^No matching items found\.$">
+    <send>notFound()</send>
+  </trigger>
+
+  <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^\.\.\.and more (.*?)\.$">
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+recipes = { }
+current_recipe = { }
+
+search_count = 0
+search_found = { }
+containers = { }
+npcs = { }
+
+local db
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnsureTables()
+  EnsureDb()
+end
+
+function OnPluginEnable()
+  EnsureTables()
+  EnsureDb()
+end
+
+function OnPluginConnect()
+  EnsureTables()
+  EnsureDb()
+end
+
+function EnsureTables()
+  recipes = { }
+  local recipes_text = GetVariable("recipes") or ""
+  if recipes_text ~= "" then
+    recipes = Deserialize(recipes_text)
+  end
+end
+
+function EnsureDb()
+  if db == nil then
+    db = assert(sqlite3.open(GetInfo(66) .. "recipes.db"))
+
+    db:exec[[
+      CREATE TABLE IF NOT EXISTS ingredients (
+        id integer not null primary key autoincrement,
+        name varchar(255) null,
+        area varchar(255) null,
+        details varchar(255) null,
+        notes varchar(255) null,
+        unique (`id`)
+      );
+    ]]
+  end
+end
+
+function showCooking()
+  if #recipes == 0 then
+    Note("You are not currently tracking any recipes.")
+    Tell("-- type 'cooking track ")
+    ColourTell("silver", "black", "<consumer name>")
+    Tell(" r:")
+    ColourTell("silver", "black", "<recipe name>")
+    Note("' to add that person --")
+  else
+    Note("You are currently tracking the following recipes:")
+    for idx, recipe in ipairs(recipes) do
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", recipe["name"]:upper())
+      ColourNote("cyan", "black", " (" .. #recipe["eaten"] .. " people have eaten)")
+      showEaten(recipe["eaten"])
+    end
+    Note("")
+    ColourTell("cyan", "black", " > ")
+    Tell("add new with '")
+    ColourTell("silver", "black", "cooking track ")
+    ColourTell("white", "black", "<consumer name>")
+    ColourTell("silver", "black", " r:")
+    ColourTell("white", "black", "<recipe name>")
+    Note("'")
+  end
+end
+
+function showEaten(eaten)
+  if #eaten == 0 then
+    ColourTell("magenta", "black", "  - ")
+    ColourNote("white", "black", "no one has eaten this yet!")
+  else
+    for idx, consumer in ipairs(eaten) do
+      ColourTell("magenta", "black", "  - ")
+      ColourTell("white", "black", consumer["name"])
+      ColourNote("yellow", "black", " (" .. consumer["date"] .. ")")
+    end
+  end
+end
+
+function addConsumer(consumer, name)
+  if consumer == nil or consumer == "" or name == nil or name == "" then
+    Tell("-- type 'cooking track ")
+    ColourTell("silver", "black", "<consumer name>")
+    Tell(" r:")
+    ColourTell("silver", "black", "<recipe name>")
+    Note("' to add that person --")
+  else
+    local found = false
+    consumer = Trim(consumer:gsub("^%l", string.upper))
+    name = Trim(name)
+    for idx, recipe in ipairs(recipes) do
+      if (string.find(string.lower(recipe["name"]), string.lower(name)) ~= nil) then
+        local rep = false
+        for _, con in ipairs(recipe["eaten"]) do
+          if consumer == con["name"] then 
+            rep = true
+            break
+          end
+        end
+        
+        if rep then
+          Note("Consumer '" .. consumer .. "' has already eaten '" .. recipe["name"] .. "'")
+        else
+          Note("Adding '" .. consumer .. "' as a consumer of '" .. recipe["name"] .. "'")
+          table.insert(recipe["eaten"], { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') })
+          found = true
+          break
+        end
+      end
+    end
+
+    if not found then
+      table.insert(recipes, { name = name, eaten = { }})
+      addConsumer(consumer, name)
+      return
+    end
+
+    SetVariable("recipes", Serialize(recipes))
+    SaveState()
+  end
+end
+
+function addNpcTracking(npc, recipe)
+  if npcs[string.lower(npc)] then
+    addConsumer(npc, recipe)
+  end
+end
+
+function clearCooking(name)
+  if name == nil or name == "" or name == "all" then
+    recipes = {}
+  else
+    name = Trim(name)
+    for idx, recipe in ipairs(recipes) do
+      if (string.find(string.lower(recipe["name"]), string.lower(name)) ~= nil) then
+        Note("Removing '" .. recipe["name"] .. "' from list of tracked recipes.")
+        table.remove(recipes, idx)
+        break
+      end
+    end
+  end
+  
+  SetVariable("recipes", Serialize(recipes))
+  SaveState()
+end
+
+function cleanCooking(name)
+  name = string.lower(Trim(name or ""))
+  local cleaned = false
+  for idx, recipe in ipairs(recipes) do
+    if (name == "" or name == "all" or string.find(string.lower(recipe["name"]), name) ~= nil) then
+      local consumer_set = {}
+      local cleaned_recipe = { name = recipe["name"], eaten = {}}
+      for _, consumer in ipairs(recipe["eaten"]) do
+        if not consumer_set[consumer["name"]] then
+          consumer_set[consumer["name"]] = true
+          table.insert(cleaned_recipe["eaten"], consumer)
+        end
+      end
+      local dupes = #recipe["eaten"] - #cleaned_recipe["eaten"]
+      if dupes > 0 then
+        Note("Cleaned up '" .. recipe["name"] .. "' removing " .. dupes .. " duplicates.")
+        recipes[idx] = cleaned_recipe
+        cleaned = true
+      end
+    end
+  end
+  
+  if cleaned then
+    SetVariable("recipes", Serialize(recipes))
+    SaveState()
+  end
+end
+
+function showFoodTrucks()
+  Note("NPCs that will eat your food:")
+  npcs = { }
+  showFoodTruck("Faltel", "Templeton", "Fox Fur Tavern", "45972", "Elf")
+  showFoodTruck("Shady", "Templeton", "Fool's Gold Tavern", "47034", "Human")
+  showFoodTruck("Grundel", "Templeton", "Fisherman's Cafe", "46452", "Human")
+  showFoodTruck("Urkfet", "Tellerium", "Seagull Tavern", "41835", "Troll")
+  showFoodTruck("Bovel", "Tellerium", "Peachtree Tavern", "41807", "Mino")
+  showFoodTruck("Miller", "Winton", "The Trash Compactor Bar and Grill", "335857", "Human")
+  showFoodTruck("Flam", "Rune", "Flam's Steak House", "10722", "Dracon")
+  showFoodTruck("Friedburg", "Lowangen", "Friedburg's Training", "16090", "Human")
+  showFoodTruck("Finn", "A Hill Giant Refuge", "Finn's Tavern", "345845", "Giant")
+  showFoodTruck("a rapacious chemwalker", "Dungeon Deceit", "", "", "")
+  showFoodTruck("Angus", "Smuggler's Gulch", "The Far End of the Saloon", "9373", "Human")
+  showFoodTruck("Hungry Harmook", "Towne of Decara", "An Overflowing Workshop", "116305", "Llamataur")
+  showFoodTruck("Shroom", "Towne of Decara", "The Tipsy Toadstool", "116030", "Dracon")
+  showFoodTruck("a malnourished girl", "Refuge of the Xanai", "", "", "")
+  showFoodTruck("Alimenta", "Rahdiyr", "Alimenta's Tavern", "199976", "Sidhe")
+  showFoodTruck("Sam the Barkeep", "Human Outpost", "The Bar at the Longbranch", "50867", "Human")
+  showFoodTruck("Cortez, the bartender", "Cavhfail", "Blue Crescent Tavern", "199045", "Fey")
+  showFoodTruck("a busy bartender", "Genauras", "", "", "")
+  showFoodTruck("the bartender", "A Ghost Town", "", "", "")
+  showFoodTruck("Grundy the Bartender", "Renn", "The Juggling Gopher", "78967", "halfling")
+  showFoodTruck("a bartender with a low-cut top", "Hlegmal's Tavern", "The Back Bar", "385957", "Orc")
+  showFoodTruck("a famished ghast", "Domain of Arbaces", "", "", "")
+end
+
+function showFoodTruck(name, town, room, num, race)
+  ColourTell("cyan", "black", " * ")
+  ColourTell("white", "black", name)
+  ColourTell("yellow", "black", " (" .. town .. ") ")
+  if room ~= nil and room ~= "" and num ~= nil and num ~= "" then
+    Hyperlink("mapper goto " .. num, "[" .. room .. "]", "", "silver", "black", false)
+  end
+  if race ~= nil and race ~= "" then
+    ColourNote("green", "black", " - " .. race)
+  else
+    Note("")
+  end
+
+  npcs[string.lower(name)] = true
+end
+
+---------------------
+-- current recipe
+---------------------
+
+function clearRecipe()
+  current_recipe = { }
+end
+
+function addToRecipe(ingredient)
+  Note("adding '" .. ingredient .. "'")
+  table.insert(current_recipe, ingredient)
+end
+
+function displayHelperOptions()
+  Note("")
+  Hyperlink("cooking search", "[Search for Ingredients]", "", "silver", "black", false)
+  Tell(" - ")
+  ColourTell("silver", "black", "Get from: ")
+  Hyperlink("cooking getall bag", "[bag]", "", "silver", "black", false)
+  Tell(" ")
+  Hyperlink("cooking getall 2.bag", "[2.bag]", "", "silver", "black", false)
+  Tell(" ")
+  Hyperlink("cooking getall 3.bag", "[3.bag]", "", "silver", "black", false)
+  Tell(" ")
+  Hyperlink("cooking getall bag", "[3.trunk]", "", "silver", "black", false)
+  Note("")
+end
+
+function search()
+  search_count = 0
+  search_found = { }
+  Note("Searching for ingredients, please wait...")
+
+  EnableTriggerGroup("search_recipe", true)
+  for _, i in ipairs(current_recipe) do
+    SendNoEcho("inventory search \"" .. i .. "\"")
+  end
+end
+
+function getAll(container)
+  for _, i in ipairs(current_recipe) do
+    SendNoEcho("get \"" .. i .. "\" " .. container)
+  end
+end
+
+function found(ingredient)
+  if search_found ~= nil and #search_found > 0 then
+    for _, i in ipairs(search_found) do
+      if ingredient == i then
+        return
+      end
+    end
+  end
+
+  table.insert(search_found, ingredient)
+  search_count = search_count + 1  
+  checkIfDone()
+end
+
+function notFound()
+  search_count = search_count + 1
+  checkIfDone()
+end
+
+function checkIfDone()
+  if search_count == #current_recipe then
+    DoAfterSpecial(1, "finishSearch()", sendto.script)
+  end
+end
+
+function finishSearch()
+  EnableTriggerGroup("search_recipe", false)
+  
+  if #search_found ~= #current_recipe then
+    ing_set = {}
+    for _, ingredient in ipairs(search_found) do
+      ing_set[ingredient] = true
+    end
+
+    ColourTell("silver", "black", "You need: ")
+    for idx, i in ipairs(current_recipe) do
+      if not ing_set[i] then
+        Hyperlink("cooking find " .. i, "[" .. i .. "]", "Find", "white", "black", false)
+        if idx == #current_recipe then
+          ColourTell("silver", "black", ".")
+        else
+          ColourTell("silver", "black", ", ")
+        end
+      end
+    end
+    Note("")
+  else
+    ColourNote("white", "black", "You have all the ingredients required!")
+  end
+end
+
+function findIngredient(ingredient)
+  if db == nil then EnsureDb() end
+
+  Note("Searching DB for '" .. ingredient .. "'")
+
+  for row in db:nrows(string.format("SELECT area, details, notes FROM ingredients WHERE name = '" .. ingredient .. "'")) do
+      ColourTell("cyan", "black", " * ")
+      if row.area ~= nil and #row.area > 0 then
+        ColourTell("white", "black", row.area)
+      else
+        ColourTell("red", "black", "UNKNOWN")
+      end 
+      
+      ColourTell("silver", "black", " - ")
+
+      if row.details ~= nil and #row.details > 0 then
+        ColourTell("white", "black", row.details)
+        if row.notes ~= nil and #row.notes > 0 then
+          ColourTell("white", "black", "(" .. row.notes .. ")")
+        end
+      elseif row.notes ~= nil and #row.notes > 0 then
+        ColourTell("white", "black", row.notes)
+      end
+
+      Note("")
+    end
+end
+
+---------------------
+-- serialization
+---------------------
+
+function Serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return Serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function Deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>

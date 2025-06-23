@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="bosses_killed_sort"
+   author="Oona"
+   id="ffe0696159421d1841e22b03"
+   language="Lua"
+   purpose="sort your boss kils by date"
+   save_state="y"
+   date_written="2025-05-02 12:00:00"
+   requires="4.71"
+   version="1.0">
+
+<description trim="y">
+
+<![CDATA[
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+<alias match="^bosses sort$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("get_bosses", true)
+        clearBosses()
+        Note("Sorting bosses by date killed...")
+        SendNoEcho("boss killed")
+    </send>
+</alias>
+
+<alias match="^bosses export$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>
+        EnableTriggerGroup("export_bosses", true)
+        startExport()        
+    </send>
+</alias>
+
+</aliases>
+
+<triggers>
+  <trigger group="get_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^Bosses you have killed:$">
+  </trigger>
+
+  <trigger group="get_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^(.*?) - (.*?) - (.*?)$">
+    <send>addToBosses("%1", "%2", "%3")</send>
+  </trigger>
+
+  <trigger group="get_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^A total of (\d+) bosses\.$">
+    <send>
+      EnableTriggerGroup("get_bosses", false)
+      showSortedBosses()
+    </send>
+  </trigger>
+
+  <trigger group="get_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^\[C\]ontinue \[R\]edraw \[B\]ack \[E\]xit\:(.*?)$">
+    <send>SendNoEcho("c")</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^(.*?) - (.*?) - (.*?)$">
+    <send>addToBossesForExport("%1", "%2", "%3")</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^\* (.*?).$">
+    <send>addToHeadsForExport("%1")</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^\[C\]ontinue \[R\]edraw \[B\]ack \[E\]xit\:(.*?)$">
+    <send>SendNoEcho("c")</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>onVitalsPrompt()</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^You have fed me the following heads:$">
+    <send>done_heads = true</send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^A total of (\d+) bosses\.$">
+    <send>
+      EnableTriggerGroup("export_bosses", false)
+      doFinalExport()
+    </send>
+  </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="y" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^(.*?)$">
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+bosses = {}
+bosses_todo = {}
+longest = 0
+done_heads = false
+
+function OnPluginConnect()
+  hour_offset = GetVariable("hour_offset") or 1
+  EnableTriggerGroup("get_bossess", false)
+end
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTriggerGroup("get_bossess", false)
+end
+
+function clearBosses()
+  bosses = {}
+  longest = 0
+end
+
+function parseDate(str)
+  if str == nil or str == "" then
+    return false, nil
+  else
+    str = str:gsub("%s+", " "):gsub("%.$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local success, result = pcall(function()
+      local day_name, month_str, day, hour, min, sec, year = str:match("(%a+) (%a+) (%d+) (%d+):(%d+):(%d+) (%d+)")
+    
+      local months = {
+        Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6,
+        Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12
+      }
+
+      local month = months[month_str]
+
+      if not (month and day and hour and min and sec and year) then
+        --Note("could not parse: " .. str)
+        return false, nil
+      end
+
+      return os.time({
+        year = tonumber(year),
+        month = month,
+        day = tonumber(day),
+        hour = tonumber(hour),
+        min = tonumber(min),
+        sec = tonumber(sec)
+      })
+    end)
+
+    return success, result
+  end
+
+end
+
+function addToBosses(name, category, date_killed)
+  local bossName = name:match("^%s*(.-)%s*$")
+  
+  if bossName ~= nil then
+    local success, parsedDateKilled = parseDate(date_killed)
+    if success then
+      table.insert(bosses, { name = bossName, category = category, date_killed = date_killed, parsed_date = parsedDateKilled })
+
+      if (#bossName > longest) then longest = #bossName end
+    end
+  end
+end
+
+function showSortedBosses()
+  table.sort(bosses, function(a, b)
+
+    if (a.parsed_date == nil) then
+      return false
+    end
+
+    if (b.parsed_date == nil) then
+      return true
+    end
+
+    return b.parsed_date > a.parsed_date 
+  end)
+
+  for _, boss in ipairs(bosses) do
+    
+    Tell("* ")
+    doName(boss.name)    
+    Tell(" - ")
+    doCategory(boss.category)
+    Tell(" - ")
+    ColourTell("red", "black", boss.date_killed)
+    Note("") 
+  end
+end
+
+function doName(boss_name)
+  local padded_string = string.format("%" .. longest .. "s", boss_name)
+  ColourTell("lightgray", "black", padded_string)
+end
+
+function doCategory(category)
+  local color = "red"
+  if category == "2" then color = "brown" end
+  if category == "3" then color = "yellow" end
+  if category == "4" then color = "green" end
+  if category == "5" then color = "blue" end
+  if category == "6" then color = "cyan" end
+  if category == "7" then color = "white" end
+
+  ColourTell(color, "black", category)  
+end
+
+function startExport()
+  done_heads = false
+  Note("STARTING EXPORT, PLEASE WAIT...")
+  clearBosses()
+  SendNoEcho("boss list")
+end
+
+function onVitalsPrompt()
+  if done_heads then
+    SendNoEcho("boss killed")
+  else
+    SendNoEcho("use redemption heads")
+  end
+end
+
+function addToBossesForExport(name, category, date_killed)
+  local boss_name = name:match("^%s*(.-)%s*$")
+  
+  if boss_name ~= nil then
+    local success, parsedDateKilled = parseDate(date_killed)
+    if success then
+      local found = false
+      for idx, boss in ipairs(bosses) do
+        if boss_name:lower() == boss["name"]:lower() then
+          bosses[idx].date_killed = date_killed
+          bosses[idx].parsed_date = parsedDateKilled
+          found = true
+          break
+        end
+      end
+
+      if not found then
+        table.insert(bosses, { name = boss_name, category = category, date_killed = "<not killed>", parsed_date = nil })
+      end
+    end
+  end
+end
+
+function addToHeadsForExport(name)
+  local boss_name = name:match("^%s*(.-)%s*$")
+
+  if boss_name ~= nil then
+    for idx, boss in ipairs(bosses) do
+      if boss_name:lower() == boss["name"]:lower() then
+        bosses[idx].has_head = true
+        break
+      end
+    end
+  end
+end
+
+function doFinalExport()
+  local not_killed, yes_killed = splitTablesByKilled(bosses)
+  local todo_1, todo_2, todo_3, todo_4, todo_5, todo_6, todo_7 = splitTablesByCategory(not_killed)
+  local done_1, done_2, done_3, done_4, done_5, done_6, done_7 = splitTablesByCategory(yes_killed)
+
+  AppendToNotepad("boss export", "||||||'''Bosses To Kill'''||\r\n")
+  AppendToNotepad("boss export", "|| Category || Name || Redemption||\r\n")
+  
+  doExportForCategory(1, todo_1)
+  doExportForCategory(2, todo_2)
+  doExportForCategory(3, todo_3)
+  doExportForCategory(4, todo_4)
+  doExportForCategory(5, todo_5)
+  doExportForCategory(6, todo_6)
+  doExportForCategory(7, todo_7)
+
+  AppendToNotepad("boss export", "\r\n||||||||'''Bosses Killed'''||\r\n")
+  AppendToNotepad("boss export", "|| Category || Name || Date Killed || Redemption ||\r\n")
+  
+  doExportForCategory(1, done_1)
+  doExportForCategory(2, done_2)
+  doExportForCategory(3, done_3)
+  doExportForCategory(4, done_4)
+  doExportForCategory(5, done_5)
+  doExportForCategory(6, done_6)
+  doExportForCategory(7, done_7)
+
+  AppendToNotepad("boss export", "\r\n A total of " .. #yes_killed .. " bosses killed out of " .. #bosses .. " total bosses.")
+  NotepadSaveMethod("boss export", 2)
+
+  Note("EXPORT FINISHED")
+end
+
+function doExportForCategory(cat, tab)
+  if tab == nil then return end
+
+  for i = 1, #tab do
+    if (tab[i].date_killed == "<not killed>") then
+      AppendToNotepad("boss export", "|| " .. cat .. " || [[" .. tab[i].name .. "]] ||")
+    else
+      AppendToNotepad("boss export", "|| " .. cat .. " || [[" .. tab[i].name .. "]] || " .. tab[i].date_killed .. " ||")
+    end
+
+    if cat >= 5 then
+      if tab[i].has_head then
+        AppendToNotepad("boss export", " &#9989; ||\r\n")
+      else
+        AppendToNotepad("boss export", " &#10060; ||\r\n")
+      end
+    else
+      AppendToNotepad("boss export", " ||\r\n")
+    end
+  end
+end
+
+function splitTablesByKilled(t)
+    local not_killed = {}
+    local killed = {}
+
+    for _, entry in ipairs(t) do
+        if entry.date_killed == "<not killed>" then
+            table.insert(not_killed, entry)
+        else
+            table.insert(killed, entry)
+        end
+    end
+
+    return not_killed, killed
+end
+
+function splitTablesByCategory(t)
+  table.sort(t, function(a, b)
+    if a.category ~= b.category then
+      return a.category < b.category
+    elseif a.parsed_date ~= b.parsed_date then
+      return a.parsed_date < b.parsed_date
+    else
+      return a.name < b.name
+    end
+  end)
+
+  local cat1 = {}
+  local cat2 = {}
+  local cat3 = {}
+  local cat4 = {}
+  local cat5 = {}
+  local cat6 = {}
+  local cat7 = {}
+
+  for _, entry in ipairs(t) do
+    if entry.category == "1" then
+      table.insert(cat1, entry)
+    elseif entry.category == "2" then
+      table.insert(cat2, entry)
+    elseif entry.category == "3" then
+      table.insert(cat3, entry)
+    elseif entry.category == "4" then
+      table.insert(cat4, entry)
+    elseif entry.category == "5" then
+      table.insert(cat5, entry)
+    elseif entry.category == "6" then
+      table.insert(cat6, entry)
+    elseif entry.category == "7" then
+      table.insert(cat7, entry)
+    end
+  end
+
+  return cat1, cat2, cat3, cat4, cat5, cat6, cat7
+end
+
+]]>
+
+</script>
+
+</muclient>
