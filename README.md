@@ -9,6 +9,10 @@ I'm still adding to a lot of these so let me know if you see any issues.
 
 Customizable panel to add buttons to. Can be tied to specific affects to show when you have an affect active and how much time is left on it.
 
+You will need to have the affectsbuttons_miniwindow.lua, badaffects_miniwindow.lua, and configuration_miniwindow.lua files in your MUSHclient\lua folder or this will crap out.
+
+Also have the SHOW-AFFECT-SPOILERS setting on in game to make sure you get all the events and stuff.
+
 ## Blackjack Helper
 
 Pretty self-explanitory, turn this on to keep feeding the dealer your vouchers. You have to explicitly turn this on, use responsibly.
@@ -42,6 +46,12 @@ Uses a random website I found to look up word possiblities. Works really well on
 ## Lootable Tracker
 
 Track lootables so you know when you can loot them again. Has a couple in there already like the Archon box lootables. It's a little finicky though, it should try to automatically loot again to update the timer but sometimes it doesn't. Manually re-loot until I fix it I guess. Lootables that can be looted again show when you log on.
+
+## Quest Helper
+
+Puts a little quest button on the screen to track your current quest in a collapsable mini window. Will also look the quest up on annwn.info for a little help. Can do a quest hint <phase #> for additional info pulled too. It will save quests in a db so it doesn't try to get it multiple times from the site. Can get weird for quests not found on annwn though. Will be adding customization to this soon too.
+
+Will need the quest_miniwindow.lua and questsearcher.lua files in the MUSHclient\lua folder.
 
 ## Split Scroll
 
