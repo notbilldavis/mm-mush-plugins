@@ -130,6 +130,17 @@ end
 
 function EnsureDb()
   if db == nil then
+    local path = GetInfo(66)
+    local filename = "recipes.db"
+
+    if (not fileExists(path .. filename)) then
+      local res = tryDownloadDatabase(path, filename)
+
+      if (res ~= 0) then
+        Note("Try downloading the recipes.db file manually and reinstalling this plugin.")
+      end
+    end
+
     db = assert(sqlite3.open(GetInfo(66) .. "recipes.db"))
 
     db:exec[[
@@ -143,6 +154,48 @@ function EnsureDb()
       );
     ]]
   end
+end
+
+function fileExists(path)
+  local f = io.open(path, "r")
+
+  if (f) then
+    io.close(f)
+    return true
+  else
+    return false
+  end
+end
+
+function tryDownloadDatabase(path, filename)
+  local http = require "socket.http"
+  local url = "https://github.com/notbilldavis/mm-mush-plugins/raw/refs/heads/main/recipes.db"
+
+  Note("Downloading ingredients database...")
+  SetStatus ("Downloading recipes.db: " .. url .. " to: " .. path .. filename .. "...")
+
+  local file, dl_res, header = http.request(url)
+  if (dl_res ~= 200) then
+    ColourNote("red" , "black", "There was an error accessing " .. url .. " - code: " .. dl_res)
+    return -1
+  end
+
+  Note("Download complete, saving database...")
+  SetStatus ("Ready")
+
+  local f, save_res, rescode = io.open(lpath, "wb")
+  if (f == nil) then
+    ColourNote("red" , "black", "There was an error creating database file: " .. save_res .. " - code: " .. rescode)
+    return -1
+  end
+
+  f:write(file)
+  f:flush()
+  f:close()
+
+  ColourNote("green" , "black", "Save complete!")
+
+  return 0
 end
 
 function showCooking()
