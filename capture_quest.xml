@@ -114,8 +114,8 @@ function OnPluginSaveState()
 end
 
 function captureStart(num, name)
-  if string:find(string.lower(name), "daily quest", 1, true) ~= nil or
-     string:find(string.lower(name), "archon meta", 1, true) ~= nil then
+  if string.find(string.lower(name), "daily quest", 1, true) ~= nil or
+     string.find(string.lower(name), "archon meta", 1, true) ~= nil then
     return
   end
   
