@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="capture_quests"
+   author="Oona"
+   id="892911b648d09c18e1ecd4e6"
+   language="Lua"
+   purpose="show quest details in new capture tab"
+   save_state="y"
+   date_written="2025-06-04 18:38:09"
+   requires="4.71"
+   version="1.0"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+  <alias enabled="y" match="^q(|uest) hint (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>showHint("%2")</send>
+  </alias>
+
+  <alias enabled="y" match="^quest aban(|don) (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>
+      Send("quest abandon %2")
+      clearWindow()
+    </send>
+  </alias>
+
+  <alias enabled="y" match="^capture quest clear$" regexp="y" send_to="12" sequence="100">
+    <send>clearWindow()</send>
+  </alias>
+
+  <alias enabled="y" match="^capture quest reset$" regexp="y" send_to="12" sequence="100">
+    <send>
+      clearWindow()
+      DeleteVariable ("mw_" .. GetPluginID() .. "_windowx")
+      DeleteVariable ("mw_" .. GetPluginID() .. "_windowy")
+      DeleteVariable ("mw_" .. GetPluginID() .. "_windowmode")
+      DeleteVariable ("mw_" .. GetPluginID() .. "_windowflags")
+    </send>
+  </alias>
+
+</aliases>
+
+<triggers>
+
+  <trigger enabled="y" keep_evaluating="y" name="capture_name" match="^This quest \[(.*?)\] is called \'(.*?)\'\,$" regexp="y" send_to="12" sequence="100">
+    <send>captureStart("%1", "%2")</send>
+  </trigger>
+
+  <trigger match="*" keep_evaluating="y" name="capture_line" send_to="12" sequence="100">
+    <send>captureLine("%0")</send>
+  </trigger>
+
+  <trigger match="^$" keep_evaluating="y" name="capture_end" regexp="y" send_to="12" sequence="100">
+    <send>captureEnd()</send>
+  </trigger>  
+
+  <trigger enabled="y" keep_evaluating="y" expand_variables="y" match="^(.*?) tells you\, \'Congratulations on the completion of thy quest\, (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>clearWindow()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You have run out of time for your quest\, (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>clearWindow() </send>
+  </trigger>
+
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "quest_miniwindow"
+require "questsearcher"
+
+local quest_num
+local quest_phases
+
+function OnPluginInstall()
+  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  InitMiniWindow()
+end
+
+function OnPluginEnable()
+  clear()
+end
+
+function OnPluginClose()
+  SaveState()
+  hideWindow()
+end
+
+function OnPluginDisable()
+  SaveState()
+  hideWindow()
+end
+
+function OnPluginSaveState()
+  if INIT then
+    movewindow.save_state(GetPluginID())
+  end
+end
+
+function captureStart(num, name)
+  if string:find(string.lower(name), "daily quest", 1, true) ~= nil or
+     string:find(string.lower(name), "archon meta", 1, true) ~= nil then
+    return
+  end
+  
+  EnableTrigger("capture_line", true)
+  EnableTrigger("capture_end", true)
+
+  clear()
+  
+  addToLine("Quest ", "springgreen")
+  addToLine("[", "blue")
+  addToLine(num, "springgreen")
+  addToLine("] ", "blue")
+  addToLine(name, "springgreen")
+  addNewLine()
+
+  if quest_num ~= num then
+    quest_num = num
+    quest_phases = getQuestInfo(num, name)
+  end
+end
+
+function captureLine(line)
+  if (string.find(string.lower(line), string.lower("phase"), 1, true) ~= nil) then
+    local split = utils.split(line, ":")
+    addToLine(" " .. string.format("%-8s", split[1]) .. " : ", "cyan")
+
+    local color = "silver"
+    local phase_text = Trim(split[2])
+    local counter = ""
+    if string.sub(phase_text, 1, 1) == "[" then
+      local counterEnd = string.find(phase_text, "]")
+      counter = string.sub(phase_text, 1, counterEnd + 1)
+    end
+
+    phase_text = phase_text:gsub("%b[]", ""):gsub("%.", ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+
+    if string.sub(phase_text, 1, 1) == "*" then
+      phase_text = string.sub(phase_text, 2, #phase_text)
+      color = "dimgray"
+    end
+
+    phase_text = counter .. phase_text
+
+    addToLine(phase_text, color)
+    addNewLine()
+
+    if color ~= "dimgray" and quest_phases ~= nil then
+      for i, phase in ipairs(quest_phases) do
+        local check = Trim(phase.text:lower():gsub(" and keep", ""))
+        local one = Trim(phase_text:lower():gsub(" and keep", ""))
+        local two = Trim(string.sub(check, 1, #check - 1))
+        if one == two then
+          for _, item in ipairs(phase.items) do
+            addToLine("  - " .. item, "silver")
+            addNewLine()
+          end
+          for _, mob in ipairs(phase.mobs) do
+            addToLine("  - " .. mob, "silver")
+            addNewLine()
+          end
+          for _, room in ipairs(phase.rooms) do
+            addToLine("  - " .. room, "silver")
+            addNewLine()
+          end
+        end
+      end
+    end
+  end
+end
+
+function captureEnd()
+  EnableTrigger("capture_line", false)
+  EnableTrigger("capture_end", false)
+end
+
+function clearWindow()
+  Note("Clearing quest capture.")
+  clear()
+end
+
+function showHint(phase_num)
+  local shown = false
+  local phase = quest_phases[tonumber(phase_num)]
+  if phase ~= nil and phase.hints ~= nil then
+    for _, hint in ipairs(phase.hints) do
+      if hint ~= nil and hint ~= "" then
+        shown = true
+        Note(hint)
+      end
+    end
+  end
+  
+  if not shown then
+    Note("No hints available for this phase.")
+  end
+end
+
+function addToLine(txt, text_color, back_color)
+  if (not styles) then
+    styles = {}
+  end
+
+  if (txt == "\r\n") then
+    AddLine(styles)
+    styles = {}
+  else
+    if back_color == nil then back_color = "black" end
+    styles[#styles + 1] = {
+      text = txt,
+      textcolour = ColourNameToRGB(text_color),
+      backcolour = ColourNameToRGB(back_color)
+    }
+  end
+end
+
+function addNewLine()
+  addToLine("\r\n", "silver")
+end
+
+]]>
+
+</script>
+
+</muclient>

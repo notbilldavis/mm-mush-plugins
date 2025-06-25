@@ -65,6 +65,7 @@ function _Configuration.show()
     end
   end
 
+  WindowSetZOrder(WIN, 9999)
   WindowShow(WIN, true)
 end
 
@@ -111,6 +112,7 @@ function _Configuration.changenumber(flags, group_id, option_id)
     }))
 
   if user_input ~= nil then
+    CONFIG[group_id][option_id].value = tostring(user_input)
     CONFIG[group_id][option_id].raw_value = user_input
   end
   _Configuration.show()
@@ -130,6 +132,7 @@ function _Configuration.changetext(flags, group_id, option_id)
     })
 
   if user_input ~= nil then
+    CONFIG[group_id][option_id].value = user_input
     CONFIG[group_id][option_id].raw_value = user_input
   end
   _Configuration.show()
@@ -172,6 +175,7 @@ function _Configuration.changelist(flags, group_id, option_id)
     CONFIG[group_id][option_id].list)
 
   if user_input ~= nil then
+    CONFIG[group_id][option_id].value = tostring(user_input)
     CONFIG[group_id][option_id].raw_value = user_input
   end
   _Configuration.show()
@@ -179,6 +183,7 @@ end
 
 function _Configuration.validateNumber(min, max)
   return function(s)
+    if min == nil or max == nil then return true end
     local n = tonumber(s)
     if not n then
       utils.msgbox("Enter a valid number", "Invalid", "ok", "!", 1)

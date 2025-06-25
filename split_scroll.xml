@@ -8,7 +8,7 @@
   author="Oona"
   id="f453be8f0a2cd84fb3f9ff8a"
   language="Lua"
-  purpose="show a splitter when scrolling to always display the last 10 lines"
+  purpose="show a splitter when scrolling to always display the last 25 lines"
   save_state="y"
   date_written="2025-06-01 12:00:00"
   requires="4.71"
@@ -20,10 +20,18 @@
 <![CDATA[
 
 Does what it says on the tin, when you scroll up in your output window you will
-still see the latest 15 or so lines at the bottom so you can go look at stuff
+still see the latest 25 or so lines at the bottom so you can go look at stuff
 with out needing to worry about new stuff happening without your knowledge.
 
 Click the down arrow button to shoot back down.
+
+Use "split config" to open a window to make some adjustments if things are weird.
+
+The variable count is a magic number you probably need to play with if your split
+section isn't going away even at the bottom of the screen. Make it a little higher
+and try it out, adjusting as needed.
+
+Make your font the same as what is in your MUSH configuration -> output settings.
 
 Only really tested with my own layout so let me know if it acts weird for you.
 
@@ -34,6 +42,10 @@ Only really tested with my own layout so let me know if it acts weird for you.
 </plugin>
 
 <aliases>
+  <alias match="^split[ ]+config(|ure)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure()</send>
+  </alias>
+
   <alias match="^split[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>ShowDebug()</send>
   </alias>
@@ -49,9 +61,10 @@ Only really tested with my own layout so let me know if it acts weird for you.
 
 <![CDATA[
 
+local can_configure, Configuration = pcall(require, "configuration_miniwindow")
+
 local WIN = GetPluginID()
-local FONT = "font" .. WIN
-local ROWS = 15
+local FONT = WIN .. "_font"
 
 local LINE_HEIGHT
 local BORDER
@@ -60,15 +73,23 @@ local RIGHT
 local TOP
 local WINDOW_HEIGHT
 
+local SS_CONFIGURATION = {
+  BUTTON_X_DISTANCE = 225,
+  BUTTON_Y_DISTANCE = 100,
+  BUTTON_HEIGHT = 50,
+  BUTTON_WIDTH = 50,
+  BUTTON_COLOR = ColourNameToRGB("dimgray"),
+  ARROW_COLOR = ColourNameToRGB("darkgray"),
+  SPLIT_FONT = nil,
+  ROW_COUNT = 25,
+  VARIABLE_COUNT = 650
+}
+
 counter = 0
 init = false
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-end
-
-function OnPluginEnable()
-  showWindow()
 end
 
 function OnPluginClose()
@@ -86,26 +107,53 @@ end
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
 
-  FONT = "font" .. WIN
-
-  local font_name = GetInfo(20) or "Lucida Console"
-  local font_size = GetInfo(213) or 10
-
-  check(WindowCreate(WIN, 0, 0, 1, 1, 0, 0, ColourNameToRGB("black")))
-  check(WindowFont(WIN, FONT, font_name, font_size))
-  LINE_HEIGHT = (WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 1) + 1
-  BORDER = GetInfo(277)
-  WINDOW_HEIGHT = LINE_HEIGHT * (ROWS + 1) + BORDER + 4
-
-  local bottom = GetPluginVariable("cb6469228f9f7e26129c1ebc", "trbottom") or GetInfo(293)
-  TOP =  (bottom - LINE_HEIGHT * (ROWS + 1)) - BORDER  
-  LEFT = (GetPluginVariable("cb6469228f9f7e26129c1ebc", "trleft") or GetInfo(290)) - BORDER
-  RIGHT =(GetPluginVariable("cb6469228f9f7e26129c1ebc", "trright") or GetInfo(292)) + BORDER + 2
+  loadSavedData()
+  createWindowAndFont()
 
   init = true
 end
 
+function loadSavedData()
+  local serialized_config = GetVariable("splitscroll_config") or ""
+  if serialized_config == "" then
+    local def_font, def_size = GetInfo(20) or "Lucida Console", GetInfo(213) or 10
+    SS_CONFIGURATION = {
+      BUTTON_X_DISTANCE = 250,
+      BUTTON_Y_DISTANCE = 100,
+      BUTTON_HEIGHT = 50,
+      BUTTON_WIDTH = 50,
+      BUTTON_COLOR = ColourNameToRGB("dimgray"),
+      ARROW_COLOR = ColourNameToRGB("darkgray"),
+      SPLIT_FONT = { name = def_font, size = def_size },
+      ROW_COUNT = 15,
+      VARIABLE_COUNT = 800
+    }
+  else
+    SS_CONFIGURATION = Deserialize(serialized_config)
+  end
+end
+
+function createWindowAndFont()
+  local font = SS_CONFIGURATION["SPLIT_FONT"]
+  
+  WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
+  WindowFont(WIN, FONT, font.name, font.size)
+  
+  LINE_HEIGHT = GetInfo(212) --(WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 1) + 1
+  BORDER = GetInfo(277)
+  WINDOW_HEIGHT = LINE_HEIGHT * (SS_CONFIGURATION["ROW_COUNT"] + 1) + BORDER + 4
+
+  local bottom = GetPluginVariable("cb6469228f9f7e26129c1ebc", "trbottom") or GetInfo(293)
+  TOP =  (bottom - LINE_HEIGHT * (SS_CONFIGURATION["ROW_COUNT"] + 1)) - BORDER  
+  LEFT = (GetPluginVariable("cb6469228f9f7e26129c1ebc", "trleft") or GetInfo(290)) - BORDER
+  RIGHT =(GetPluginVariable("cb6469228f9f7e26129c1ebc", "trright") or GetInfo(292)) + BORDER + 2
+end
+
 function OnPluginTick()
+  drawSplitScroll()
+end
+
+function drawSplitScroll()
   if not init then return end
 
   counter = counter + 1
@@ -121,23 +169,23 @@ function OnPluginTick()
   local scroll = GetInfo(296)
   local total_height = GetLinesInBufferCount() * GetInfo(212)
 
-  if scroll < total_height - 800 then
+  if scroll < total_height - SS_CONFIGURATION["VARIABLE_COUNT"] then
     WindowRectOp(WIN, miniwin.rect_fill, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, ColourNameToRGB("black"))
     WindowLine(WIN, 0, 0, RIGHT, 0, ColourNameToRGB("silver"), miniwin.pen_solid, 2)
     
     local cnt = 0
     local lines_in_buffer = GetLinesInBufferCount()
-    for line = lines_in_buffer - ROWS, lines_in_buffer do
+    for line = lines_in_buffer - SS_CONFIGURATION["ROW_COUNT"], lines_in_buffer do
       drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
       cnt = cnt + 1
     end
 
-    local btn_left = RIGHT - 250
-    local btn_top = WINDOW_HEIGHT - 100
-    local btn_right = btn_left + 50
-    local btn_bottom = btn_top + 50
+    local btn_left = RIGHT - SS_CONFIGURATION["BUTTON_X_DISTANCE"]
+    local btn_top = WINDOW_HEIGHT - SS_CONFIGURATION["BUTTON_Y_DISTANCE"]
+    local btn_right = btn_left + SS_CONFIGURATION["BUTTON_WIDTH"]
+    local btn_bottom = btn_top + SS_CONFIGURATION["BUTTON_HEIGHT"]
 
-    WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, ColourNameToRGB("dimgray"))
+    WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, SS_CONFIGURATION["BUTTON_COLOR"])
 
     local centerX = (btn_left + btn_right) / 2
     local point1 = { x = centerX, y = btn_bottom - 10 }
@@ -146,7 +194,7 @@ function OnPluginTick()
 
     local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
 
-    WindowPolygon(WIN, downArrow, ColourNameToRGB("darkgray"), miniwin.pen_solid, 1, ColourNameToRGB("darkgray"), miniwin.brush_solid, true, false)
+    WindowPolygon(WIN, downArrow, SS_CONFIGURATION["ARROW_COLOR"], miniwin.pen_solid, 1, SS_CONFIGURATION["ARROW_COLOR"], miniwin.brush_solid, true, false)
     WindowAddHotspot(WIN, "scroll_to_bottom", btn_left, btn_top, btn_right, btn_bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
 
     WindowShow(WIN, true)
@@ -160,10 +208,7 @@ function OnScrollToBottom()
 end
 
 function drawLine(i, y)
-  --Note(y)
-  --if y > WINDOW_HEIGHT then Note("y (" .. y .. ") is greater than window height (" .. WINDOW_HEIGHT .. ")") end
-
-  local x = BORDER
+  local x = BORDER + GetInfo(276)
   local style_count = GetLineInfo (i, 11)
   if style_count == nil then 
     WindowText(WIN, FONT, "there was a problem with line " .. i .. ", sorry", x, y, 0, 0, ColourNameToRGB("white"))
@@ -204,6 +249,38 @@ function hideWindow()
   WindowShow(WIN, false)
 end
 
+function Configure()
+  if can_configure then
+    local config = {
+      Return_Button = {
+        BUTTON_X_DISTANCE = { label = "Button X Distance", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_X_DISTANCE), raw_value = SS_CONFIGURATION.BUTTON_X_DISTANCE, min = 0, max = 800 },
+        BUTTON_Y_DISTANCE = { label = "Button Y Distance", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_Y_DISTANCE), raw_value = SS_CONFIGURATION.BUTTON_Y_DISTANCE, min = 0, max = 800 },
+        BUTTON_HEIGHT = { label = "Button Height", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_HEIGHT), raw_value = SS_CONFIGURATION.BUTTON_HEIGHT, min = 10, max = 100 },
+        BUTTON_WIDTH = { label = "Button Width", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_WIDTH), raw_value = SS_CONFIGURATION.BUTTON_WIDTH, min = 10, max = 100 },
+        BUTTON_COLOR = { label = "Button Color", type = "color", value = SS_CONFIGURATION.BUTTON_COLOR, raw_value = SS_CONFIGURATION.BUTTON_COLOR },
+        ARROW_COLOR = { label = "Arrow Color", type = "color", value = SS_CONFIGURATION.ARROW_COLOR, raw_value = SS_CONFIGURATION.ARROW_COLOR },
+      },
+      Split_Options = {
+        ROW_COUNT = { label = "Number of Rows", type = "number", value = tostring(SS_CONFIGURATION.ROW_COUNT), raw_value = SS_CONFIGURATION.ROW_COUNT },
+        SPLIT_FONT = { label = "Font", type = "font", value = SS_CONFIGURATION.SPLIT_FONT.name .. " (" .. SS_CONFIGURATION.SPLIT_FONT.size .. ")", raw_value = SS_CONFIGURATION.SPLIT_FONT },
+        VARIABLE_COUNT = { label = "Variable Count", type = "number", value = SS_CONFIGURATION.VARIABLE_COUNT, raw_value = SS_CONFIGURATION.VARIABLE_COUNT },
+      }
+    }
+    Configuration.Show(config, configureDone)
+  end
+end
+
+function configureDone(group_id, option_id, config)
+  SS_CONFIGURATION[option_id] = config.raw_value
+  SetVariable("splitscroll_config", Serialize(SS_CONFIGURATION))
+  
+  if group_id == "Split_Options" then
+    createWindowAndFont()
+  end
+
+  drawSplitScroll()
+end
+
 function ShowDebug()
   local buffer_count = GetLinesInBufferCount()
   Note("scroll: " .. GetInfo(296))
@@ -212,6 +289,40 @@ function ShowDebug()
   Note("top: " .. TOP)
   Note("left: " .. LEFT)
   Note("right: " .. RIGHT)
+end
+
+function Serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return Serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function Deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
 end
 
 ]]>
