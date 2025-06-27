@@ -42,6 +42,10 @@
     <send>showFoodTrucks()</send>
   </alias>
 
+  <alias match="^cooking[ ]+containers(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setContainers("%1")</send>
+  </alias>
+
   <alias match="^cooking[ ]+search$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>search()</send>
   </alias>
@@ -64,6 +68,7 @@
     <send>
       EnableTriggerGroup("get_recipe", true)
       clearRecipe()
+      recipe_name = "%1"
     </send>
   </trigger>
 
@@ -79,7 +84,7 @@
   </trigger>
 
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?) found in(.*?)$">
-    <send>found("%1")</send>
+    <send>found("%1", "%2")</send>
   </trigger>
 
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^No matching items found\.$">
@@ -96,11 +101,39 @@
 
 recipes = { }
 current_recipe = { }
-
+recipe_name = ""
 search_count = 0
 search_found = { }
 containers = { }
-npcs = { }
+
+set_containers = { "bag", "2.bag", "trunk", "2.trunk" }
+
+npcs = { 
+  { name = "Faltel", area = "Templeton", room = "Fox Fur Tavern", num = "45972", race = "Elf" },
+  { name = "Shady", area = "Templeton", room = "Fool's Gold Tavern", num = "47034", race = "Human" },
+  { name = "Grundel", area = "Templeton", room = "Fisherman's Cafe", num = "46452", race = "Human" },
+  { name = "Urkfet", area = "Tellerium", room = "Seagull Tavern", num = "41835", race = "Troll" },
+  { name = "Bovel", area = "Tellerium", room = "Peachtree Tavern", num = "41807", race = "Mino" },
+  { name = "Miller", area = "Winton", room = "The Trash Compactor Bar and Grill", num = "335857", race = "Human" },
+  { name = "Flam", area = "Rune", room = "Flam's Steak House", num = "10722", race = "Dracon" },
+  { name = "Friedburg", area = "Lowangen", room = "Friedburg's Training", num = "16090", race = "Human" },
+  { name = "Finn", area = "A Hill Giant Refuge", room = "Finn's Tavern", num = "345845", race = "Giant" },
+  { name = "a rapacious chemwalker", area = "Dungeon Deceit", room = "", num = "", race = "" },
+  { name = "Angus", area = "Smuggler's Gulch", room = "The Far End of the Saloon", num = "9373", race = "Human" },
+  { name = "Hungry Harmook", area = "Towne of Decara", room = "An Overflowing Workshop", num = "116305", race = "Llamataur" },
+  { name = "Shroom", area = "Towne of Decara", room = "The Tipsy Toadstool", num = "116030", race = "Dracon" },
+  { name = "a malnourished girl", area = "Refuge of the Xanai", room = "", num = "", race = "" },
+  { name = "Alimenta", area = "Rahdiyr", room = "Alimenta's Tavern", num = "199976", race = "Sidhe" },
+  { name = "Sam the Barkeep", area = "Human Outpost", room = "The Bar at the Longbranch", num = "50867", race = "Human" },
+  { name = "Cortez, the bartender", area = "Cavhfail", room = "Blue Crescent Tavern", num= "199045", race = "Fey" },
+  { name = "a busy bartender", area = "Genauras", room = "", num = "", race = "" },
+  { name = "the bartender", area = "A Ghost Town", room = "", num = "", race = "" },
+  { name = "Grundy the Bartender", area = "Renn", room = "The Juggling Gopher", num = "78967", race = "halfling" },
+  { name = "a bartender with a low-cut top", area = "Hlegmal's Tavern", room = "The Back Bar", num = "385957", race = "Orc" },
+  { name = "a famished ghast", area = "Domain of Arbaces", room = "", num = "", race = "" },
+}
+
+npc_names = {}
 
 local db
 
@@ -125,6 +158,16 @@ function EnsureTables()
   local recipes_text = GetVariable("recipes") or ""
   if recipes_text ~= "" then
     recipes = Deserialize(recipes_text)
+  end
+
+  set_containers = { "bag", "2.bag", "trunk", "2.trunk" }
+  local containers_text = GetVariable("containers") or ""
+  if containers_text ~= "" then
+    set_containers = Deserialize(containers_text)
+  end
+
+  for _, npc in ipairs(npcs) do
+    npc_names[npc.name:lower()] = true
   end
 end
 
@@ -282,7 +325,7 @@ function addConsumer(consumer, name)
 end
 
 function addNpcTracking(npc, recipe)
-  if npcs[string.lower(npc)] then
+  if npc_names[string.lower(npc)] then
     addConsumer(npc, recipe)
   end
 end
@@ -335,29 +378,9 @@ end
 
 function showFoodTrucks()
   Note("NPCs that will eat your food:")
-  npcs = { }
-  showFoodTruck("Faltel", "Templeton", "Fox Fur Tavern", "45972", "Elf")
-  showFoodTruck("Shady", "Templeton", "Fool's Gold Tavern", "47034", "Human")
-  showFoodTruck("Grundel", "Templeton", "Fisherman's Cafe", "46452", "Human")
-  showFoodTruck("Urkfet", "Tellerium", "Seagull Tavern", "41835", "Troll")
-  showFoodTruck("Bovel", "Tellerium", "Peachtree Tavern", "41807", "Mino")
-  showFoodTruck("Miller", "Winton", "The Trash Compactor Bar and Grill", "335857", "Human")
-  showFoodTruck("Flam", "Rune", "Flam's Steak House", "10722", "Dracon")
-  showFoodTruck("Friedburg", "Lowangen", "Friedburg's Training", "16090", "Human")
-  showFoodTruck("Finn", "A Hill Giant Refuge", "Finn's Tavern", "345845", "Giant")
-  showFoodTruck("a rapacious chemwalker", "Dungeon Deceit", "", "", "")
-  showFoodTruck("Angus", "Smuggler's Gulch", "The Far End of the Saloon", "9373", "Human")
-  showFoodTruck("Hungry Harmook", "Towne of Decara", "An Overflowing Workshop", "116305", "Llamataur")
-  showFoodTruck("Shroom", "Towne of Decara", "The Tipsy Toadstool", "116030", "Dracon")
-  showFoodTruck("a malnourished girl", "Refuge of the Xanai", "", "", "")
-  showFoodTruck("Alimenta", "Rahdiyr", "Alimenta's Tavern", "199976", "Sidhe")
-  showFoodTruck("Sam the Barkeep", "Human Outpost", "The Bar at the Longbranch", "50867", "Human")
-  showFoodTruck("Cortez, the bartender", "Cavhfail", "Blue Crescent Tavern", "199045", "Fey")
-  showFoodTruck("a busy bartender", "Genauras", "", "", "")
-  showFoodTruck("the bartender", "A Ghost Town", "", "", "")
-  showFoodTruck("Grundy the Bartender", "Renn", "The Juggling Gopher", "78967", "halfling")
-  showFoodTruck("a bartender with a low-cut top", "Hlegmal's Tavern", "The Back Bar", "385957", "Orc")
-  showFoodTruck("a famished ghast", "Domain of Arbaces", "", "", "")
+  for _, npc in ipairs(npcs) do
+    showFoodTruck(npc.name, npc.area, npc.room, npc.num, npc.race)
+  end
 end
 
 function showFoodTruck(name, town, room, num, race)
@@ -372,8 +395,6 @@ function showFoodTruck(name, town, room, num, race)
   else
     Note("")
   end
-
-  npcs[string.lower(name)] = true
 end
 
 ---------------------
@@ -385,7 +406,6 @@ function clearRecipe()
 end
 
 function addToRecipe(ingredient)
-  Note("adding '" .. ingredient .. "'")
   table.insert(current_recipe, ingredient)
 end
 
@@ -393,15 +413,42 @@ function displayHelperOptions()
   Note("")
   Hyperlink("cooking search", "[Search for Ingredients]", "", "silver", "black", false)
   Tell(" - ")
+  if recipe_name ~= nil and #recipe_name > 0 then
+    Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
+    Tell(" - ")
+  end
   ColourTell("silver", "black", "Get from: ")
-  Hyperlink("cooking getall bag", "[bag]", "", "silver", "black", false)
-  Tell(" ")
-  Hyperlink("cooking getall 2.bag", "[2.bag]", "", "silver", "black", false)
-  Tell(" ")
-  Hyperlink("cooking getall 3.bag", "[3.bag]", "", "silver", "black", false)
-  Tell(" ")
-  Hyperlink("cooking getall bag", "[3.trunk]", "", "silver", "black", false)
-  Note("")
+ 
+  for _, container in ipairs(set_containers) do
+    Hyperlink("cooking getall " .. container, "[" .. container .. "]", "", "silver", "black", false)
+    Tell(" ")
+  end
+end
+
+function setContainers(cont)
+  cont = Trim(cont or "")
+  if cont ~= "" then
+    set_containers = {}
+    local split_cont = utils.split(cont, ",")
+    for _, container in ipairs(split_cont) do
+      table.insert(set_containers, Trim(container))
+    end
+    SetVariable("containers", Serialize(set_containers))
+    SaveState()
+    Tell("You have set the following containers: ")
+  else
+    Tell("You have the following containers set: ")
+  end
+    
+  for i, container in ipairs(set_containers) do
+    ColourTell("white", "black", container)
+    if i < #set_containers then Tell(", ") end
+  end
+  Note(".")
+
+  if (cont == "") then
+    Note("Use 'cooking containers <containers>' to set this by providing a comma-delimited string.")
+  end
 end
 
 function search()
@@ -419,9 +466,14 @@ function getAll(container)
   for _, i in ipairs(current_recipe) do
     SendNoEcho("get \"" .. i .. "\" " .. container)
   end
+
+  if recipe_name ~= nil and #recipe_name > 0 then
+    Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
+    Note("")
+  end
 end
 
-function found(ingredient)
+function found(ingredient, location)
   if search_found ~= nil and #search_found > 0 then
     for _, i in ipairs(search_found) do
       if ingredient == i then
@@ -430,6 +482,7 @@ function found(ingredient)
     end
   end
 
+  containers[location] = true
   table.insert(search_found, ingredient)
   search_count = search_count + 1  
   checkIfDone()
@@ -469,6 +522,22 @@ function finishSearch()
     Note("")
   else
     ColourNote("white", "black", "You have all the ingredients required!")
+    Tell("You can find them: ")
+    for k, v in pairs(containers) do
+      ColourTell("cyan", "black", " * ")
+      ColourNote("silver", "black", "in" .. k)      
+    end
+
+    if recipe_name ~= nil and #recipe_name > 0 then
+      Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
+      Tell(" - ")
+    end
+    ColourTell("silver", "black", "Get from: ")
+  
+    for _, container in ipairs(set_containers) do
+      Hyperlink("cooking getall " .. container, "[" .. container .. "]", "", "silver", "black", false)
+      Tell(" ")
+    end
   end
 end
 

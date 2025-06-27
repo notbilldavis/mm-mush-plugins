@@ -34,6 +34,8 @@ local hangman_word = ""
 local possible_guesses = {}
 
 function startHangman()
+  hangman_word = ""
+  possible_guesses = {}
   Send("hangman start")
   Send("hangman e")
 end
@@ -50,13 +52,13 @@ function solveHangman(wrong_guesses)
   elseif string.find(hangman_word, "_", 1, true) == nil then
     -- we done, good job
   elseif hangman_word == "e____" then
-    Send("m")
+    Send("hangman m")
   elseif hangman_word == "em___" then
-    Send("p")
+    Send("hangman p")
   elseif hangman_word == "emp__" then
-    Send("t")
+    Send("hangman t")
   elseif hangman_word == "empt_" then
-    Send("y")
+    Send("hangman y")
   else
     local url = "https://www.hangman-solver.com/.netlify/functions/answers?word=" .. hangman_word .. "&guesses=" .. string.gsub(wrong_guesses, " ", "")
 
