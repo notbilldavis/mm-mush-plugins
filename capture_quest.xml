@@ -90,11 +90,11 @@ local quest_phases
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  InitMiniWindow()
+  InitializeMiniWindow()
 end
 
 function OnPluginEnable()
-  clear()
+  clearMiniWindow()
 end
 
 function OnPluginClose()
@@ -122,7 +122,7 @@ function captureStart(num, name)
   EnableTrigger("capture_line", true)
   EnableTrigger("capture_end", true)
 
-  clear()
+  clearMiniWindow()
   
   addToLine("Quest ", "springgreen")
   addToLine("[", "blue")
@@ -192,8 +192,7 @@ function captureEnd()
 end
 
 function clearWindow()
-  Note("Clearing quest capture.")
-  clear()
+  clearMiniWindow()
 end
 
 function showHint(phase_num)

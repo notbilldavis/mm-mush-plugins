@@ -1,30 +1,16 @@
-local BadAffects = {}
-local _BadAffects = {}
+local config_window = require "configuration_miniwindow"
+
+local BAMW = {}
+local bamw = {}
 
 local WIN = "badaffects_" .. GetPluginID()
 local BUTTONFONT = WIN .. "_button_font"
 local AFFECTSFONT = WIN .. "_affects_font"
 
-local BA_CONFIGURATION = {
-  BUTTON_FONT = { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-  AFFECTS_FONT = { name = "Lucida Console", size = 9, colour = 255, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-  LOCK_POSITION = false,
-  EXPAND_DOWN = false,
-  EXPAND_RIGHT = false,
-  ENABLED = true,
-  BACKGROUND_COLOR = 0,
-  BORDER_COLOR = 12632256,
-  BUTTON_LABEL = "Affects",
-  ACTIVE_BUTTON_COLOR = 8421504,
-  ACTIVE_LABEL_COLOR = 16777215,
-  DISABLED_BUTTON_COLOR = 6908265,
-  DISABLED_LABEL_COLOR = 8421504
-}
+local BA_CONFIGURATION = nil
 
 local WINDOW_WIDTH = 100
 local WINDOW_HEIGHT = 25
-local BUTTON_WIDTH = 100
-local BUTTON_HEIGHT = 25
 local LINE_HEIGHT = nil
 local COL_1_WIDTH = 0
 local COL_2_WIDTH = 0
@@ -39,7 +25,7 @@ local DRAG_Y = nil
 
 local TEXT_BUFFER = { }
 local BAD_STUFF = { }
-local CHARACTER_NAME = ""
+
 local EXPANDED = true
 local ANCHOR_LIST = { 
   "0: None", 
@@ -47,16 +33,45 @@ local ANCHOR_LIST = {
   "5: Top Left (Output)", "6: Bottom Left (Output)", "7: Top Right (Output)", "8: Bottom Right (Output)",
 }
 
-function BadAffects.InitializeMiniWindow(character_name)
+local CHARACTER_NAME = ""
+
+function BAMW.InitializeMiniWindow(character_name)
   CHARACTER_NAME = character_name
 
-  _BadAffects.loadSavedData()
-  _BadAffects.createWindowAndFont()
-  
-  BadAffects.DrawMiniWindow()
+  bamw.loadSavedData()
+  bamw.createWindowAndFont()  
+  BAMW.DrawMiniWindow()
 end
 
-function _BadAffects.createWindowAndFont()
+function bamw.loadSavedData()
+  local serialized_config = GetVariable(CHARACTER_NAME .. "_badaffects_config") or ""
+  if serialized_config == "" then
+    BA_CONFIGURATION = { }  
+  else
+    BA_CONFIGURATION = Deserialize(serialized_config)
+  end
+
+  BA_CONFIGURATION.BUTTON_FONT = bamw.getValueOrDefault(BA_CONFIGURATION.BUTTON_FONT,  { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  BA_CONFIGURATION.AFFECTS_FONT = bamw.getValueOrDefault(BA_CONFIGURATION.AFFECTS_FONT,  { name = "Lucida Console", size = 9, colour = 255, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  BA_CONFIGURATION.BUTTON_WIDTH = bamw.getValueOrDefault(BA_CONFIGURATION.BUTTON_WIDTH,  100)
+  BA_CONFIGURATION.BUTTON_HEIGHT = bamw.getValueOrDefault(BA_CONFIGURATION.BUTTON_HEIGHT,  25)
+  BA_CONFIGURATION.LOCK_POSITION = bamw.getValueOrDefault(BA_CONFIGURATION.LOCK_POSITION,  false)
+  BA_CONFIGURATION.EXPAND_DOWN = bamw.getValueOrDefault(BA_CONFIGURATION.EXPAND_DOWN,  false)
+  BA_CONFIGURATION.EXPAND_RIGHT = bamw.getValueOrDefault(BA_CONFIGURATION.EXPAND_RIGHT,  false)
+  BA_CONFIGURATION.ENABLED = bamw.getValueOrDefault(BA_CONFIGURATION.ENABLED,  true)
+  BA_CONFIGURATION.BACKGROUND_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.BACKGROUND_COLOR,  0)
+  BA_CONFIGURATION.BORDER_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.BORDER_COLOR,  12632256)
+  BA_CONFIGURATION.BUTTON_LABEL = bamw.getValueOrDefault(BA_CONFIGURATION.BUTTON_LABEL,  "Affects")
+  BA_CONFIGURATION.ACTIVE_BUTTON_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.ACTIVE_BUTTON_COLOR,  8421504)
+  BA_CONFIGURATION.ACTIVE_LABEL_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.ACTIVE_LABEL_COLOR,  16777215)
+  BA_CONFIGURATION.DISABLED_BUTTON_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.DISABLED_BUTTON_COLOR,  6908265)
+  BA_CONFIGURATION.DISABLED_LABEL_COLOR = bamw.getValueOrDefault(BA_CONFIGURATION.DISABLED_LABEL_COLOR,  842150)
+  
+  BUTTON_X = GetVariable(CHARACTER_NAME .. "_badaffects_buttonx") or GetInfo(292) - BA_CONFIGURATION.BUTTON_WIDTH - 25
+  BUTTON_Y = GetVariable(CHARACTER_NAME .. "_badaffects_buttony") or GetInfo(293) - BA_CONFIGURATION.BUTTON_HEIGHT - 25
+end
+
+function bamw.createWindowAndFont()
   if BA_CONFIGURATION == nil then return end
 
   local btnfont = BA_CONFIGURATION["BUTTON_FONT"]
@@ -65,58 +80,56 @@ function _BadAffects.createWindowAndFont()
   WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
   
   WindowFont(WIN, BUTTONFONT, btnfont.name, btnfont.size, 
-    _BadAffects.convertToBool(btnfont.bold), 
-    _BadAffects.convertToBool(btnfont.italic), 
-    _BadAffects.convertToBool(btnfont.italic), 
-    _BadAffects.convertToBool(btnfont.strikeout))
+    bamw.convertToBool(btnfont.bold), 
+    bamw.convertToBool(btnfont.italic), 
+    bamw.convertToBool(btnfont.underline), 
+    bamw.convertToBool(btnfont.strikeout))
 
   WindowFont(WIN, AFFECTSFONT, afffont.name, afffont.size, 
-    _BadAffects.convertToBool(afffont.bold), 
-    _BadAffects.convertToBool(afffont.italic), 
-    _BadAffects.convertToBool(afffont.italic), 
-    _BadAffects.convertToBool(afffont.strikeout))
+    bamw.convertToBool(afffont.bold), 
+    bamw.convertToBool(afffont.italic), 
+    bamw.convertToBool(afffont.underline), 
+    bamw.convertToBool(afffont.strikeout))
 
   LINE_HEIGHT = WindowFontInfo(WIN, BUTTONFONT, 1) - WindowFontInfo(WIN, BUTTONFONT, 4) + 2
 end
 
-function BadAffects.DrawMiniWindow()
+function BAMW.DrawMiniWindow()
   if BA_CONFIGURATION ~= nil and BA_CONFIGURATION.ENABLED and WIN then
     WindowShow(WIN, false)
 
-    _BadAffects.setSizeAndPositionToContent()
-    _BadAffects.drawToggleButton()
-    _BadAffects.drawAffectsWindows()
-    _BadAffects.drawAffectsText()
+    bamw.setSizeAndPositionToContent()
+    bamw.drawToggleButton()
+    bamw.drawAffectsWindows()
+    bamw.drawAffectsText()
 
     WindowShow(WIN, true)
   end
 end
 
-function BadAffects.ClearMiniWindow() 
+function BAMW.ClearMiniWindow() 
   TEXT_BUFFER = {}
   EXPANDED = false
-  BadAffects.DrawMiniWindow()
+  BAMW.DrawMiniWindow()
 end
 
-function BadAffects.CloseMiniWindow()
-  if WIN then
-    BadAffects.SaveMiniWindow()
-    WindowShow(WIN, false)
-  end
+function BAMW.CloseMiniWindow()
+  BAMW.SaveMiniWindow()
+  WindowShow(WIN, false)  
 end
 
-function BadAffects.SaveMiniWindow()
-  if WIN then
-    SetVariable(CHARACTER_NAME .. "_badaffects_config", Serialize(BA_CONFIGURATION))
-    SetVariable(CHARACTER_NAME .. "_badaffects_buttonx", _BadAffects.getButtonX())
-    SetVariable(CHARACTER_NAME .. "_badaffects_buttony", _BadAffects.getButtonY())
-  end
+function BAMW.SaveMiniWindow()
+  SetVariable(CHARACTER_NAME .. "_badaffects_config", Serialize(BA_CONFIGURATION))
+  SetVariable(CHARACTER_NAME .. "_badaffects_buttonx", bamw.getButtonX())
+  SetVariable(CHARACTER_NAME .. "_badaffects_buttony", bamw.getButtonY())
 end
 
-function BadAffects.GetConfiguration()
+function BAMW.GetConfiguration()
   local config = {
     BUTTON_FONT = { label = "Button Font", type = "font", value = BA_CONFIGURATION.BUTTON_FONT.name .. " (" .. BA_CONFIGURATION.BUTTON_FONT.size .. ")", raw_value = BA_CONFIGURATION.BUTTON_FONT },
     AFFECTS_FONT = { label = "Affects Font", type = "font", value = BA_CONFIGURATION.AFFECTS_FONT.name .. " (" .. BA_CONFIGURATION.AFFECTS_FONT.size .. ")", raw_value = BA_CONFIGURATION.AFFECTS_FONT },
+    BUTTON_WIDTH = { type = "number", raw_value = BA_CONFIGURATION.BUTTON_WIDTH, min = 50, max = 400 },
+    BUTTON_HEIGHT = { type = "number", raw_value = BA_CONFIGURATION.BUTTON_HEIGHT, min = 50, max = 400 },
     ENABLED = { label = "Enabled", type = "bool", value = tostring(BA_CONFIGURATION.ENABLED), raw_value = BA_CONFIGURATION.ENABLED },    
     LOCK_POSITION = { label = "Lock Position", type = "bool", value = tostring(BA_CONFIGURATION.LOCK_POSITION), raw_value = BA_CONFIGURATION.LOCK_POSITION },
     EXPAND_DOWN = { label = "Expand Down", type = "bool", value = tostring(BA_CONFIGURATION.EXPAND_DOWN), raw_value = BA_CONFIGURATION.EXPAND_DOWN },
@@ -134,19 +147,19 @@ function BadAffects.GetConfiguration()
   return config
 end
 
-function BadAffects.SaveConfiguration(option, config)
+function BAMW.SaveConfiguration(option, config)
   if option == "ANCHOR" then
-    _BadAffects.adjustAnchor(config.raw_value)
+    bamw.adjustAnchor(config.raw_value)
   else
     BA_CONFIGURATION[option] = config.raw_value
   end
   
-  BadAffects.SaveMiniWindow()
-  _BadAffects.createWindowAndFont()
-  BadAffects.DrawMiniWindow()
+  BAMW.SaveMiniWindow()
+  bamw.createWindowAndFont()
+  BAMW.DrawMiniWindow()
 end
 
-function _BadAffects.adjustAnchor(anchor_idx)
+function bamw.adjustAnchor(anchor_idx)
   local anchor = ANCHOR_LIST[anchor_idx]:sub(4)
   if anchor == nil or anchor == "" or anchor == "None" then
     return
@@ -161,12 +174,12 @@ function _BadAffects.adjustAnchor(anchor_idx)
     BA_CONFIGURATION.EXPAND_DOWN = false
     BA_CONFIGURATION.EXPAND_RIGHT = true
   elseif anchor == "Top Right (Window)" then
-    BUTTON_X = GetInfo(281) - BUTTON_WIDTH - 10
+    BUTTON_X = GetInfo(281) - BA_CONFIGURATION.BUTTON_WIDTH - 10
     BUTTON_Y = 10
     BA_CONFIGURATION.EXPAND_DOWN = true
     BA_CONFIGURATION.EXPAND_RIGHT = false
   elseif anchor == "Bottom Right (Window)" then
-    BUTTON_X = GetInfo(281) - BUTTON_WIDTH - 10
+    BUTTON_X = GetInfo(281) - BA_CONFIGURATION.BUTTON_WIDTH - 10
     BUTTON_Y = GetInfo(280) - 10
     BA_CONFIGURATION.EXPAND_DOWN = false
     BA_CONFIGURATION.EXPAND_RIGHT = false
@@ -194,18 +207,18 @@ function _BadAffects.adjustAnchor(anchor_idx)
 
   --Note("Set anchor points: " .. anchor .. " (" .. BUTTON_X .. ", " .. BUTTON_Y .. ")")
 
-  _BadAffects.setSizeAndPositionToContent()
+  bamw.setSizeAndPositionToContent()
 end
 
-function _BadAffects.setSizeAndPositionToContent()
+function bamw.setSizeAndPositionToContent()
   local left = math.max(WindowInfo(WIN, 1), 0)
   local top = math.max(WindowInfo(WIN, 2), 0)
   local right = left + WindowInfo(WIN, 3)
   local bottom = top + WindowInfo(WIN, 4)
 
-  local final_width = BUTTON_WIDTH
+  local final_width = BA_CONFIGURATION.BUTTON_WIDTH or 100
   local column1Final, column2Final = 0, 0
-  local final_height = BUTTON_HEIGHT
+  local final_height = BA_CONFIGURATION.BUTTON_HEIGHT or 25
 
   if TEXT_BUFFER == nil then
     TEXT_BUFFER = { }
@@ -233,7 +246,7 @@ function _BadAffects.setSizeAndPositionToContent()
   end
 
   if EXPANDED then
-    final_height = #TEXT_BUFFER * LINE_HEIGHT + BUTTON_HEIGHT + 4
+    final_height = #TEXT_BUFFER * LINE_HEIGHT + BA_CONFIGURATION.BUTTON_HEIGHT + 4
 
     for _, details in ipairs(TEXT_BUFFER) do
       if details ~= nil and details.affect ~= nil and details.expire ~= nil then
@@ -258,8 +271,8 @@ function _BadAffects.setSizeAndPositionToContent()
     COL_2_WIDTH = column2Final
   end
 
-  WINDOW_WIDTH = math.max(final_width, BUTTON_WIDTH)
-  WINDOW_HEIGHT = math.max(final_height, BUTTON_HEIGHT)
+  WINDOW_WIDTH = math.max(final_width, BA_CONFIGURATION.BUTTON_WIDTH)
+  WINDOW_HEIGHT = math.max(final_height, BA_CONFIGURATION.BUTTON_HEIGHT)
 
   local new_left = 0
   local new_top = 0
@@ -284,24 +297,24 @@ function _BadAffects.setSizeAndPositionToContent()
   WindowSetZOrder(WIN, 9999)
 end
 
-function _BadAffects.drawToggleButton()
+function bamw.drawToggleButton()
   local text_width = WindowTextWidth(WIN, BUTTONFONT, BA_CONFIGURATION.BUTTON_LABEL)
   local left = 0
   local top = 0
-  local right = BUTTON_WIDTH  
-  local bottom = BUTTON_HEIGHT
+  local right = BA_CONFIGURATION.BUTTON_WIDTH  
+  local bottom = BA_CONFIGURATION.BUTTON_HEIGHT
 
   if not BA_CONFIGURATION.EXPAND_RIGHT then
-    left = WINDOW_WIDTH - BUTTON_WIDTH
+    left = WINDOW_WIDTH - BA_CONFIGURATION.BUTTON_WIDTH
     right = WINDOW_WIDTH
   end
 
   if not BA_CONFIGURATION.EXPAND_DOWN then
-    top = WINDOW_HEIGHT - BUTTON_HEIGHT
+    top = WINDOW_HEIGHT - BA_CONFIGURATION.BUTTON_HEIGHT
     bottom = WINDOW_HEIGHT
   end
 
-  local button_width = BUTTON_WIDTH
+  local button_width = BA_CONFIGURATION.BUTTON_WIDTH
   local button_right = right
   if not BA_CONFIGURATION.LOCK_POSITION then 
     button_width = button_width - 25
@@ -335,8 +348,8 @@ function badaffects_drag_mousedown(flags, hotspot_id)
 end
 
 function baddaffects_drag_move(flags, hotspot_id)
-  local pos_x = _BadAffects.clamp(WindowInfo(WIN, 17) - DRAG_X, 0, GetInfo(281) - WINDOW_WIDTH)
-  local pos_y = _BadAffects.clamp(WindowInfo(WIN, 18) - DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
+  local pos_x = bamw.clamp(WindowInfo(WIN, 17) - DRAG_X, 0, GetInfo(281) - WINDOW_WIDTH)
+  local pos_y = bamw.clamp(WindowInfo(WIN, 18) - DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
 
   SetCursor(miniwin.cursor_hand)
   WindowPosition(WIN, pos_x, pos_y, 0, miniwin.create_absolute_location);
@@ -344,30 +357,30 @@ end
 
 function badaffects_drag_release(flags, hotspot_id)
   Repaint()
-  SetVariable(CHARACTER_NAME .. "_badaffects_buttonx", _BadAffects.getButtonX())
-  SetVariable(CHARACTER_NAME .. "_badaffects_buttony", _BadAffects.getButtonY())
+  SetVariable(CHARACTER_NAME .. "_badaffects_buttonx", bamw.getButtonX())
+  SetVariable(CHARACTER_NAME .. "_badaffects_buttony", bamw.getButtonY())
 end
 
-function _BadAffects.drawAffectsWindows()
+function bamw.drawAffectsWindows()
   if EXPANDED then
     local top = 0
-    local bottom = WINDOW_HEIGHT - BUTTON_HEIGHT
+    local bottom = WINDOW_HEIGHT - BA_CONFIGURATION.BUTTON_HEIGHT
 
     local left_clear = 0
-    local top_clear = WINDOW_HEIGHT - BUTTON_HEIGHT
-    local right_clear = WINDOW_WIDTH - BUTTON_WIDTH
+    local top_clear = WINDOW_HEIGHT - BA_CONFIGURATION.BUTTON_HEIGHT
+    local right_clear = WINDOW_WIDTH - BA_CONFIGURATION.BUTTON_WIDTH
     local bottom_clear = WINDOW_HEIGHT
 
     if BA_CONFIGURATION.EXPAND_DOWN then
-      top = BUTTON_HEIGHT
+      top = BA_CONFIGURATION.BUTTON_HEIGHT
       bottom = WINDOW_HEIGHT
 
       top_clear = 0
-      bottom_clear = BUTTON_HEIGHT
+      bottom_clear = BA_CONFIGURATION.BUTTON_HEIGHT
     end
 
     if BA_CONFIGURATION.EXPAND_RIGHT then
-      left_clear = BUTTON_WIDTH
+      left_clear = BA_CONFIGURATION.BUTTON_WIDTH
       right_clear = WINDOW_WIDTH
     end
 
@@ -377,11 +390,11 @@ function _BadAffects.drawAffectsWindows()
   end
 end
 
-function _BadAffects.drawAffectsText()
+function bamw.drawAffectsText()
   if EXPANDED then
     local y = 4
     if BA_CONFIGURATION.EXPAND_DOWN then
-      y = y + BUTTON_HEIGHT
+      y = y + BA_CONFIGURATION.BUTTON_HEIGHT
     end
     
     for i = 1, #TEXT_BUFFER do
@@ -397,7 +410,7 @@ function _BadAffects.drawAffectsText()
         if expires_in > 0 then
           WindowText(WIN, BUTTONFONT, details.affect, x + 2, y, 0, 0, BA_CONFIGURATION.AFFECTS_FONT.colour)
           WindowText(WIN, BUTTONFONT, "-", COL_1_WIDTH + 10, y, 0, 0, BA_CONFIGURATION.BORDER_COLOR)
-          WindowText(WIN, BUTTONFONT, _BadAffects.getFriendlyExpire(expires_in), COL_1_WIDTH + 22, y, 0, 0, BA_CONFIGURATION.AFFECTS_FONT.colour)
+          WindowText(WIN, BUTTONFONT, bamw.getFriendlyExpire(expires_in), COL_1_WIDTH + 22, y, 0, 0, BA_CONFIGURATION.AFFECTS_FONT.colour)
           y = y + LINE_HEIGHT
         end
       end
@@ -405,28 +418,28 @@ function _BadAffects.drawAffectsText()
   end
 end
 
-function BadAffects.AddNegativeAffect(aff, time)
+function BAMW.AddNegativeAffect(aff, time, redraw)
   if BA_CONFIGURATION.ENABLED then
     EXPANDED = true
 
     if TEXT_BUFFER == nil then 
-      BadAffects.ClearMiniWindow()
+      BAMW.ClearMiniWindow()
     end
 
-    local expires_in = os.time() + (time / 4 * 60)
-
-    if expires_in > 0 then
-      table.insert(TEXT_BUFFER, { affect = aff, expire = expires_in })
+    if time > os.time() then
+      table.insert(TEXT_BUFFER, { affect = aff, expire = time })
     end
 
-    BadAffects.DrawMiniWindow()
+    if redraw then
+      BAMW.DrawMiniWindow()
+    end
   end
 end
 
-function BadAffects.RemoveNegativeAffect(affect)
+function BAMW.RemoveNegativeAffect(affect, redraw)
   if BA_CONFIGURATION.ENABLED then
     if TEXT_BUFFER == nil then 
-      BadAffects.ClearMiniWindow()
+      BAMW.ClearMiniWindow()
     end
 
     for i = #TEXT_BUFFER, 1, -1 do
@@ -436,16 +449,18 @@ function BadAffects.RemoveNegativeAffect(affect)
       end
     end
 
-    BadAffects.DrawMiniWindow()
+    if redraw then
+      BAMW.DrawMiniWindow()
+    end
   end
 end
 
-function _BadAffects.getFriendlyExpire(expires_in)
+function bamw.getFriendlyExpire(expires_in)
   if (expires_in > 0) then
     local minutes = expires_in / 60
     local mins = math.floor(minutes)
     local secs = math.floor((minutes - mins) * 60) 
-
+    
     return mins .. " minutes and " .. secs .. " seconds.";
   end
 
@@ -456,7 +471,7 @@ function badaffects_button_click(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
     if #TEXT_BUFFER > 0 then
       EXPANDED = not EXPANDED
-      BadAffects.DrawMiniWindow()
+      BAMW.DrawMiniWindow()
     end
   end
   if flags == miniwin.hotspot_got_rh_mouse then
@@ -466,7 +481,7 @@ function badaffects_button_click(flags, hotspot_id)
     for _, a in ipairs(ANCHOR_LIST) do
       menu_items = menu_items .. a .. " | "
     end
-    menu_items = menu_items .. " < |-| Disable"
+    menu_items = menu_items .. " < | - | Disable | - | Configure"
     local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
     if result == nil or result == "" then return end
     if result == "Lock Position" then
@@ -474,45 +489,29 @@ function badaffects_button_click(flags, hotspot_id)
     elseif result == "Disable" then
       BA_CONFIGURATION.ENABLED = false
       WindowShow(WIN, false)
+    elseif result == "Configure" then
+      bamw.configure()
     else
       for i, a in ipairs(ANCHOR_LIST) do
         if result == a then
-          _BadAffects.adjustAnchor(i)
+          bamw.adjustAnchor(i)
         end
       end
     end
-    BadAffects.SaveMiniWindow()
-    BadAffects.DrawMiniWindow()
+    BAMW.SaveMiniWindow()
+    BAMW.DrawMiniWindow()
   end
 end
 
-function _BadAffects.loadSavedData()
-  local serialized_config = GetVariable(CHARACTER_NAME .. "_badaffects_config") or ""
-  if serialized_config == "" then
-    BA_CONFIGURATION = {
-      BUTTON_FONT = { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-      AFFECTS_FONT = { name = "Lucida Console", size = 9, colour = 255, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-      LOCK_POSITION = false,
-      EXPAND_DOWN = false,
-      EXPAND_RIGHT = false,
-      ENABLED = true,
-      BACKGROUND_COLOR = 0,
-      BORDER_COLOR = 12632256,
-      BUTTON_LABEL = "Affects",
-      ACTIVE_BUTTON_COLOR = 8421504,
-      ACTIVE_LABEL_COLOR = 16777215,
-      DISABLED_BUTTON_COLOR = 6908265,
-      DISABLED_LABEL_COLOR = 8421504
-    }
-  else
-    BA_CONFIGURATION = Deserialize(serialized_config)
-  end
-  
-  BUTTON_X = GetVariable(CHARACTER_NAME .. "_badaffects_buttonx") or GetInfo(292) - BUTTON_WIDTH - 25
-  BUTTON_Y = GetVariable(CHARACTER_NAME .. "_badaffects_buttony") or GetInfo(293) - BUTTON_HEIGHT - 25
+function bamw.configure()
+  config_window.Show(BAMW.GetConfiguration(), bamw.configureDone)
 end
 
-function _BadAffects.getButtonX()
+function bamw.configureDone(group_id, option_id, config)
+  BAMW.SaveConfiguration(option_id, config)
+end
+
+function bamw.getButtonX()
   if BA_CONFIGURATION.EXPAND_RIGHT then
     return WindowInfo(WIN, 10)
   end
@@ -520,7 +519,7 @@ function _BadAffects.getButtonX()
   return WindowInfo(WIN, 12)
 end
 
-function _BadAffects.getButtonY()
+function bamw.getButtonY()
   if BA_CONFIGURATION.EXPAND_DOWN then
     return WindowInfo(WIN, 11)
   end
@@ -528,7 +527,7 @@ function _BadAffects.getButtonY()
   return WindowInfo(WIN, 13)
 end
 
-function _BadAffects.clamp(val, min, max)
+function bamw.clamp(val, min, max)
   val = val or 0
   min = min or 0
   max = max or 0
@@ -571,7 +570,7 @@ function Deserialize(serializedTable)
   end
 end
 
-function _BadAffects.convertFromBool(bool_value)
+function bamw.convertFromBool(bool_value)
   if bool_value then
     return 1
   else
@@ -579,7 +578,7 @@ function _BadAffects.convertFromBool(bool_value)
   end
 end
 
-function _BadAffects.convertToBool(bool_value, def_value)
+function bamw.convertToBool(bool_value, def_value)
   if bool_value == 0 or bool_value == "0" then
     return false
   elseif bool_value == 1 or bool_value == "1" then
@@ -589,8 +588,16 @@ function _BadAffects.convertToBool(bool_value, def_value)
   return def_value
 end
 
-function BadAffects._debug()
-  BadAffects.AddNegativeAffect("fake affect", 30)
+function bamw.getValueOrDefault(value, default)
+  if value == nil then
+    return default
+  end
+
+  return value
 end
 
-return BadAffects
+function BAMW._debug()
+  BAMW.AddNegativeAffect("fake affect", os.time() + (60 * 5), true)
+end
+
+return BAMW

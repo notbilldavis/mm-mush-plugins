@@ -11,7 +11,7 @@
    purpose="clickable buttons list that changes colors for your affects"
    save_state="y"
    date_written="2025-03-16 13:57:37"
-   date_modified="2025-06-21 07:31:05"
+   date_modified="2025-06-28 00:29:36"
    requires="4.71"
    version="2.0"
    >
@@ -23,7 +23,10 @@
 Adds a panel you can add buttons to that will perform commands when clicked.
 Buttons with an affect associated will be color-coded based on its status
 This affect is typically the name of the skill/spell in lower case
-Buttons without an affect will just be gray
+Buttons without an affect will just be gray.
+
+You can right-click a button to perform a lot of actions and you can use the
+following commands to things as well, such as add buttons.
 
  * affects add <title> a:<affect> c:<command>
  * affects edit <title> a:<affect> c:<command>
@@ -33,42 +36,26 @@ Buttons without an affect will just be gray
 <affect> is the affect it will try to track, it can be empty
 <command> is the command to send when clicked
 
+Using 'affects add' without any arguments will walk you through it step by step
+and using 'affects edit <title>' will walk you through it that way.
+
  * affects move up <title>
  * affects move down <title>
 
 This will move the button around.
 
- * affects width <new_width>
-
-Set your buttons to this width explicitly if you have small or larger buttons.
-
- * affects font
-
-Change the font characteristics of the buttons
-
- * affects header
- * affects header <new_header>
-
-Toggle the header on and off or change what it says completely.
-
- * affects lock
-
-Lock the position of the buttons window so it can't be moved around
-
- * affects stretch
-
-Force the entire window to stretch to max height
-
  * affects broadcast <affect>
 
 When this affect is applied we can broadcast it for other plugins to pick it up
+
+  * affects configure
+
+This will open up a configuration window that will let you do all sorts of things.
 
 Some notes:
 
 Druid affects are usually translated to non-druid spells that are exclusive so 
 having a ring that gives stone skin will still show your invoke ooze as casted
-
-I haven't done this completely. I have just done the ones that pertain to me
 
 This isn't 100% accurate. Some spells don't fire off events when they expire so
 to be certain you are up to date you can view your affects manually at anytime
@@ -82,7 +69,7 @@ and reset your meter thingy. Manually check affects to fix it.
 Examples:
 
 affects add Whirlwind a:whirlwind c:cast whirlwind
-affects add Invoke Ooze / Stone Skin a:stone skin c:invoke ooze
+affects add Invoke Ooze a:stone skin c:invoke ooze
 affects add Summon Mount a: c:cast 'summon mount'
 
 
@@ -96,12 +83,20 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 <aliases>
 
+  <alias match="^affects[ ]+add$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>AddButton(nil, nil, nil)</send>
+  </alias>
+
   <alias match="^affects[ ]+add[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>AddButton("%1", "%2", "%3")</send>
   </alias>
 
   <alias match="^affects[ ]+edit[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>EditButton("%1", "%2", "%3")</send>
+  </alias>
+
+  <alias match="^affects[ ]+edit[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>EditButton("%1", nil, nil)</send>
   </alias>
 
   <alias match="^affects[ ]+delete[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
@@ -167,7 +162,6 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   <alias match="^affects[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>
       Buttons._debug()
-      BadAffects._debug()
     </send>
   </alias>
 
@@ -183,7 +177,6 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>
         notify = false
         EnableTriggerGroup("get_affects", true)
-        BadAffects.ClearMiniWindow()
         Buttons.ClearMiniWindow()
     </send>
   </trigger>
@@ -272,7 +265,6 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   <timer name="affects_timer" enabled="y" second="10" offset_second="0.00" send_to="12" active_closed="y">
     <send>
       Buttons.DrawMiniWindow()
-      BadAffects.DrawMiniWindow()
     </send>
   </timer>
 
@@ -284,13 +276,11 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 require "gmcphelper"
 
-BadAffects = require("badaffects_miniwindow")
 Buttons = require("affectsbuttons_miniwindow")
 Configuration = require("configuration_miniwindow")
 
 local CHARACTER_NAME
 
-negative_affects = {}
 notify = true
 
 -----------------
@@ -314,19 +304,16 @@ function OnPluginConnect()
 end
 
 function OnPluginClose()
-  BadAffects.CloseMiniWindow()
   Buttons.CloseMiniWindow()
   Configuration.Hide()
 end
 
 function OnPluginDisable()
-  BadAffects.CloseMiniWindow()
   Buttons.CloseMiniWindow()
   Configuration.Hide()
 end
 
 function OnPluginSaveState()
-  BadAffects.SaveMiniWindow()
   Buttons.SaveMiniWindow()
 end
 
@@ -342,34 +329,12 @@ function setCharacterName(name)
     Note("Unknown character name, set with 'affects setchar <name>'") 
   else
     CHARACTER_NAME = name
-    initializeNegativeAffects()
+    
     Buttons.InitializeMiniWindow(name)
-    BadAffects.InitializeMiniWindow(name)
+    
     if Buttons.CURRENT_AFFECTS == nil then
       Send("affects")
     end
-  end
-end
-
-function initializeNegativeAffects()
-  local bad = { "blindness", "confusion", "deafen", "etheric pollution",
-    "hinder", "mental disruption", "web", "pestilence", "silence", "sleep", 
-    "slow magic", "slow", "stone curse", "paralysis", "extinction", "amnesia",
-    "energy orb", "plague", "poison", "memory drain", "binding curse",
-    "finality of the ender", "gangrene", "malignancy", "hex", "blue cough disease",
-    "subdue", "condemn", "traumatize", "instanity", "with swiveling hooks",
-    "jinx", "hobble", "bleeding", "disjunction", "decrepify", "vacuum web",
-    "poverty of maradas", "pressure points", "unraveling", "dull wits",
-    "withering touch", "scarify", "dampening field", "malediction", "paralyze",
-    "impede movement", "strike of death", "poverty of ether", "immobilize",
-    "damnation", "spider incubator", "entomb", "contagion", "faerie fire",
-    "giant grasping hand", "existential horror", "slurping proboscis",
-    "harrow", "excommunicate", "boreworms disease", "irk", "nightmares",
-    "hotfoot", "burning ember", "cavern sickness disease", "mesmerize",
-    "fatigue", "ash evocation" }
-
-  for _, aff in ipairs(bad) do
-    negative_affects[aff] = true
   end
 end
 
@@ -381,10 +346,6 @@ function SetAffect(affect, time_str)
   local parsed_affect = ParseAffect(affect)
   local converted_time = tonumber(time_str or 0) or 0  
   Buttons.SetAffect(parsed_affect, converted_time, notify)
-
-  if negative_affects[parsed_affect] then
-    BadAffects.AddNegativeAffect(parsed_affect, converted_time)
-  end
 end
 
 function RecastAffect(affect)
@@ -400,10 +361,6 @@ end
 function RemoveAffect(affect)
   local parsed_affect = ParseAffect(affect)
   Buttons.RemoveAffect(parsed_affect, notify)
-
-  if negative_affects[parsed_affect] then
-    BadAffects.RemoveNegativeAffect(parsed_affect)
-  end
 end
 
 function DisarmedBroadcast(weapon)
@@ -411,13 +368,13 @@ function DisarmedBroadcast(weapon)
 end
 
 function AddButton(title, affect, command)
-  local parsed_affect = ParseAffect(affect)
-  Buttons.AddButton(title, parsed_affect, command)
+  if affect ~= nil then affect = ParseAffect(affect) end
+  Buttons.AddButton(title, affect, command)
 end
 
 function EditButton(title, new_affect, new_command)
-  local parsed_affect = ParseAffect(parsed_affect)
-  Buttons.EditButton(title, parsed_affect, new_command)
+  if new_affect ~= nil then new_affect = ParseAffect(new_affect) end
+  Buttons.EditButton(title, new_affect, new_command)
 end
 
 function ParseAffect(affect)
@@ -462,21 +419,7 @@ end
 ---------------
 
 function Configure()
-  local config = {
-    Button_Options = Buttons.GetConfiguration(),
-    Negative_Affects_Options = BadAffects.GetConfiguration()
-  }
-  
-  Configuration.Show(config, configureDone)
-end
-
-
-function configureDone(group_id, option_id, config)
-  if group_id == "Button_Options" then
-    Buttons.SaveConfiguration(option_id, config)
-  elseif group_id == "Negative_Affects_Options" then
-    BadAffects.SaveConfiguration(option_id, config)
-  end
+  Configuration.Show(Buttons.GetConfiguration(), Buttons.SaveConfiguration)
 end
 
 function Serialize(table)

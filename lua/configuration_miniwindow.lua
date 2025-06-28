@@ -49,10 +49,12 @@ function cmw.show()
   
   local y = LINE_HEIGHT + 5
   for key, group in cmw.pairsByKeys(CONFIG) do
-    if #CONFIG > 1 then WindowText(WIN, FONT, " - " .. key:gsub("_", " ") .. " - ", 2, y, 0, 0, ColourNameToRGB("white"), true) end
-    y = y + LINE_HEIGHT
+    if cmw.getSize(CONFIG) > 1 then 
+      WindowText(WIN, FONT, " - " .. key:gsub("_", " ") .. " - ", 2, y, 0, 0, ColourNameToRGB("white"), true) 
+      y = y + LINE_HEIGHT
+    end
+    
     for k, v in cmw.pairsByKeys(group) do
-      if v.label == nil then v.label = k:lower()k:gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
       WindowText(WIN, FONT, "  * " .. v.label, 2, y, 0, 0, ColourNameToRGB("white"), true)
       if v.type == "color" then
         WindowRectOp(WIN, miniwin.rect_fill, LABEL_WIDTH + 20, y + 1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, v.raw_value)
@@ -216,10 +218,12 @@ end
 function cmw.getHeight(config)
   local height = LINE_HEIGHT + 10
   for key, group in cmw.pairsByKeys(config) do
-    height = height + LINE_HEIGHT
+    if cmw.getSize(CONFIG) > 1 then 
+      height = height + LINE_HEIGHT
+    end
     for k, v in cmw.pairsByKeys(group) do
       height = height + LINE_HEIGHT
-      if v.label == nil then v.label = k:lower()k:gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
+      if v.label == nil then v.label = k:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
       if v.value == nil then v.value = tostring(v.raw_value) end
       local label_width = WindowTextWidth(WIN, FONT, "  * " .. v.label)
       local value_width = WindowTextWidth(WIN, FONT, v.value or v.raw_value)
