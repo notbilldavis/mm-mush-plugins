@@ -360,6 +360,7 @@ function clearMiniWindow()
   TEXT_BUFFER = {}
   FORMATTED_LINES = {}
   EXPANDED = false
+  WindowDeleteAllHotspots()
   drawMiniWindow()
 end
 

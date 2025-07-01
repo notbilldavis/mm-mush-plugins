@@ -251,7 +251,7 @@ function bamw.setSizeAndPositionToContent()
     for _, details in ipairs(TEXT_BUFFER) do
       if details ~= nil and details.affect ~= nil and details.expire ~= nil then
         local col1Width = WindowTextWidth(WIN, AFFECTSFONT, details.affect)
-        local col2Width = WindowTextWidth(WIN, AFFECTSFONT, details.expire)
+        local col2Width = WindowTextWidth(WIN, AFFECTSFONT, bamw.getFriendlyExpire(details.expire))
 
         if col1Width > column1Final then
           column1Final = col1Width

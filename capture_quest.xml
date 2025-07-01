@@ -132,7 +132,7 @@ function captureStart(num, name)
   addNewLine()
 
   if quest_num ~= num then
-    quest_num = num
+    quest_num = num;
     quest_phases = getQuestInfo(num, name)
   end
 end
@@ -169,20 +169,29 @@ function captureLine(line)
         local two = Trim(string.sub(check, 1, #check - 1))
         if one == two then
           for _, item in ipairs(phase.items) do
-            addToLine("  - " .. item, "silver")
-            addNewLine()
+            displayMultiParts(item)
           end
           for _, mob in ipairs(phase.mobs) do
-            addToLine("  - " .. mob, "silver")
-            addNewLine()
+            displayMultiParts(mob)
           end
           for _, room in ipairs(phase.rooms) do
-            addToLine("  - " .. room, "silver")
-            addNewLine()
+            displayMultiParts(room)
           end
         end
       end
     end
+  end
+end
+
+function displayMultiParts(line)
+  local multi = string.find(line, "],")
+  if multi == nil then
+    addToLine("  - " .. line, "silver")
+    addNewLine()
+  else
+    addToLine("  - " .. line:sub(1, multi), "silver")
+    addNewLine()
+    displayMultiParts(" or " .. line:sub(multi + 3, #line))
   end
 end
 
