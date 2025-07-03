@@ -137,8 +137,12 @@ function ABMW.DrawMiniWindow()
   local top_pos = 6
   if AB_CONFIGURATION.SHOW_HEADER then top_pos = top_pos + 30 end
 
-  for k, v in ipairs(BUTTONS) do
-    top_pos = abmw.drawAffect(k, v["affect"], v["title"], v["action"], top_pos, v["chevron"] or false)
+  if AB_CONFIGURATION.SHOW_CAST_FAVORITES then
+    top_pos = abmw.drawAffect(nil, AB_CONFIGURATION.CAST_FAVORITES_LABEL, "affects cast favorites", top_pos, false)
+  end
+
+  for _, v in ipairs(BUTTONS) do
+    top_pos = abmw.drawAffect(v["affect"], v["title"], v["action"], top_pos, v["favorite"] or false)
   end
 
   abmw.handleBadAffects()
@@ -316,6 +320,10 @@ function abmw.getButtonsConfiguration()
     EXPIRED_COLOR = { label = "Uncasted Color", type = "color", value = AB_CONFIGURATION.EXPIRED_COLOR, raw_value = AB_CONFIGURATION.EXPIRED_COLOR },
     CASTED_COLOR = { label = "Casted Color", type = "color", value = AB_CONFIGURATION.CASTED_COLOR, raw_value = AB_CONFIGURATION.CASTED_COLOR },
     EXPIRING_COLOR = { label = "Expiring Color", type = "color", value = AB_CONFIGURATION.EXPIRING_COLOR, raw_value = AB_CONFIGURATION.EXPIRING_COLOR },
+    FAVORITE_BORDER = { label = "Favorite Border Color", type = "color", value = AB_CONFIGURATION.FAVORITE_BORDER, raw_value = AB_CONFIGURATION.FAVORITE_BORDER },
+    FAVORITE_COLOR = { label = "Favorite Color", type = "color", value = AB_CONFIGURATION.FAVORITE_COLOR, raw_value = AB_CONFIGURATION.FAVORITE_COLOR },
+    SHOW_CAST_FAVORITES = { label = "Show Cast Favorites", type = "bool", value = tostring(AB_CONFIGURATION.SHOW_CAST_FAVORITES), raw_value = AB_CONFIGURATION.SHOW_CAST_FAVORITES },
+    CAST_FAVORITES_LABEL = { label = "Cast Favorites Label", type = "text", value = AB_CONFIGURATION.CAST_FAVORITES_LABEL, raw_value = AB_CONFIGURATION.CAST_FAVORITES_LABEL},
     ANCHOR = { label = "Anchor", type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST }
   }
 
@@ -399,6 +407,10 @@ function abmw.loadSavedData()
   AB_CONFIGURATION.EXPIRED_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.EXPIRED_COLOR, 255)
   AB_CONFIGURATION.CASTED_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.CASTED_COLOR, 32768)
   AB_CONFIGURATION.EXPIRING_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.EXPIRING_COLOR, 65535)
+  AB_CONFIGURATION.FAVORITE_BORDER = abmw.getValueOrDefault(AB_CONFIGURATION.FAVORITE_BORDER, ColourNameToRGB("black"))
+  AB_CONFIGURATION.FAVORITE_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.FAVORITE_COLOR, ColourNameToRGB("gold"))
+  AB_CONFIGURATION.SHOW_CAST_FAVORITES = abmw.getValueOrDefault(AB_CONFIGURATION.SHOW_CAST_FAVORITES, true)
+  AB_CONFIGURATION.CAST_FAVORITES_LABEL = abmw.getValueOrDefault(AB_CONFIGURATION.CAST_FAVORITES_LABEL, "All Favorites")
   
   WINDOW_LEFT = GetVariable(CHARACTER_NAME .. "_affectsbuttons_left") or 0
   WINDOW_TOP = GetVariable(CHARACTER_NAME .. "_affectsbuttons_top") or 0
@@ -430,7 +442,7 @@ function abmw.loadSavedData()
   end
 end
 
-function abmw.drawAffect(num, affect, title, command, top_pos, chevron)
+function abmw.drawAffect(affect, title, command, top_pos, favorite)
   local text_width = WindowTextWidth(WIN, BUTTONFONT, title, true)
   local middle_pos = (AB_CONFIGURATION.WINDOW_WIDTH - text_width) / 2
   local expires_in = abmw.getExpiration(affect)
@@ -441,22 +453,22 @@ function abmw.drawAffect(num, affect, title, command, top_pos, chevron)
   local inner_width = AB_CONFIGURATION.WINDOW_WIDTH - 8
   local outer_width = AB_CONFIGURATION.WINDOW_WIDTH - 7
   local bottom_position = top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT or LINE_HEIGHT)
+  local middle_y = top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT - LINE_HEIGHT) / 2
 
   -- button
   WindowRectOp(WIN, 2, 8, top_pos, inner_width, bottom_position, button_color)
 
-  if chevron then 
-    WindowLine(WIN, inner_width - 20, top_pos + 8, inner_width - 12, top_pos + 4, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
-    WindowLine(WIN, inner_width - 12, top_pos + 4, inner_width - 4, top_pos + 8, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
-    WindowLine(WIN, inner_width - 20, top_pos + 12, inner_width - 12, top_pos + 8, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
-    WindowLine(WIN, inner_width - 12, top_pos + 8, inner_width - 4, top_pos + 12, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
+  if favorite then 
+    local star_size = (AB_CONFIGURATION.BUTTON_HEIGHT - 12) * .75
+    local star_points = createFavoriteStar(star_size, outer_width - star_size * 2, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT / 2)
+    WindowPolygon(WIN, star_points, AB_CONFIGURATION.FAVORITE_BORDER, miniwin.pen_solid, 1, AB_CONFIGURATION.FAVORITE_COLOR, miniwin.brush_solid, true)
   end
 
-  WindowText(WIN, BUTTONFONT, title, middle_pos, top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT - LINE_HEIGHT) / 2, 0, 0, AB_CONFIGURATION.BUTTON_FONT.colour, true)
+  WindowText(WIN, BUTTONFONT, title, middle_pos, middle_y, 0, 0, AB_CONFIGURATION.BUTTON_FONT.colour, true)
   WindowRectOp(WIN, 1, 7, top_pos, outer_width, bottom_position, AB_CONFIGURATION.BORDER_COLOR)
 
   -- hotspot
-  WindowAddHotspot(WIN, title .. "~" .. command .. "~" .. affect, 8, top_pos, inner_width, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", tooltip, 1, 0)
+  WindowAddHotspot(WIN, title .. "~" .. command .. "~" .. (affect or ""), 8, top_pos, inner_width, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", tooltip, 1, 0)
 
   -- expiration meter
   gauge(WIN, nil, current, max_duration, 8, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, AB_CONFIGURATION.WINDOW_WIDTH - 16, 8, button_color, AB_CONFIGURATION.BACKGROUND_COLOR, 0, nil, AB_CONFIGURATION.BORDER_COLOR)
@@ -464,11 +476,32 @@ function abmw.drawAffect(num, affect, title, command, top_pos, chevron)
   return top_pos + AB_CONFIGURATION.BUTTON_HEIGHT + 12
 end
 
-function abmw.getScaledChevron(left, top, right, bottom)
+function createFavoriteStar(size, offsetX, offsetY)
+   local points = {}
+  local outer_radius = size
+  local inner_radius = math.floor(size * 0.5 + 0.5)
 
-  WindowLine(WIN, left, top - 4, right, top - 4, ColourNameToRGB("cyan"), miniwin.pen_solid, 1)
-  --WindowLine(WIN, left + m + 2, bottom - 4, right - 3, top + n + 1, ColourNameToRGB("cyan"), miniwin.pen_solid, 1)
+  local angle_step = math.pi / 5 
+  local angle = -math.pi / 2
 
+  local first_x, first_y = nil, nil
+
+  for i = 1, 10 do
+    local radius = (i % 2 == 1) and outer_radius or inner_radius
+    local x = math.floor(offsetX + math.cos(angle) * radius + 0.5)
+    local y = math.floor(offsetY + math.sin(angle) * radius + 0.5)
+
+    if i == 1 then
+        first_x, first_y = x, y
+    end
+
+    table.insert(points, string.format("%d,%d", x, y))
+    angle = angle + angle_step
+  end
+
+  table.insert(points, string.format("%d,%d", first_x, first_y))
+
+  return table.concat(points, ",")
 end
 
 function abmw.getExpiration(affect)
@@ -537,32 +570,63 @@ end
 
 function affectsbuttons_button_mouseup(flags, hs_id)
   if CURRENT_COMMAND then Execute(CURRENT_COMMAND) end
-
   if (flags == miniwin.hotspot_got_rh_mouse) then
     local split = utils.split(hs_id, "~")
-    local menu_items = "Edit | Delete | Move Up | Move Down | - | Add Button | Configure"
-    if CURRENT_AFFECTS[split[3]] ~= nil and CURRENT_AFFECTS[split[3]] > os.time() then
-      menu_items = "Clear | - | " .. menu_items
+    if split[1] == "All Favorites" then
+      local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), "Configure")
+      if result == "Configure" then
+        abmw.configure()
+      end
+    else
+      local menu_items = "Edit | Delete | Move Up | Move Down | - | Add Button | Configure"
+      if CURRENT_AFFECTS[split[3]] ~= nil and CURRENT_AFFECTS[split[3]] > os.time() then
+        menu_items = "Clear | - | " .. menu_items
+      end
+      menu_items = "Set Favorite | " .. menu_items
+      local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
+      if result == nil or result == "" then return end
+      if result == "Clear" then
+        Send("affects clear '" .. CURRENT_AFFECTS[split[3]] .. "'")
+      elseif result == "Edit" then
+        ABMW.EditButton(split[1], nil, nil)
+      elseif result == "Delete" then
+        ABMW.DeleteButton(split[1])
+      elseif result == "Move Up" then
+        ABMW.MoveButtonUp(split[1])
+      elseif result == "Move Down" then
+        ABMW.MoveButtonDown(split[1])
+      elseif result == "Add Button" then
+        ABMW.AddButton(nil, nil, nil)
+      elseif result == "Configure" then
+        abmw.configure()
+      elseif result == "Set Favorite" then
+        ABMW.SetFavorite(split[1])
+      end
     end
-    --menu_items = "Set Buff | " .. menu_items
-    local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
-    if result == nil or result == "" then return end
-    if result == "Clear" then
-      Send("affects clear '" .. CURRENT_AFFECTS[split[3]] .. "'")
-    elseif result == "Edit" then
-      ABMW.EditButton(split[1], nil, nil)
-    elseif result == "Delete" then
-      ABMW.DeleteButton(split[1])
-    elseif result == "Move Up" then
-      ABMW.MoveButtonUp(split[1])
-    elseif result == "Move Down" then
-      ABMW.MoveButtonDown(split[1])
-    elseif result == "Add Button" then
-      ABMW.AddButton(nil, nil, nil)
-    elseif result == "Configure" then
-      abmw.configure()
-    elseif result == "Set Buff" then
-      ABMW.SetBuff(split[1])
+  end
+end
+
+function ABMW.CastFavorites()
+  local at_least_one = false
+  local count = 0
+  for _, button in ipairs(BUTTONS) do
+    if button.favorite then
+      at_least_one = true
+      local expires_in = abmw.getExpiration(button.affect)
+      
+      local button_color = abmw.getButtonColor(expires_in)
+      
+      if button_color == AB_CONFIGURATION.EXPIRED_COLOR or 
+         button_color == AB_CONFIGURATION.EXPIRING_COLOR or 
+         button_color == AB_CONFIGURATION.NEUTRAL_COLOR then
+        count = count + 1
+        Send(button.action)
+      end
+    end
+  end
+  if count == 0 then
+    if at_least_one then Note("No favorites needed to be casted right now!")
+    else Note("No favorites have been set up yet!")
     end
   end
 end
@@ -576,7 +640,7 @@ function ABMW.AddButton(title, affect, command)
   end
 
   for _, button in ipairs(BUTTONS) do
-    if button.title == title then
+    if button.title == title or title == "All Favorites" then
       Note("A button with that title already exists!")
       return
     end
@@ -603,7 +667,7 @@ function ABMW.AddButton(title, affect, command)
 end
 
 function ABMW.EditButton(title, new_affect, new_command)
-  if title == nil then return end
+  if title == nil or title:lower() == "all favorites" then return end
 
   for _, button in ipairs(BUTTONS) do
     if button.title == title then
@@ -638,6 +702,7 @@ function ABMW.EditButton(title, new_affect, new_command)
 end
 
 function ABMW.RenameButton(old_name, new_name)
+  if old_name:lower() == "all favorites" or new_name:lower() == "all favorites" then return end
   for _, button in ipairs(BUTTONS) do
     if button.title == old_name then
       if new_name == nil or new_name == "" then
@@ -661,6 +726,7 @@ function ABMW.RenameButton(old_name, new_name)
 end
 
 function ABMW.DeleteButton(title)
+  if title:lower() == "all favorites" then return end
   for i, button in ipairs(BUTTONS) do
     if button.title == title then
       table.remove(BUTTONS, i)
@@ -676,6 +742,7 @@ function ABMW.DeleteButton(title)
 end
 
 function ABMW.MoveButtonUp(title)
+  if title:lower() == "all favorites" then return end
   local index = nil
   for i, button in ipairs(BUTTONS) do
     if button.title == title then
@@ -694,6 +761,7 @@ function ABMW.MoveButtonUp(title)
 end
 
 function ABMW.MoveButtonDown(title)
+  if title:lower() == "all favorites" then return end
   local index = nil
   for i, button in ipairs(BUTTONS) do
     if button.title == title then
@@ -711,16 +779,21 @@ function ABMW.MoveButtonDown(title)
   end
 end
 
-function ABMW.SetBuff(title)
-  if title == nil then return end
+function ABMW.SetFavorite(title)
+  if title == nil or title:lower() == "all favorites" then return end
 
   for _, button in ipairs(BUTTONS) do
     if button.title == title then
-      button.chevron = not button.chevron
+      button.favorite = not button.favorite
 
       ABMW.DrawMiniWindow()
       SetVariable(CHARACTER_NAME .. "_affects_buttons", Serialize(BUTTONS))
-      Note("Button '" .. title .. "' has been set as a buff!")
+      if button.favorite then
+        Note("Button '" .. title .. "' has been set as a favorite!")
+      else
+        Note("Button '" .. title .. "' has been removed as a favorite.")
+      end
+      
       SaveState()
       return
     end
@@ -731,6 +804,7 @@ end
 
 function ABMW.ToggleBroadcastAffect(affect)
   if BROADCAST == nil then BROADCAST = {} end
+  if affect == nil then return end
   local broadcasting = BROADCAST[affect] or false
   BROADCAST[affect] = not broadcasting
 

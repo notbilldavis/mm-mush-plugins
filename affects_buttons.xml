@@ -52,6 +52,10 @@ When this affect is applied we can broadcast it for other plugins to pick it up
 
 This will open up a configuration window that will let you do all sorts of things.
 
+A lot of these can be done by right clicking as well, also right click to set an
+option as a favorite, this will add a button to auto-cast every button you have
+marked if it is not casted, about to expire, or doesn't have an affect.
+
 Some notes:
 
 Druid affects are usually translated to non-druid spells that are exclusive so 
@@ -157,6 +161,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
   <alias match="^affects[ ]+configure$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>Configure()</send>
+  </alias>
+
+  <alias match="^affects[ ]+cast[ ]+favorites" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.CastFavorites()</send>
   </alias>
   
   <alias match="^affects[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
