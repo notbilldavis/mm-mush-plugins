@@ -89,7 +89,7 @@ function abmw.initializeNegativeAffects()
   local bad = { "blindness", "confusion", "deafen", "etheric pollution",
     "hinder", "mental disruption", "web", "pestilence", "silence", "sleep", 
     "slow magic", "slow", "stone curse", "paralysis", "extinction", "amnesia",
-    "energy orb", "plague", "poison", "memory drain", "binding curse",
+    "energy orb", "plague", "poison", "memory drain", "binding curse", "curse",
     "finality of the ender", "gangrene", "malignancy", "hex", "blue cough disease",
     "subdue", "condemn", "traumatize", "instanity", "with swiveling hooks",
     "jinx", "hobble", "bleeding", "disjunction", "decrepify", "vacuum web",
@@ -138,7 +138,7 @@ function ABMW.DrawMiniWindow()
   if AB_CONFIGURATION.SHOW_HEADER then top_pos = top_pos + 30 end
 
   for k, v in ipairs(BUTTONS) do
-    top_pos = abmw.drawAffect(k, v["affect"], v["title"], v["action"], top_pos)
+    top_pos = abmw.drawAffect(k, v["affect"], v["title"], v["action"], top_pos, v["chevron"] or false)
   end
 
   abmw.handleBadAffects()
@@ -199,9 +199,11 @@ function affectsbuttons_drag_move(flags, hotspot_id)
 end
 
 function affectsbuttons_drag_release(flags, hotspot_id)
+  WINDOW_LEFT = WindowInfo(WIN, 10)
+  WINDOW_TOP = WindowInfo(WIN, 11)
   Repaint()
-  SetVariable(CHARACTER_NAME .. "_affectsbuttons_left", WindowInfo(WIN, 10))
-  SetVariable(CHARACTER_NAME .. "_affectsbuttons_top", WindowInfo(WIN, 11))
+  SetVariable(CHARACTER_NAME .. "_affectsbuttons_left", WINDOW_LEFT)
+  SetVariable(CHARACTER_NAME .. "_affectsbuttons_top", WINDOW_TOP)
 end
 
 function ABMW.ClearMiniWindow()
@@ -428,11 +430,11 @@ function abmw.loadSavedData()
   end
 end
 
-function abmw.drawAffect(num, affect, title, command, top_pos)
+function abmw.drawAffect(num, affect, title, command, top_pos, chevron)
   local text_width = WindowTextWidth(WIN, BUTTONFONT, title, true)
   local middle_pos = (AB_CONFIGURATION.WINDOW_WIDTH - text_width) / 2
   local expires_in = abmw.getExpiration(affect)
-  local button_color = abmw.getButtonColor(expires_in, affect)
+  local button_color = abmw.getButtonColor(expires_in)
   local tooltip = abmw.getTooltip(expires_in) or title
   local max_duration = DURATIONS[affect] or 300
   local current = abmw.clamp(expires_in, 0, max_duration)
@@ -442,16 +444,31 @@ function abmw.drawAffect(num, affect, title, command, top_pos)
 
   -- button
   WindowRectOp(WIN, 2, 8, top_pos, inner_width, bottom_position, button_color)
+
+  if chevron then 
+    WindowLine(WIN, inner_width - 20, top_pos + 8, inner_width - 12, top_pos + 4, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
+    WindowLine(WIN, inner_width - 12, top_pos + 4, inner_width - 4, top_pos + 8, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
+    WindowLine(WIN, inner_width - 20, top_pos + 12, inner_width - 12, top_pos + 8, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
+    WindowLine(WIN, inner_width - 12, top_pos + 8, inner_width - 4, top_pos + 12, ColourNameToRGB("cyan"), miniwin.pen_solid, 2)
+  end
+
   WindowText(WIN, BUTTONFONT, title, middle_pos, top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT - LINE_HEIGHT) / 2, 0, 0, AB_CONFIGURATION.BUTTON_FONT.colour, true)
   WindowRectOp(WIN, 1, 7, top_pos, outer_width, bottom_position, AB_CONFIGURATION.BORDER_COLOR)
 
   -- hotspot
-  WindowAddHotspot(WIN, title .. "~" .. command, 8, top_pos, inner_width, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", tooltip, 1, 0)
+  WindowAddHotspot(WIN, title .. "~" .. command .. "~" .. affect, 8, top_pos, inner_width, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", tooltip, 1, 0)
 
   -- expiration meter
   gauge(WIN, nil, current, max_duration, 8, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, AB_CONFIGURATION.WINDOW_WIDTH - 16, 8, button_color, AB_CONFIGURATION.BACKGROUND_COLOR, 0, nil, AB_CONFIGURATION.BORDER_COLOR)
 
   return top_pos + AB_CONFIGURATION.BUTTON_HEIGHT + 12
+end
+
+function abmw.getScaledChevron(left, top, right, bottom)
+
+  WindowLine(WIN, left, top - 4, right, top - 4, ColourNameToRGB("cyan"), miniwin.pen_solid, 1)
+  --WindowLine(WIN, left + m + 2, bottom - 4, right - 3, top + n + 1, ColourNameToRGB("cyan"), miniwin.pen_solid, 1)
+
 end
 
 function abmw.getExpiration(affect)
@@ -468,7 +485,7 @@ function abmw.getExpiration(affect)
   return CURRENT_AFFECTS[affect] - os.time()
 end
 
-function abmw.getButtonColor(expires_in, affect)
+function abmw.getButtonColor(expires_in)
   if (expires_in == nil) then
     return AB_CONFIGURATION.NEUTRAL_COLOR
   elseif (expires_in <= 0) then
@@ -524,9 +541,15 @@ function affectsbuttons_button_mouseup(flags, hs_id)
   if (flags == miniwin.hotspot_got_rh_mouse) then
     local split = utils.split(hs_id, "~")
     local menu_items = "Edit | Delete | Move Up | Move Down | - | Add Button | Configure"
+    if CURRENT_AFFECTS[split[3]] ~= nil and CURRENT_AFFECTS[split[3]] > os.time() then
+      menu_items = "Clear | - | " .. menu_items
+    end
+    --menu_items = "Set Buff | " .. menu_items
     local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
     if result == nil or result == "" then return end
-    if result == "Edit" then
+    if result == "Clear" then
+      Send("affects clear '" .. CURRENT_AFFECTS[split[3]] .. "'")
+    elseif result == "Edit" then
       ABMW.EditButton(split[1], nil, nil)
     elseif result == "Delete" then
       ABMW.DeleteButton(split[1])
@@ -538,6 +561,8 @@ function affectsbuttons_button_mouseup(flags, hs_id)
       ABMW.AddButton(nil, nil, nil)
     elseif result == "Configure" then
       abmw.configure()
+    elseif result == "Set Buff" then
+      ABMW.SetBuff(split[1])
     end
   end
 end
@@ -686,6 +711,23 @@ function ABMW.MoveButtonDown(title)
   end
 end
 
+function ABMW.SetBuff(title)
+  if title == nil then return end
+
+  for _, button in ipairs(BUTTONS) do
+    if button.title == title then
+      button.chevron = not button.chevron
+
+      ABMW.DrawMiniWindow()
+      SetVariable(CHARACTER_NAME .. "_affects_buttons", Serialize(BUTTONS))
+      Note("Button '" .. title .. "' has been set as a buff!")
+      SaveState()
+      return
+    end
+  end
+
+  Note("Button '" .. title .. "' doesn't exist!")
+end
 
 function ABMW.ToggleBroadcastAffect(affect)
   if BROADCAST == nil then BROADCAST = {} end
