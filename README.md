@@ -23,6 +23,12 @@ Pretty self-explanitory, turn this on to keep feeding the dealer your vouchers. 
 
 Sort your boss killed list by kill order, will add other sorts like by category or type eventually. Also has a command to export all your bosses into a table all fancy like. See [my OOC page](http://ooc.dune.net/alliance/Oona) for an example.
 
+## Capture Quest
+
+Puts a little quest button on the screen to track your current quest in a collapsable mini window. Will also look the quest up on annwn.info for a little help. Can do a quest hint <phase #> for additional info pulled too. It will save quests in a db so it doesn't try to get it multiple times from the site. Can get weird for quests not found on annwn though. Will be adding customization to this soon too.
+
+Will need the quest_miniwindow.lua and questsearcher.lua files in the MUSHclient\lua folder.
+
 ## Collectables
 
 Pick up those pesky collectables and keep track of them as you do. Use a log to get the plate and plushie numbers you already have to add them all in one go, stamps are a little more complicated.
@@ -47,12 +53,6 @@ Uses a random website I found to look up word possiblities. Works really well on
 
 Track lootables so you know when you can loot them again. Has a couple in there already like the Archon box lootables. It's a little finicky though, it should try to automatically loot again to update the timer but sometimes it doesn't. Manually re-loot until I fix it I guess. Lootables that can be looted again show when you log on.
 
-## Capture Quest
-
-Puts a little quest button on the screen to track your current quest in a collapsable mini window. Will also look the quest up on annwn.info for a little help. Can do a quest hint <phase #> for additional info pulled too. It will save quests in a db so it doesn't try to get it multiple times from the site. Can get weird for quests not found on annwn though. Will be adding customization to this soon too.
-
-Will need the quest_miniwindow.lua and questsearcher.lua files in the MUSHclient\lua folder.
-
 ## Split Scroll
 
 ![Image](https://github.com/user-attachments/assets/b041c136-5dc5-491c-ab95-2771f6ae1ce5)
@@ -60,3 +60,11 @@ Will need the quest_miniwindow.lua and questsearcher.lua files in the MUSHclient
 Show a few lines of current output at the bottom when you scroll up so you don't get surprised when looking at your loot or whatever. Gives you a bit old button to jump right back down. MUSH doesn't give a great way to see your scroll position so it's kind of guess work based on your font, screen size, buffer size, etc. Will be adding a configuration to this to make it hopefully work for everyone with some adjusting.
 
 Will need the configuration_miniwindow.lua file in the MUSHclient\lua folder
+
+## Tabbed Captures
+
+![Image](https://github.com/user-attachments/assets/dc5c0db8-c480-424d-be6a-0da8e4f85e9d)
+
+This works like the capture window you are used to but now you can have as many tabs as you want and separate whatever channels into whatever tabs. Can work with the affects_buttons plugin above to show broadcasted affects.
+
+This one needs the configuration_miniwindow.lua, tabbed_miniwindow.lua, colorshelper.lua, and tableshelper.lua.
