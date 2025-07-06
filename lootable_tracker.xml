@@ -11,13 +11,45 @@
    purpose="track when you can loot stuff again"
    save_state="y"
    date_written="2025-03-16 13:57:37"
-   date_modified="2025-04-26 01:44:44"
+   date_modified="2025-07-05 10:58:12"
    requires="4.71"
    version="1.1"
    >
 
 <description trim="y">
+<![CDATA[
 
+Track lootables so you know when you can loot them again. Comes with tracking for
+the three Archon Boxes, the shelf in Genauras that has manuals, and the Safe of Sin.
+
+ * lootables offset <offset>
+
+ Set your offset from system time, defaults to 1.
+
+ * lootables
+ * lootables -i
+
+ Show your list of lootables that are tracked. Use the -i parameter to get indexes
+ so you can edit or delete the ones you want.
+
+ * lootables add n:<name> z:<zone> r:<room> rn:<room number>
+
+ This will add a lootable, you'll also get a prompt if you loot one you aren't 
+ tracking to add it.
+
+ * lootables remove <index>
+
+ Removes the lootable from being tracked, get the index from the -i command above.
+
+ * lootables rename <index> <new name>
+
+ Renames the lootable using the index from -i
+
+ * lootables force <index> <time>
+
+ Force the time to be something else in case it screwed up.
+
+]]>
 </description>
 
 </plugin>
@@ -64,10 +96,6 @@
   <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
     <send>OnFirstPrompt()</send>
   </trigger>
-
-  <trigger group="gag_lootable" enabled="n" keep_evaluating="y" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^Y(.*?) is bare- someone must have already gotten to whatever was in here.$">
-  </trigger>
-
 </triggers>
 
 <script>
@@ -80,24 +108,37 @@ lootables = { }
 
 hour_offset = 1
 last_set_check = nil
+safe_room = nil
+character_name = nil
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  EnsureTables()
 end
 
-function OnPluginEnable()
-  EnsureTables()
-end
-
-function OnPluginConnect()
-  EnsureTables()
+function OnPluginBroadcast(msg, id, pname, text)
+  if id == "f67c4339ed0591a5b010d05b" then
+    if (text == "char.base") then
+      handleGmcpCharacterBase()
+    end
+  end
 end
 
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
   hour_offset = GetVariable("hour_offset") or 1
-  DoAfterSpecial(3, "ShowValidLootables()", sendto.script)
+  if character_name == nil or character_name == "" then
+    Execute("sendgmcp char.base")
+  end
+end
+
+function setCharacterName(name)
+  if name == nil or name == "" then
+    Note("Unknown character name, set with 'capture setchar <name>'") 
+  else
+    character_name = name
+    EnsureTables()
+    ShowValidLootables()
+  end
 end
 
 function EnsureTables()
@@ -107,9 +148,18 @@ function EnsureTables()
   table.insert(lootables, { name = "Archon Box", zone = "Palace of Diocletian", room = "Exploring the Confusing Catacomb Passages", room_number = "29314", next_available = nil })
   table.insert(lootables, { name = "Archon Box", zone = "Beneath A Trellis", room = "A Poorly-Concealed Cache", room_number = "80434", next_available = nil })
   table.insert(lootables, { name = "Manuals Shelf", zone = "Genauras", room = "A Dirty House", room_number = "235989", next_available = nil })
+  table.insert(lootables, { name = "Safe of Sin", zone = "safe_of_sin_const", room = "", room_number = "", next_available = nil})
 
-  local lootables_text = GetVariable("lootables_list") or ""
-  if lootables_text ~= "" then
+  local lootables_text = GetVariable(character_name .. "_lootables_list") or ""
+  if lootables_text == "" then
+    local old_lootables_text = GetVariable("lootables_list") or ""
+    local convert_old = utils.msgbox("There are no lootables saved for this character, convert the existing lootables from a previous version?", "Convert Lootables?", "yesno", "?")
+    if convert_old then
+      lootables = Deserialize(old_lootables_text)
+      SetVariable("lootables_list", Serialize(lootables))
+      SaveState()
+    end
+  else
     lootables = Deserialize(lootables_text)
   end
 end
@@ -130,7 +180,11 @@ function UpdateLootableTime(time)
   for idx, lootable in ipairs(lootables) do
     if room_number == lootable["room_number"] then
       found = true
-      -- if we are in the room with the lootable, set the next available
+    elseif lootable["zone"] == "safe_of_sin_const" and room_number == safe_room then
+      found = true
+      safe_room = nil
+    end
+    if found then
       local parsed_time = parseDate(time)
       lootable["next_available"] = parsed_time
       local _, str = getTimerColorAndString(parsed_time)
@@ -143,6 +197,7 @@ function UpdateLootableTime(time)
     Note("")
   end
 
+  last_set_check = nil
   SetVariable("lootables_list", Serialize(lootables))
   SaveState()
 end
@@ -172,37 +227,42 @@ function SetLootable(container)
     local room_name = gmcpval("name")
   
     local found = false
+    
+    if container == "a safe belonging to the Commissioner of Sin" then
+      found = true
+      safe_room = room_number
+    end
 
     last_set_check = now
   
-    for idx, lootable in ipairs(lootables) do
-      if room_number == lootable["room_number"] then
-        found = true
-        -- turn on gagging triggers and get again to update
-        DoAfterSpecial(.5, "TryUpdateWithGag(\"" .. container .. "\")", sendto.script)
-        break
+    if not found then
+      for idx, lootable in ipairs(lootables) do
+        if room_number == lootable["room_number"] then
+          found = true
+          break
+        end
       end
     end
 
-    if not found then
-      -- create a hyperlink to add this lootable
+    if found then
+      SendNoEcho("take stuff '" .. container .. "'")
+    else
       Hyperlink("lootables add n:" .. container .. " z:" .. zone .. " r:" .. room_name .. " rn:" .. room_number, "[Click to track this lootable]", "", "silver", "black", false)
       Note("")
     end
   end
 end
 
-function TryUpdateWithGag(lootable_name)
-  EnableTriggerGroup("gag_lootable", true)
-  SendNoEcho("take stuff '" .. lootable_name .. "'")
-  DoAfterSpecial(.5, "EnableTriggerGroup(\"gag_lootable\", false)", sendto.script)
-end
-
 function AddLootable(name, zone, room_name, room_number)
+  if name == "a safe belonging to the Commissioner of Sin" then
+    zone = "safe_of_sin_const"
+    room_name = ""
+    room_number = ""
+  end
   local new_name = utils.inputbox(name, "Name this lootable", name)
-  table.insert(lootables, { name = name, zone = zone, room = room_name, room_number = room_number, next_available = nil })
-  Note("New lootable '" .. name .. "' has been added.")
-  DoAfterSpecial(.5, "TryUpdateWithGag(\"lootable\")", sendto.script)
+  table.insert(lootables, { name = new_name, zone = zone, room = room_name, room_number = room_number, next_available = nil })
+  Note("New lootable '" .. new_name .. "' has been added.")
+  SendNoEcho("take stuff 'lootable'")
 end
 
 function ShowLootables(show_indexes)
@@ -409,6 +469,16 @@ function get_gmcp_room()
   local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
   luastmt = "gmcpdata = " .. gmcparg
   assert(loadstring(luastmt or ""))()
+end
+
+function handleGmcpCharacterBase()
+  if character_name == nil or character_name == "" then
+    local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
+    luastmt = "gmcpdata = " .. gmcparg
+    assert(loadstring(luastmt or ""))()
+    local name = gmcpval("name")
+    setCharacterName(name)
+  end
 end
 
 ---------------------
