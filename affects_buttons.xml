@@ -297,17 +297,20 @@ notify = true
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTrigger("first_prompt", true)
   EnableTriggerGroup("get_affects", false)
   Buttons.PrepareMiniWindow()
 end
 
 function OnPluginEnable()
   EnableTriggerGroup("get_affects", false)
+  EnableTrigger("first_prompt", true)
   Buttons.PrepareMiniWindow()
 end
 
 function OnPluginConnect()
   EnableTriggerGroup("get_affects", false)
+  EnableTrigger("first_prompt", true)
   Buttons.PrepareMiniWindow()
 end
 
@@ -327,9 +330,7 @@ end
 
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
-  if (CHARACTER_NAME == nil or CHARACTER_NAME == "") then
-    Execute("sendgmcp char.base")
-  end  
+  Execute("sendgmcp char.base")
 end
 
 function setCharacterName(name)

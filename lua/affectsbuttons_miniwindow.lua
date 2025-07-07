@@ -91,7 +91,7 @@ function abmw.initializeNegativeAffects()
     "slow magic", "slow", "stone curse", "paralysis", "extinction", "amnesia",
     "energy orb", "plague", "poison", "memory drain", "binding curse", "curse",
     "finality of the ender", "gangrene", "malignancy", "hex", "blue cough disease",
-    "subdue", "condemn", "traumatize", "instanity", "with swiveling hooks",
+    "subdue", "condemn", "traumatize", "insanity", "with swiveling hooks",
     "jinx", "hobble", "bleeding", "disjunction", "decrepify", "vacuum web",
     "poverty of maradas", "pressure points", "unraveling", "dull wits",
     "withering touch", "scarify", "dampening field", "malediction", "paralyze",
@@ -100,7 +100,7 @@ function abmw.initializeNegativeAffects()
     "giant grasping hand", "existential horror", "slurping proboscis",
     "harrow", "excommunicate", "boreworms disease", "irk", "nightmares",
     "hotfoot", "burning ember", "cavern sickness disease", "mesmerize",
-    "fatigue", "ash evocation" }
+    "fatigue", "ash evocation", "evil eye" }
 
   for _, aff in ipairs(bad) do
     NEGATIVE_AFFECTS[aff] = true

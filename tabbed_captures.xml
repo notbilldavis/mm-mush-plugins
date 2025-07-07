@@ -40,6 +40,9 @@ probably have that already.
   <alias enabled="y" match="^capture help$" regexp="y" send_to="12" sequence="100">
     <send>doOnHelp()</send>
   </alias>
+  <alias match="^capture[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setCharacterName("%1")</send>
+  </alias>
   <alias enabled="y" match="^capture debug$" regexp="y" send_to="12" sequence="100">
     <send>doDebug()</send>
   </alias>
@@ -248,14 +251,17 @@ local GAGS = {
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTrigger("first_prompt", true)
   PrepareMiniWindow()
 end
 
 function OnPluginEnable()
+  EnableTrigger("first_prompt", true)
   PrepareMiniWindow()
 end
 
 function OnPluginConnect()
+  EnableTrigger("first_prompt", true)
   PrepareMiniWindow()
 end
 
@@ -277,9 +283,7 @@ end
 
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
-  if (CHARACTER_NAME == nil or CHARACTER_NAME == "") then
-    Execute("sendgmcp char.base")
-  end  
+  Execute("sendgmcp char.base")
 end
 
 function setCharacterName(name)

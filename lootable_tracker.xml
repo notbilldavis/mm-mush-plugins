@@ -113,6 +113,11 @@ character_name = nil
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  EnableTrigger("first_prompt", true)
+end
+
+function OnPluginEnable()
+  EnableTrigger("first_prompt", true)
 end
 
 function OnPluginBroadcast(msg, id, pname, text)
@@ -126,9 +131,7 @@ end
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
   hour_offset = GetVariable("hour_offset") or 1
-  if character_name == nil or character_name == "" then
-    Execute("sendgmcp char.base")
-  end
+  Execute("sendgmcp char.base")
 end
 
 function setCharacterName(name)
@@ -156,7 +159,7 @@ function EnsureTables()
     local convert_old = utils.msgbox("There are no lootables saved for this character, convert the existing lootables from a previous version?", "Convert Lootables?", "yesno", "?")
     if convert_old then
       lootables = Deserialize(old_lootables_text)
-      SetVariable("lootables_list", Serialize(lootables))
+      SetVariable(character_name .. "_lootables_list", Serialize(lootables))
       SaveState()
     end
   else
