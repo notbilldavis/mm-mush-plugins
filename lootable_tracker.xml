@@ -159,8 +159,7 @@ function EnsureTables()
     local convert_old = utils.msgbox("There are no lootables saved for this character, convert the existing lootables from a previous version?", "Convert Lootables?", "yesno", "?")
     if convert_old then
       lootables = Deserialize(old_lootables_text)
-      SetVariable(character_name .. "_lootables_list", Serialize(lootables))
-      SaveState()
+      saveLootables()
     end
   else
     lootables = Deserialize(lootables_text)
@@ -201,8 +200,7 @@ function UpdateLootableTime(time)
   end
 
   last_set_check = nil
-  SetVariable("lootables_list", Serialize(lootables))
-  SaveState()
+  saveLootables()
 end
 
 function SetLootable(container)
@@ -356,8 +354,7 @@ function RemoveLootable(idx)
   table.remove(lootables, tonumber(idx))
   ShowLootables()
 
-  SetVariable("lootables_list", Serialize(lootables))
-  SaveState()  
+  saveLootables()
 end
 
 function RenameLootable(idx, new_name)
@@ -371,8 +368,7 @@ function RenameLootable(idx, new_name)
   if i ~= nil and new_name ~= nil and new_name ~= "" then
     lootables[i]["name"] = new_name
 
-    SetVariable("lootables_list", Serialize(lootables))
-    SaveState()  
+    saveLootables() 
   end
 end
 
@@ -391,9 +387,13 @@ function ForceLootable(idx, new_available)
 
     Note("Date changed.")
 
-    SetVariable("lootables_list", Serialize(lootables))
-    SaveState()  
+    saveLootables()
   end
+end
+
+function saveLootables()
+  SetVariable(character_name .. "_lootables_list", Serialize(lootables))
+  SaveState()
 end
 
 function parseDate(str)
