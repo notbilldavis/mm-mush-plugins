@@ -191,6 +191,7 @@ function UpdateLootableTime(time)
       lootable["next_available"] = parsed_time
       local _, str = getTimerColorAndString(parsed_time)
       Note("Lootable '" .. lootable["name"] .. "' can be looted again in " ..  str .. ".")
+      break
     end
   end
 
@@ -292,9 +293,11 @@ function ShowLootables(show_indexes)
       Tell("* ")
     end
     ColourTell("white", "black", lootable["name"])
-    Tell(" in ")
-    ColourTell("white", "black", lootable["zone"] .. " ")
-    Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+    if lootable["zone"] ~= "safe_of_sin_const" then
+      Tell(" in ")
+      ColourTell("white", "black", lootable["zone"] .. " ")
+      Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+    end
     Tell(" > ")
     doTimeString(lootable["next_available"])
     if show_indexes then
@@ -333,9 +336,11 @@ function ShowValidLootables()
     if color == "green" or lootable["next_available"] == nil then
       Tell("* ")
       ColourTell("white", "black", lootable["name"])
-      Tell(" in ")
-      ColourTell("white", "black", lootable["zone"] .. " ")
-      Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+      if lootable["zone"] ~= "safe_of_sin_const" then
+        Tell(" in ")
+        ColourTell("white", "black", lootable["zone"] .. " ")
+        Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
+      end
       if lootable["next_available"] == nil then
         Note(" has no last looted time, so it could be ready.")
       else
