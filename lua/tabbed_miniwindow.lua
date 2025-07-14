@@ -170,7 +170,7 @@ function loadSavedTabs()
     ALL_TABS = Deserialize(all_tabs_text)
   end
 
-  CURRENT_TAB_NAME = ALL_TABS[1]["name"]
+  CURRENT_TAB_NAME = ALL_TABS[1]["name"] or ""
 end
 
 function loadSavedPosition()
@@ -240,7 +240,7 @@ function addLineToTab(tab, channel, styledLineSegments)
   end
 
   if tab["channels"][channel] then
-    local tab_name = tab["name"]
+    local tab_name = tab["name"] or ""
     addTextToBuffer(tab_name, styledLineSegments)
     
     local ref = refresh_type.NONE
@@ -350,7 +350,7 @@ end
 function drawTabs()
   local x = 1
   for idx, tab in ipairs(ALL_TABS) do
-    local tab_name = tab["name"]
+    local tab_name = tab["name"] or ""
     local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
     local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
     local center_pos_x = x + ((text_width + 20) / 2) - (text_width / 2)
@@ -380,7 +380,7 @@ end
 function drawNotifications()
   local x = 1
   for idx, tab in ipairs(ALL_TABS) do
-    local tab_name = tab["name"]
+    local tab_name = tab["name"] or ""
     local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
     
     if tab["notify"] then
@@ -860,7 +860,7 @@ function doRightClickHeaderMenu(name)
         drawMiniWindow()
 
       elseif result == "rename tab" then
-        local new_name = utils.inputbox(tab["name"], "Rename Tab", name)
+        local new_name = utils.inputbox(tab["name"] or "", "Rename Tab", name)
         if new_name ~= nil and #new_name > 0 then 
           ALL_TABS[i]["name"] = new_name
           drawMiniWindow()
