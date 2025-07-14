@@ -235,7 +235,7 @@ function drawMiniWindow()
 end
 
 function addLineToTab(tab, channel, styledLineSegments)
-  if tab == nil or tab["channels"] == nil then
+  if tab == nil or tab["channels"] == nil or tab["name"] == nil or tab["name"] == "" then
     return refresh_type.NONE
   end
 
@@ -351,25 +351,27 @@ function drawTabs()
   local x = 1
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
-    local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
-    local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
-    local center_pos_x = x + ((text_width + 20) / 2) - (text_width / 2)
-    local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + 2
-    local tab_tooltip = ""
+    if tab_name ~= "" then
+      local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
+      local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
+      local center_pos_x = x + ((text_width + 20) / 2) - (text_width / 2)
+      local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + 2
+      local tab_tooltip = ""
 
-    WindowRectOp(WIN, miniwin.rect_fill, x, 1, x + text_width + 20, HEADER_HEIGHT, tab_color)
-    WindowRectOp(WIN, miniwin.rect_frame, x, 1, x + text_width + 20, HEADER_HEIGHT, CONFIG.BORDER_COLOR)
-    WindowText(WIN, HEADERFONT, tab_name, center_pos_x, center_pos_y, 0, 0, CONFIG.HEADER_FONT.colour)
+      WindowRectOp(WIN, miniwin.rect_fill, x, 1, x + text_width + 20, HEADER_HEIGHT, tab_color)
+      WindowRectOp(WIN, miniwin.rect_frame, x, 1, x + text_width + 20, HEADER_HEIGHT, CONFIG.BORDER_COLOR)
+      WindowText(WIN, HEADERFONT, tab_name, center_pos_x, center_pos_y, 0, 0, CONFIG.HEADER_FONT.colour)
 
-    if tab["notify"] then
-      drawNotification(tab_name, x + text_width)
+      if tab["notify"] then
+        drawNotification(tab_name, x + text_width)
+      end
+
+      WindowLine(WIN, 0, HEADER_HEIGHT, POSITION.WINDOW_WIDTH, HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, 3)
+      
+      WindowAddHotspot(WIN, tab_name, x, 0, x + text_width + 20, HEADER_HEIGHT, "", "", "", "", "OnHeaderClick", tab_tooltip, miniwin.cursor_hand, 0)
+
+      x = x + text_width + 25
     end
-
-    WindowLine(WIN, 0, HEADER_HEIGHT, POSITION.WINDOW_WIDTH, HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, 3)
-    
-    WindowAddHotspot(WIN, tab_name, x, 0, x + text_width + 20, HEADER_HEIGHT, "", "", "", "", "OnHeaderClick", tab_tooltip, miniwin.cursor_hand, 0)
-
-    x = x + text_width + 25
   end
 
   if not CONFIG.LOCK_POSITION then
@@ -381,13 +383,15 @@ function drawNotifications()
   local x = 1
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
-    local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
+    if tab_name ~= "" then
+      local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
     
-    if tab["notify"] then
-      drawNotification(tab_name, x + text_width)
-    end
+      if tab["notify"] then
+        drawNotification(tab_name, x + text_width)
+      end
 
-    x = x + text_width + 25
+      x = x + text_width + 25
+    end
   end
 end
 
@@ -1057,16 +1061,18 @@ function OnNewTabClick()
     channels[value] = value
   end
   local new_tab_name = utils.inputbox("Enter a name for the new tab", "New Tab", "Tab " .. new_index)
-  local new_tab_channels = utils.multilistbox("Choose the channels this tab will display", "New Tab", channels, nil)
-  local new_tab_notify = utils.msgbox("Should new entries added to this tab when it is invactive show a notification icon?", "New Tab", "yesno", "?")
+  if new_tab_name ~= nil and new_tab_name ~= "" then
+    local new_tab_channels = utils.multilistbox("Choose the channels this tab will display", "New Tab", channels, nil)
+    local new_tab_notify = utils.msgbox("Should new entries added to this tab when it is invactive show a notification icon?", "New Tab", "yesno", "?")
   
-  ALL_TABS[new_index] = {
-    name = new_tab_name,
-    channels = new_tab_channels or {},
-    notify = new_tab_notify == "yes"
-  }
+    ALL_TABS[new_index] = {
+      name = new_tab_name,
+      channels = new_tab_channels or {},
+      notify = new_tab_notify == "yes"
+    }
 
-  drawMiniWindow()
+    drawMiniWindow()
+  end
 end
 
 function convertToBool(bool_value, def_value)

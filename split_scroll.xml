@@ -35,6 +35,8 @@ Make your font the same as what is in your MUSH configuration -> output settings
 
 Only really tested with my own layout so let me know if it acts weird for you.
 
+Use "split update" to update from github.
+
 ]]>
 
 </description>
@@ -49,6 +51,10 @@ Only really tested with my own layout so let me know if it acts weird for you.
   <alias match="^split[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>ShowDebug()</send>
   </alias>
+
+  <alias match="^split[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>checkForUpdates()</send>
+  </alias>
 </aliases>
 
 <triggers>
@@ -61,8 +67,34 @@ Only really tested with my own layout so let me know if it acts weird for you.
 
 <![CDATA[
 
-local can_configure, Configuration = pcall(require, "configuration_miniwindow")
+function tryRequire(required_name, required_remote_url)
+  local is_installed, required_ref = pcall(require, required_name)
+  if not is_installed then
+    local https = require("ssl.https")
+    local ltn12 = require("ltn12")
+    local response = {}
+    local _, dl_res = https.request {
+        url = required_remote_url,
+        sink = ltn12.sink.table(response)
+    }
+    if (dl_res == 200) then
+      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
+      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
+      new_file:write(required_ref_file)
+      new_file:flush()
+      new_file:close()
+      is_installed, required_ref = pcall(require, required_name)
+    end
+  end
 
+  if not is_installed then
+    ColourNote("red" , "black", "Could not get download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
+  end
+
+  return is_installed, required_ref
+end
+
+local can_configure, Configuration = tryRequire("configuration_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua")
 local WIN = GetPluginID()
 local FONT = WIN .. "_font"
 
@@ -162,40 +194,11 @@ function drawSplitScroll()
     return
   end
 
-  WindowCreate(WIN, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
-  WindowAddHotspot(WIN, "textarea", 0, 0, RIGHT - LEFT, WINDOW_HEIGHT, "", "", "", "", "", "", miniwin.cursor_ibeam, 0)
-  WindowScrollwheelHandler(WIN, "textarea", "OnWheelScroll")
-
   local scroll = GetInfo(296)
   local total_height = GetLinesInBufferCount() * GetInfo(212)
 
   if scroll < total_height - SS_CONFIGURATION["VARIABLE_COUNT"] then
-    WindowRectOp(WIN, miniwin.rect_fill, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, ColourNameToRGB("black"))
-    WindowLine(WIN, 0, 0, RIGHT, 0, ColourNameToRGB("silver"), miniwin.pen_solid, 2)
-    
-    local cnt = 0
-    local lines_in_buffer = GetLinesInBufferCount()
-    for line = lines_in_buffer - SS_CONFIGURATION["ROW_COUNT"], lines_in_buffer do
-      drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
-      cnt = cnt + 1
-    end
-
-    local btn_left = RIGHT - SS_CONFIGURATION["BUTTON_X_DISTANCE"]
-    local btn_top = WINDOW_HEIGHT - SS_CONFIGURATION["BUTTON_Y_DISTANCE"]
-    local btn_right = btn_left + SS_CONFIGURATION["BUTTON_WIDTH"]
-    local btn_bottom = btn_top + SS_CONFIGURATION["BUTTON_HEIGHT"]
-
-    WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, SS_CONFIGURATION["BUTTON_COLOR"])
-
-    local centerX = (btn_left + btn_right) / 2
-    local point1 = { x = centerX, y = btn_bottom - 10 }
-    local point2 = { x = btn_left + 10, y = btn_top + 10 }
-    local point3 = { x = btn_right - 10, y = btn_top + 10 }
-
-    local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
-
-    WindowPolygon(WIN, downArrow, SS_CONFIGURATION["ARROW_COLOR"], miniwin.pen_solid, 1, SS_CONFIGURATION["ARROW_COLOR"], miniwin.brush_solid, true, false)
-    WindowAddHotspot(WIN, "scroll_to_bottom", btn_left, btn_top, btn_right, btn_bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
+    drawLines()
 
     WindowShow(WIN, true)
   else
@@ -203,8 +206,43 @@ function drawSplitScroll()
   end
 end
 
-function OnScrollToBottom()
-  SetScroll(-1, true)
+function drawLines()
+  WindowCreate(WIN, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
+  WindowRectOp(WIN, miniwin.rect_fill, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, ColourNameToRGB("black"))
+  WindowLine(WIN, 0, 0, RIGHT, 0, ColourNameToRGB("silver"), miniwin.pen_solid, 2)
+  WindowAddHotspot(WIN, "textarea", 0, 0, RIGHT - LEFT, WINDOW_HEIGHT, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)
+  WindowDragHandler(WIN, "textarea", "OnTextAreaMouseMove", "", 0x10)
+  WindowScrollwheelHandler(WIN, "textarea", "OnWheelScroll")
+  
+  SELECTED_TEXT = ""
+
+  local cnt = 0
+  local lines_in_buffer = GetLinesInBufferCount()
+  for line = lines_in_buffer - SS_CONFIGURATION["ROW_COUNT"], lines_in_buffer do
+    drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
+    cnt = cnt + 1
+  end
+
+  drawScrollToBottomButton()
+end
+
+function drawScrollToBottomButton()
+  local btn_left = RIGHT - SS_CONFIGURATION["BUTTON_X_DISTANCE"]
+  local btn_top = WINDOW_HEIGHT - SS_CONFIGURATION["BUTTON_Y_DISTANCE"]
+  local btn_right = btn_left + SS_CONFIGURATION["BUTTON_WIDTH"]
+  local btn_bottom = btn_top + SS_CONFIGURATION["BUTTON_HEIGHT"]
+
+  WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, SS_CONFIGURATION["BUTTON_COLOR"])
+
+  local centerX = (btn_left + btn_right) / 2
+  local point1 = { x = centerX, y = btn_bottom - 10 }
+  local point2 = { x = btn_left + 10, y = btn_top + 10 }
+  local point3 = { x = btn_right - 10, y = btn_top + 10 }
+
+  local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
+
+  WindowPolygon(WIN, downArrow, SS_CONFIGURATION["ARROW_COLOR"], miniwin.pen_solid, 1, SS_CONFIGURATION["ARROW_COLOR"], miniwin.brush_solid, true, false)
+  WindowAddHotspot(WIN, "scroll_to_bottom", btn_left, btn_top, btn_right, btn_bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
 end
 
 function drawLine(i, y)
@@ -223,10 +261,26 @@ function drawLine(i, y)
     if bgcol then
       WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, bgcol)
     end
-
+    
     WindowText(WIN, FONT, txt, x, y, 0, 0, fgcol)
     x = x + w
   end
+end
+
+function OnTextAreaMouseUp(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_rh_mouse then
+    local menu_items = "Scroll to Bottom | Configure"
+    if hasSelection() then menu_items = "Copy Selection | " .. menu_items end
+    local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
+    if result == "Scroll to Bottom" then OnScrollToBottom()
+    elseif result == "Configure" then Configure()
+    elseif result == "Copy Selection" then copySelectedText()
+    end
+  end
+end
+
+function OnScrollToBottom()
+  SetScroll(-1, true)
 end
 
 function OnWheelScroll(flags, hotspot_id)
@@ -267,6 +321,8 @@ function Configure()
       }
     }
     Configuration.Show(config, configureDone)
+  else
+    Note("Make sure you have the configuration_miniwindow.lua file in your lua folder and reinstall this plugin.")
   end
 end
 
@@ -322,6 +378,19 @@ function Deserialize(serializedTable)
     return func()
   else
     return nil, "Failed to load string"
+  end
+end
+
+function checkForUpdates()
+  local updater_installed, updater = tryRequire("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua")
+
+  if not updater_installed then
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  else
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/split_scroll.xml" },
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration.lua" }
+    })
   end
 end
 

@@ -286,8 +286,35 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 require "gmcphelper"
 
-Buttons = require("affectsbuttons_miniwindow")
-Configuration = require("configuration_miniwindow")
+function tryRequire(required_name, required_remote_url)
+  local is_installed, required_ref = pcall(require, required_name)
+  if not is_installed then
+    local https = require("ssl.https")
+    local ltn12 = require("ltn12")
+    local response = {}
+    local _, dl_res = https.request {
+        url = required_remote_url,
+        sink = ltn12.sink.table(response)
+    }
+    if (dl_res == 200) then
+      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
+      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
+      new_file:write(required_ref_file)
+      new_file:flush()
+      new_file:close()
+      is_installed, required_ref = pcall(require, required_name)
+    end
+  end
+
+  if not is_installed then
+    ColourNote("red" , "black", "Could not get download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
+  end
+
+  return is_installed, required_ref
+end
+
+buttons_installed, Buttons = tryRequire("affectsbuttons_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/affectsbuttons_minimindow.lua")
+config_installed, Configuration = tryRequire("configuration_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua")
 
 local CHARACTER_NAME
 
@@ -299,6 +326,10 @@ notify = true
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
+  if not buttons_installed or not config_installed then 
+    ColourNote("black", "red", "You do not have the required files in your lua directory. Expect issues.") 
+  end
+
   EnableTrigger("first_prompt", true)
   EnableTriggerGroup("get_affects", false)
   Buttons.PrepareMiniWindow()
@@ -517,67 +548,16 @@ function handleGmcpAffect(who, spell, isOn, duration)
 end
 
 function checkForUpdates()
-  local success, result = pcall(function()
-    local https = require("ssl.https")
-    local ltn12 = require("ltn12")
-    local lua_dir = GetInfo(56):gsub("\\", "/") .. "lua/"
-    local file_main = GetPluginInfo("3a8348c0204a529dc99c2ba8", 6):gsub("\\", "/")
-    local file_dep1 = lua_dir .. "affectsbuttons_miniwindow.lua"
-    local file_dep2 = lua_dir .. "badaffects_miniwindow.lua"
-    local file_dep3 = lua_dir .. "configuration_miniwindow.lua"
-    local url_main = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/affects_buttons.xml"
-    local url_dep1 = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/affectsbuttons_miniwindow.lua"
-    local url_dep2 = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/badaffects_miniwindow.lua"
-    local url_dep3 = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua"
-    
-    local function check(local_filename, remote_url)
-      local f = io.open(local_filename, "rb")
-      if not f then return nil end
-      local local_script = f:read("*all")
-      f:close()
+  local updater_installed, updater = tryRequire("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua")
 
-      local response = {}
-      local _, dl_res = https.request {
-          url = remote_url,
-          sink = ltn12.sink.table(response)
-      }
-
-      if (dl_res ~= 200) then
-        ColourNote("red" , "black", "There was an error accessing " .. remote_url .. " - code: " .. dl_res)
-        return false
-      end
-
-      local remote_script = table.concat(response)
-
-      if not remote_script then
-        return false
-      end
-
-      if local_script ~= remote_script then
-        os.remove(local_filename .. ".backup")
-        os.rename(local_filename, local_filename .. ".backup")
-        local new_file, res, res_code = io.open(local_filename, "wb")
-        if (f == nil) then
-          ColourNote("red" , "black", "There was an error updating: " .. res .. " - code: " .. res_code .. "! Manually update.")
-          os.rename(local_filename .. ".backup", local_filename)
-          return false
-        end
-
-        new_file:write(remote_script)
-        new_file:flush()
-        new_file:close()
-        return true
-      end
-
-      return false
-    end
-
-    if check(file_main, url_main) or check(file_dep1, url_dep1) or check(file_dep2, url_dep2) or check(file_dep3, url_dep3) then
-      ColourNote("green", "black", "The 'affects_buttons' plugin has been updated and should be reinstalled.")
-    else
-      Note("No updates available for 'affects_buttons' at this time.")
-    end
-  end)
+  if updater_installed then
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/affects_buttons.xml" },
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/affectsbuttons_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/affectsbuttons_miniwindow.lua"},
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/badaffects_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/badaffects_miniwindow.lua"},
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua" },
+    })
+  end
 end
 
 ]]>
