@@ -1110,6 +1110,12 @@ function configure()
       SCROLL_COLOR = { label = "Scroll Handle Color", type = "color", value = CONFIG.SCROLL_COLOR, raw_value = CONFIG.SCROLL_COLOR },
       ANCHOR = { label = "Anchor", type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
       STRETCH = { type = "list", value = "None", raw_value = 1, list = STRETCH_LIST }
+    },
+    Position = {
+      WINDOW_LEFT = { type = "number", raw_value = POSITION.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
+      WINDOW_TOP = { type = "number", raw_value = POSITION.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
+      WINDOW_WIDTH = { type = "number", raw_value = POSITION.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
+      WINDOW_HEIGHT = { type = "number", raw_value = POSITION.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
     }
   }
   
@@ -1117,12 +1123,16 @@ function configure()
 end
 
 function configureDone(group_id, option_id, config)
-  if option_id == "ANCHOR" then
-    adjustAnchor(config.raw_value)
-  elseif option_id == "STRETCH" then
-    adjustStretch(config.raw_value)
+  if group_id == "Position" then
+    POSITION[option_id] = config.raw_value
   else
-    CONFIG[option_id] = config.raw_value
+    if option_id == "ANCHOR" then
+      adjustAnchor(config.raw_value)
+    elseif option_id == "STRETCH" then
+      adjustStretch(config.raw_value)
+    else
+      CONFIG[option_id] = config.raw_value
+    end
   end
 
   saveMiniWindow()
