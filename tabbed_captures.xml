@@ -372,9 +372,7 @@ end
 function shouldSkip(channel, line)
   if GAGS[channel] ~= nil then    
     for i = 1, #GAGS[channel] do
-      local test = string.find(line:lower(), GAGS[channel][i]:lower())
-      if (test ~= nil) then
-        Note(test)
+      if string.find(line:lower(), GAGS[channel][i]:lower(), 1, true) then
         return true
       end
     end
@@ -489,12 +487,12 @@ function checkForUpdates()
 
       local response = {}
       local _, dl_res = https.request {
-          url = url_main,
+          url = remote_url,
           sink = ltn12.sink.table(response)
       }
 
       if (dl_res ~= 200) then
-        ColourNote("red" , "black", "There was an error accessing " .. url_main .. " - code: " .. dl_res)
+        ColourNote("red" , "black", "There was an error accessing " .. remote_url .. " - code: " .. dl_res)
         return false
       end
 

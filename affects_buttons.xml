@@ -52,10 +52,6 @@ When this affect is applied we can broadcast it for other plugins to pick it up
 
 This will open up a configuration window that will let you do all sorts of things.
 
- * affects update
-
-This will try to update the plugin from the github.
-
 A lot of these can be done by right clicking as well, also right click to set an
 option as a favorite, this will add a button to auto-cast every button you have
 marked if it is not casted, about to expire, or doesn't have an affect.
@@ -525,7 +521,7 @@ function checkForUpdates()
     local https = require("ssl.https")
     local ltn12 = require("ltn12")
     local lua_dir = GetInfo(56):gsub("\\", "/") .. "lua/"
-    local file_main = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/")
+    local file_main = GetPluginInfo("3a8348c0204a529dc99c2ba8", 6):gsub("\\", "/")
     local file_dep1 = lua_dir .. "affectsbuttons_miniwindow.lua"
     local file_dep2 = lua_dir .. "badaffects_miniwindow.lua"
     local file_dep3 = lua_dir .. "configuration_miniwindow.lua"
@@ -542,12 +538,12 @@ function checkForUpdates()
 
       local response = {}
       local _, dl_res = https.request {
-          url = url_main,
+          url = remote_url,
           sink = ltn12.sink.table(response)
       }
 
       if (dl_res ~= 200) then
-        ColourNote("red" , "black", "There was an error accessing " .. url_main .. " - code: " .. dl_res)
+        ColourNote("red" , "black", "There was an error accessing " .. remote_url .. " - code: " .. dl_res)
         return false
       end
 
@@ -577,9 +573,9 @@ function checkForUpdates()
     end
 
     if check(file_main, url_main) or check(file_dep1, url_dep1) or check(file_dep2, url_dep2) or check(file_dep3, url_dep3) then
-      ColourNote("green", "black", "The '" .. GetPluginName() .. "' plugin has been updated and should be reinstalled.")
+      ColourNote("green", "black", "The 'affects_buttons' plugin has been updated and should be reinstalled.")
     else
-      Note("No updates available for '" .. GetPluginName() .. "' at this time.")
+      Note("No updates available for 'affects_buttons' at this time.")
     end
   end)
 end
