@@ -367,7 +367,9 @@ end
 function shouldSkip(channel, line)
   if GAGS[channel] ~= nil then    
     for i = 1, #GAGS[channel] do
-      if (string.find(line:lower(), GAGS[channel][i]:lower())) then
+      local test = string.find(line:lower(), GAGS[channel][i]:lower())
+      if (test ~= nil) then
+        Note(test)
         return true
       end
     end
