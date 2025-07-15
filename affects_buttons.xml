@@ -11,9 +11,9 @@
    purpose="clickable buttons list that changes colors for your affects"
    save_state="y"
    date_written="2025-03-16 13:57:37"
-   date_modified="2025-06-28 00:29:36"
+   date_modified="2025-07-15 10:45:00"
    requires="4.71"
-   version="2.0"
+   version="2.1"
    >
 
 <description trim="y">
@@ -218,11 +218,11 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   <!-- casted affects with timer -->
 
   <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "%4")</send>
+    <send>SetAffect("%1", "%4", false)</send>
   </trigger>  
 
   <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "%4")</send>
+    <send>SetAffect("%1", "%4", false)</send>
   </trigger>
 
   <!-- estimate duration when recasted before expiration -->
@@ -234,11 +234,11 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   <!-- permanent affects -->
 
   <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "-1")</send>
+    <send>SetAffect("%1", "-1", false)</send>
   </trigger>
 
   <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "-1")</send>
+    <send>SetAffect("%1", "-1", false)</send>
   </trigger>
 
   <!-- removals -->
@@ -384,10 +384,10 @@ end
 -- affects dict
 -----------------
 
-function SetAffect(affect, time_str)
+function SetAffect(affect, time_str, refresh)
   local parsed_affect = ParseAffect(affect)
   local converted_time = tonumber(time_str or 0) or 0  
-  Buttons.SetAffect(parsed_affect, converted_time, notify)
+  Buttons.SetAffect(parsed_affect, converted_time, notify, refresh)
 end
 
 function RecastAffect(affect)

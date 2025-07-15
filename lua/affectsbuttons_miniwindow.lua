@@ -29,6 +29,7 @@ local DRAG_X = nil
 local DRAG_Y = nil
 local INIT = false
 
+local HAS_ACTIVE_AFFECTS = true
 local NEGATIVE_AFFECTS = {}
 
 local ANCHOR_LIST = { 
@@ -121,33 +122,39 @@ function ABMW.DrawMiniWindow()
   WindowRectOp(WIN, miniwin.rect_fill, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, height, AB_CONFIGURATION.BACKGROUND_COLOR)
   WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, AB_CONFIGURATION.BORDER_COLOR)
 
-  if AB_CONFIGURATION.SHOW_HEADER then
-    local text_width = math.min(AB_CONFIGURATION.WINDOW_WIDTH, WindowTextWidth(WIN, HEADERFONT, AB_CONFIGURATION.HEADER_TEXT, true))
-    local center_pos_x = (AB_CONFIGURATION.WINDOW_WIDTH - text_width) / 2
-    WindowText(WIN, HEADERFONT, AB_CONFIGURATION.HEADER_TEXT, center_pos_x, 8, 0, 0, AB_CONFIGURATION.HEADER_FONT.colour, false)
-
-    if not AB_CONFIGURATION.LOCK_POSITION then
-      WindowAddHotspot(WIN, "drag_" .. WIN, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, 30, "", "", "affectsbuttons_drag_mousedown", "", "", "", 10, 0)
-      WindowDragHandler (WIN, "drag_" .. WIN, "affectsbuttons_drag_move", "affectsbuttons_drag_release", 0)
-    else
-      WindowAddHotspot(WIN, "drag_" .. WIN, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, 30, "", "", "affectsbuttons_drag_mousedown", "", "", "", 0, 0)
-    end
-  end 
-
   local top_pos = 6
-  if AB_CONFIGURATION.SHOW_HEADER then top_pos = top_pos + 30 end
+  if AB_CONFIGURATION.SHOW_HEADER then
+    top_pos = abmw.drawHeader(AB_CONFIGURATION.HEADER_TEXT, top_pos, true)
+  end 
 
   if AB_CONFIGURATION.SHOW_CAST_FAVORITES then
     top_pos = abmw.drawAffect(nil, AB_CONFIGURATION.CAST_FAVORITES_LABEL, "affects cast favorites", top_pos, false)
   end
 
+  HAS_ACTIVE_AFFECTS = false
   for _, v in ipairs(BUTTONS) do
-    top_pos = abmw.drawAffect(v["affect"], v["title"], v["action"], top_pos, v["favorite"] or false)
+    if abmw.isEmptyButton(v) and AB_CONFIGURATION.SHOW_EMPTY_AS_HEADER then
+      top_pos = abmw.drawHeader(v["title"], top_pos, false)
+    else
+      top_pos = abmw.drawAffect(v["affect"], v["title"], v["action"], top_pos, v["favorite"] or false)
+    end
+  end
+
+  if not HAS_ACTIVE_AFFECTS then
+    EnableTimer("affects_timer", false)
+  elseif AB_CONFIGURATION.REFRESH_TIME > 0 then
+    EnableTimer("affects_timer", true)
   end
 
   abmw.handleBadAffects()
 
   WindowShow(WIN, true)
+end
+
+function abmw.isEmptyButton(btn)
+  local aff = btn["affect"] or ""
+  local act = btn["action"] or ""
+  return aff == "" and act == ""
 end
 
 function abmw.handleBadAffects()
@@ -238,15 +245,19 @@ function ABMW.SaveMiniWindow()
   bad_affects.SaveMiniWindow()
 end
 
-function ABMW.SetAffect(affect, time, notify)
+function ABMW.SetAffect(affect, time, notify, refresh)
   if (time == 0) then
     ABMW.RemoveAffect(affect, notify)
   else
     if time == -1 then
       PERM_AFFECTS[affect] = 1
     else
+      if AB_CONFIGURATION.REFRESH_TIME > 0 then
+        EnableTimer("affects_timer", true)
+      end
       local previous_temp = CURRENT_AFFECTS[affect] or 0
       CURRENT_AFFECTS[affect] = os.time() + (time / 4 * 60)
+
       abmw.checkDuration(affect)
       abmw.checkForNotifyAdd(notify, affect, previous_temp)
 
@@ -255,11 +266,13 @@ function ABMW.SetAffect(affect, time, notify)
       end
     end
 
-    ABMW.DrawMiniWindow()
+    if refresh == nil or refresh == true then
+      ABMW.DrawMiniWindow()
+    end
   end
 end
 
-function ABMW.RemoveAffect(affect, notify)
+function ABMW.RemoveAffect(affect, notify, refresh)
   local previous_temp = CURRENT_AFFECTS[affect] or 0
 
   CURRENT_AFFECTS[affect] = 0
@@ -271,7 +284,9 @@ function ABMW.RemoveAffect(affect, notify)
     bad_affects.RemoveNegativeAffect(affect, true)
   end
 
-  ABMW.DrawMiniWindow()
+  if refresh == nil or refresh == true then
+    ABMW.DrawMiniWindow()
+  end
 end
 
 function abmw.checkDuration(affect)
@@ -324,7 +339,9 @@ function abmw.getButtonsConfiguration()
     FAVORITE_COLOR = { label = "Favorite Color", type = "color", value = AB_CONFIGURATION.FAVORITE_COLOR, raw_value = AB_CONFIGURATION.FAVORITE_COLOR },
     SHOW_CAST_FAVORITES = { label = "Show Cast Favorites", type = "bool", value = tostring(AB_CONFIGURATION.SHOW_CAST_FAVORITES), raw_value = AB_CONFIGURATION.SHOW_CAST_FAVORITES },
     CAST_FAVORITES_LABEL = { label = "Cast Favorites Label", type = "text", value = AB_CONFIGURATION.CAST_FAVORITES_LABEL, raw_value = AB_CONFIGURATION.CAST_FAVORITES_LABEL},
-    ANCHOR = { label = "Anchor", type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST }
+    ANCHOR = { label = "Anchor", type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
+    REFRESH_TIME = { label = "Refresh Time (seconds)", type = "number", raw_value = AB_CONFIGURATION.REFRESH_TIME, min = 0, max = 1000 },
+    SHOW_EMPTY_AS_HEADER = { label = "Empty Buttons as Headers", type = "bool", raw_value = AB_CONFIGURATION.SHOW_EMPTY_AS_HEADER },
   }
 
   return config
@@ -343,6 +360,16 @@ function abmw.saveButtonsConfiguration(option, config)
     abmw.adjustAnchor(config.raw_value)
   else
     AB_CONFIGURATION[option] = config.raw_value
+
+    if option == "REFRESH_TIME" then
+      if AB_CONFIGURATION.REFRESH_TIME > 0 then
+        SetTimerOption ("affects_timer", "second", AB_CONFIGURATION.REFRESH_TIME)
+        EnableTimer("affects_timer", true)
+      else
+        Note("Refresh time has been set to zero, affect expirations will not update automatically.")
+        EnableTimer("affects_timer", false)
+      end
+    end
   end
   
   ABMW.SaveMiniWindow()
@@ -411,6 +438,15 @@ function abmw.loadSavedData()
   AB_CONFIGURATION.FAVORITE_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.FAVORITE_COLOR, ColourNameToRGB("gold"))
   AB_CONFIGURATION.SHOW_CAST_FAVORITES = abmw.getValueOrDefault(AB_CONFIGURATION.SHOW_CAST_FAVORITES, true)
   AB_CONFIGURATION.CAST_FAVORITES_LABEL = abmw.getValueOrDefault(AB_CONFIGURATION.CAST_FAVORITES_LABEL, "All Favorites")
+  AB_CONFIGURATION.REFRESH_TIME = abmw.getValueOrDefault(AB_CONFIGURATION.REFRESH_TIME, 10)
+  AB_CONFIGURATION.SHOW_EMPTY_AS_HEADER = abmw.getValueOrDefault(AB_CONFIGURATION.SHOW_EMPTY_AS_HEADER, true)
+
+  if AB_CONFIGURATION.REFRESH_TIME > 0 then
+    SetTimerOption ("affects_timer", "second", AB_CONFIGURATION.REFRESH_TIME)
+    EnableTimer("affects_timer", true)
+  else
+    EnableTimer("affects_timer", false)
+  end
   
   WINDOW_LEFT = GetVariable(CHARACTER_NAME .. "_affectsbuttons_left") or 0
   WINDOW_TOP = GetVariable(CHARACTER_NAME .. "_affectsbuttons_top") or 0
@@ -442,6 +478,26 @@ function abmw.loadSavedData()
   end
 end
 
+function abmw.drawHeader(header_text, y_pos, is_main_header)
+  local text_width = math.min(AB_CONFIGURATION.WINDOW_WIDTH, WindowTextWidth(WIN, HEADERFONT, header_text, true))
+  local center_pos_x = (AB_CONFIGURATION.WINDOW_WIDTH - text_width) / 2
+  WindowText(WIN, HEADERFONT, header_text, center_pos_x, y_pos, 0, 0, AB_CONFIGURATION.HEADER_FONT.colour, false)
+
+  if is_main_header then
+    if not AB_CONFIGURATION.LOCK_POSITION then
+      WindowAddHotspot(WIN, "drag_" .. WIN, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, 30, "", "", "affectsbuttons_drag_mousedown", "", "", "", 10, 0)
+      WindowDragHandler (WIN, "drag_" .. WIN, "affectsbuttons_drag_move", "affectsbuttons_drag_release", 0)
+    else
+      WindowAddHotspot(WIN, "drag_" .. WIN, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, 30, "", "", "affectsbuttons_drag_mousedown", "", "", "", 0, 0)
+    end
+  else
+    WindowAddHotspot(WIN, header_text .. "~~", 8, y_pos, AB_CONFIGURATION.WINDOW_WIDTH, y_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", 
+      "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", "", 0, 0)
+  end
+
+  return y_pos + 25
+end
+
 function abmw.drawAffect(affect, title, command, top_pos, favorite)
   local text_width = WindowTextWidth(WIN, BUTTONFONT, title, true)
   local middle_pos = (AB_CONFIGURATION.WINDOW_WIDTH - text_width) / 2
@@ -454,6 +510,10 @@ function abmw.drawAffect(affect, title, command, top_pos, favorite)
   local outer_width = AB_CONFIGURATION.WINDOW_WIDTH - 7
   local bottom_position = top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT or LINE_HEIGHT)
   local middle_y = top_pos + (AB_CONFIGURATION.BUTTON_HEIGHT - LINE_HEIGHT) / 2
+
+  if expires_in ~= nil and expires_in > 0 and expires_in ~= 666666666 then
+    HAS_ACTIVE_AFFECTS = true
+  end
 
   -- button
   WindowRectOp(WIN, 2, 8, top_pos, inner_width, bottom_position, button_color)
@@ -582,7 +642,9 @@ function affectsbuttons_button_mouseup(flags, hs_id)
       if CURRENT_AFFECTS[split[3]] ~= nil and CURRENT_AFFECTS[split[3]] > os.time() then
         menu_items = "Clear | - | " .. menu_items
       end
-      menu_items = "Set Favorite | " .. menu_items
+      if split[2] ~= "" or split[3] ~= "" then
+        menu_items = "Set Favorite | " .. menu_items
+      end
       local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
       if result == nil or result == "" then return end
       if result == "Clear" then
