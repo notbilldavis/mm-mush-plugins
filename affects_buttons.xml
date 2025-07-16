@@ -336,12 +336,14 @@ function OnPluginInstall()
 end
 
 function OnPluginEnable()
+  CHARACTER_NAME = nil
   EnableTriggerGroup("get_affects", false)
   EnableTrigger("first_prompt", true)
   Buttons.PrepareMiniWindow()
 end
 
 function OnPluginConnect()
+  CHARACTER_NAME = nil
   EnableTriggerGroup("get_affects", false)
   EnableTrigger("first_prompt", true)
   Buttons.PrepareMiniWindow()
@@ -359,6 +361,10 @@ end
 
 function OnPluginSaveState()
   Buttons.SaveMiniWindow()
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
 end
 
 function OnFirstPrompt()

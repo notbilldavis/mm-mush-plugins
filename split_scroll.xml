@@ -132,6 +132,10 @@ function OnPluginDisable()
   hideWindow()
 end
 
+function OnPluginDisconnect()
+  checkForUpdates()
+end
+
 function doOnHelp()
   ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
 end

@@ -82,6 +82,33 @@
 
 <![CDATA[
 
+function ensureRequired(required_name, required_remote_url, should_return)
+  local existing_file = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "r")
+  if not existing_file then
+    local https = require("ssl.https")
+    local ltn12 = require("ltn12")
+    local response = {}
+    local _, dl_res = https.request {
+        url = required_remote_url,
+        sink = ltn12.sink.table(response)
+    }
+    if (dl_res == 200) then
+      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
+      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
+      new_file:write(required_ref_file)
+      new_file:flush()
+      new_file:close()
+    end
+  end
+
+  if should_return then 
+    return pcall(require, required_name)
+  end
+end
+
+ensureRequired("quest_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/quest_miniwindow.lua", false)
+ensureRequired("questsearcher", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/questsearcher.lua", false)
+
 require "quest_miniwindow"
 require "questsearcher"
 
@@ -105,6 +132,10 @@ end
 function OnPluginDisable()
   SaveState()
   hideWindow()
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
 end
 
 function OnPluginSaveState()
@@ -241,6 +272,20 @@ end
 
 function addNewLine()
   addToLine("\r\n", "silver")
+end
+
+function checkForUpdates()
+  local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
+
+  if not updater_installed then
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  else
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/capture_quest.xml" },
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/quest_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/quest_miniwindow.lua" },
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/questsearcher.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/questsearcher.lua" }
+    })
+  end
 end
 
 ]]>

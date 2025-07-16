@@ -153,6 +153,15 @@ function OnPluginConnect()
   EnsureDb()
 end
 
+function OnPluginDisconnect()
+  local updater_installed, updater = pcall("required", "updatehelper")
+  if updated_installer then
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/cooking_helper.xml" },
+    })
+  end
+end
+
 function EnsureTables()
   recipes = { }
   local recipes_text = GetVariable("recipes") or ""

@@ -288,11 +288,13 @@ function OnPluginInstall()
 end
 
 function OnPluginEnable()
+  CHARACTER_NAME = nil
   EnableTrigger("first_prompt", true)
   PrepareMiniWindow()
 end
 
 function OnPluginConnect()
+  CHARACTER_NAME = nil
   EnableTrigger("first_prompt", true)
   PrepareMiniWindow()
 end
@@ -307,6 +309,10 @@ end
 
 function OnPluginSaveState()
   saveMiniWindow()
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
 end
 
 function doOnHelp()

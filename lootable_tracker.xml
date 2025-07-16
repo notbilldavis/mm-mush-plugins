@@ -117,7 +117,22 @@ function OnPluginInstall()
 end
 
 function OnPluginEnable()
+  character_name = nil
   EnableTrigger("first_prompt", true)
+end
+
+function OnPluginConnect()
+  character_name = nil
+  EnableTrigger("first_prompt", true)
+end
+
+function OnPluginDisconnect()
+  local updater_installed, updater = pcall("required", "updatehelper")
+  if updated_installer then
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lootable_tracker.xml" },
+    })
+  end
 end
 
 function OnPluginBroadcast(msg, id, pname, text)
