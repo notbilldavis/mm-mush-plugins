@@ -71,6 +71,10 @@
     <send>addToHeadsForExport("%1")</send>
   </trigger>
 
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^\[(.*?)\]$">
+    <send>addToMarksForExport("%0")</send>
+  </trigger>
+
   <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^\[C\]ontinue \[R\]edraw \[B\]ack \[E\]xit\:(.*?)$">
     <send>SendNoEcho("c")</send>
   </trigger>
@@ -82,6 +86,13 @@
   <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^You have fed me the following heads:$">
     <send>done_heads = true</send>
   </trigger>
+
+  <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^You have (.*?) of the (.*?) listed Marks\.$">
+    <send>
+      mark_total = %2
+      done_marks = true
+    </send>
+  </trigger>  
 
   <trigger group="export_bosses" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^A total of (\d+) bosses\.$">
     <send>
@@ -100,8 +111,11 @@
 
 bosses = {}
 bosses_todo = {}
+marks = {}
 longest = 0
+mark_total = 0
 done_heads = false
+done_marks = false
 
 function OnPluginConnect()
   hour_offset = GetVariable("hour_offset") or 1
@@ -211,16 +225,20 @@ end
 
 function startExport()
   done_heads = false
+  done_marks = false
   Note("STARTING EXPORT, PLEASE WAIT...")
   clearBosses()
+  marks = {}
   SendNoEcho("boss list")
 end
 
 function onVitalsPrompt()
-  if done_heads then
+  if done_heads and done_marks then
     SendNoEcho("boss killed")
-  else
+  elseif done_marks then
     SendNoEcho("use redemption heads")
+  else
+    SendNoEcho("score marks")
   end
 end
 
@@ -260,10 +278,31 @@ function addToHeadsForExport(name)
   end
 end
 
+function addToMarksForExport(mark_line)
+  if not marks_done then
+    for match in mark_line:gmatch("%[([^%]]-)%]") do
+      local trimmed = match:match("^%s*(.-)%s*$")
+      table.insert(marks, trimmed)
+    end    
+  end
+end
+
 function doFinalExport()
   local not_killed, yes_killed = splitTablesByKilled(bosses)
   local todo_1, todo_2, todo_3, todo_4, todo_5, todo_6, todo_7 = splitTablesByCategory(not_killed)
   local done_1, done_2, done_3, done_4, done_5, done_6, done_7 = splitTablesByCategory(yes_killed)
+
+  AppendToNotepad("boss export", "||||||'''Obtained Marks'''||\r\n")
+  for i = 1, #marks, 3 do
+    local m1, m2, m3 = "", "", ""
+    m1 = "[[Mark of " .. marks[i] .. "]]"
+    if i + 1 <= #marks then m2 = "[[Mark of " .. marks[i+1] .. "]]" end
+    if i + 2 <= #marks then m3 = "[[Mark of " .. marks[i+2] .. "]]" end
+    AppendToNotepad("boss export", "|| " .. m1 .. " || " .. m2 .. " || " .. m3 .. " ||\r\n")
+  end
+  AppendToNotepad("boss export", "\r\n A total of " .. #marks .. " marks obtained out of " .. mark_total .. " total marks.")
+
+  AppendToNotepad("boss export", "\r\n\r\n")
 
   AppendToNotepad("boss export", "||||||'''Bosses To Kill'''||\r\n")
   AppendToNotepad("boss export", "|| Category || Name || Redemption||\r\n")
