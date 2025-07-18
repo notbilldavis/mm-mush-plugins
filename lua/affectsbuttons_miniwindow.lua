@@ -101,7 +101,8 @@ function abmw.initializeNegativeAffects()
     "giant grasping hand", "existential horror", "slurping proboscis",
     "harrow", "excommunicate", "boreworms disease", "irk", "nightmares",
     "hotfoot", "burning ember", "cavern sickness disease", "mesmerize",
-    "fatigue", "ash evocation", "evil eye", "hellfire surge", "latent charge" }
+    "fatigue", "ash evocation", "evil eye", "hellfire surge", "latent charge",
+    "static field", "weaken" }
 
   for _, aff in ipairs(bad) do
     NEGATIVE_AFFECTS[aff] = true
