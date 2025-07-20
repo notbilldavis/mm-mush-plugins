@@ -27,6 +27,10 @@
 
 <aliases>
 
+  <alias enabled="y" match="^capture quest remove (.*?)" regexp="y" send_to="12" sequence="100">
+    <send>removeQuest("%1")</send>
+  </alias>
+
   <alias enabled="y" match="^q(|uest) hint (.*?)$" regexp="y" send_to="12" sequence="100">
     <send>showHint("%2")</send>
   </alias>
@@ -50,6 +54,10 @@
       DeleteVariable ("mw_" .. GetPluginID() .. "_windowmode")
       DeleteVariable ("mw_" .. GetPluginID() .. "_windowflags")
     </send>
+  </alias>
+
+  <alias enabled="y" match="^capture quest debug$" regexp="y" send_to="12" sequence="100">
+    <send>debug()</send>
   </alias>
 
 </aliases>
@@ -155,12 +163,12 @@ function captureStart(num, name)
 
   clearMiniWindow()
   
-  addToLine("Quest ", "springgreen")
-  addToLine("[", "blue")
-  addToLine(num, "springgreen")
-  addToLine("] ", "blue")
-  addToLine(name, "springgreen")
-  addNewLine()
+  addToLine("Quest ", "springgreen", "black", "quest" .. num, true)
+  addToLine("[", "blue", "black", "quest" .. num, true)
+  addToLine(num, "springgreen", "black", "quest" .. num, true)
+  addToLine("] ", "blue", "black", "quest" .. num, true)
+  addToLine(name, "springgreen", "black", "quest" .. num, true)
+  addNewLine("quest" .. num, true)
 
   if quest_num ~= num then
     quest_num = num;
@@ -169,9 +177,10 @@ function captureStart(num, name)
 end
 
 function captureLine(line)
-  if (string.find(string.lower(line), string.lower("phase"), 1, true) ~= nil) then
+  if (string.find(string.lower(line), string.lower("phase"), 1, true) ~= nil and string.find(string.lower(line), string.lower("metaquest"), 1, true) == nil) then
     local split = utils.split(line, ":")
-    addToLine(" " .. string.format("%-8s", split[1]) .. " : ", "cyan")
+    local section = split[1]
+    addToLine(section, "cyan", "black", section, true)
 
     local color = "silver"
     local phase_text = Trim(split[2])
@@ -190,8 +199,8 @@ function captureLine(line)
 
     phase_text = counter .. phase_text
 
-    addToLine(phase_text, color)
-    addNewLine()
+    addToLine(phase_text, color, "black", section, true)
+    addNewLine(section, true)
 
     if color ~= "dimgray" and quest_phases ~= nil then
       for i, phase in ipairs(quest_phases) do
@@ -200,13 +209,13 @@ function captureLine(line)
         local two = Trim(string.sub(check, 1, #check - 1))
         if one == two then
           for _, item in ipairs(phase.items) do
-            displayMultiParts(item)
+            displayMultiParts(item, section)
           end
           for _, mob in ipairs(phase.mobs) do
-            displayMultiParts(mob)
+            displayMultiParts(mob, section)
           end
           for _, room in ipairs(phase.rooms) do
-            displayMultiParts(room)
+            displayMultiParts(room, section)
           end
         end
       end
@@ -214,15 +223,15 @@ function captureLine(line)
   end
 end
 
-function displayMultiParts(line)
+function displayMultiParts(line, section)
   local multi = string.find(line, "],")
   if multi == nil then
-    addToLine("  - " .. line, "silver")
-    addNewLine()
+    addToLine("  - " .. line, "silver", "black", section, false)
+    addNewLine(section, false)
   else
-    addToLine("  - " .. line:sub(1, multi), "silver")
-    addNewLine()
-    displayMultiParts(" or " .. line:sub(multi + 3, #line))
+    addToLine("  - " .. line:sub(1, multi), "silver", "black", section, false)
+    addNewLine(section, false)
+    displayMultiParts(" or " .. line:sub(multi + 3, #line), section)
   end
 end
 
@@ -233,6 +242,16 @@ end
 
 function clearWindow()
   clearMiniWindow()
+end
+
+function removeQuest(quest_id)
+  local removed = removeQuestFromDb(quest_id)
+  if removed then
+    clearWindow()
+    Note("Quest has been removed from the database, check quest status to retrieve it again.")
+  else
+    Note("Unable to remove from db.")
+  end
 end
 
 function showHint(phase_num)
@@ -252,13 +271,13 @@ function showHint(phase_num)
   end
 end
 
-function addToLine(txt, text_color, back_color)
+function addToLine(txt, text_color, back_color, section, is_header)
   if (not styles) then
     styles = {}
   end
 
   if (txt == "\r\n") then
-    AddLine(styles)
+    AddLine(styles, section, is_header)
     styles = {}
   else
     if back_color == nil then back_color = "black" end
@@ -270,8 +289,8 @@ function addToLine(txt, text_color, back_color)
   end
 end
 
-function addNewLine()
-  addToLine("\r\n", "silver")
+function addNewLine(section, is_header)
+  addToLine("\r\n", "silver", "black", section, is_header)
 end
 
 function checkForUpdates()

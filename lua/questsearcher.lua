@@ -134,13 +134,13 @@ function getQuestInfo(quest_num, quest_name)
     quest =  { phases = phases }
   end
 
-  db:close()
-
   return quest.phases
 end
 
 function initDb()
   db = assert(sqlite3.open(GetInfo(66) .. "annwn_quests.db"))
+
+  db:exec("PRAGMA foreign_keys = ON")
 
   db:exec[[
       CREATE TABLE IF NOT EXISTS quests (
@@ -189,6 +189,76 @@ function initDb()
           FOREIGN KEY(phase_id) REFERENCES phases(id)
       );
   ]]
+
+  local function needsMigration(child_table, from_col, parent_table, to_col)
+    for row in db:nrows("PRAGMA foreign_key_list(" .. child_table .. ")") do
+      if row.table == parent_table and row.from == from_col and row.to == to_col then
+        return row.on_delete:upper() ~= "CASCADE"
+      end
+    end
+    return true
+  end
+
+  local migrations = {}
+
+  if needsMigration("phases", "quest_id", "quests", "id") then
+    migrations["phases"] = [[
+      CREATE TABLE phases (
+        id INTEGER PRIMARY KEY,
+        quest_id INTEGER,
+        phase_number INTEGER,
+        description TEXT,
+        UNIQUE(quest_id, phase_number),
+        FOREIGN KEY(quest_id) REFERENCES quests(id) ON DELETE CASCADE
+      );
+    ]]
+  end
+
+  local dependents = { "mobs", "items", "rooms" }
+
+  for _, tbl in ipairs(dependents) do
+    if needsMigration(tbl, "phase_id", "phases", "id") then
+      migrations[tbl] = string.format([[
+        CREATE TABLE %s (
+          id INTEGER PRIMARY KEY,
+          phase_id INTEGER,
+          %s_name TEXT,
+          UNIQUE(phase_id, %s_name),
+          FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+        );
+      ]], tbl, tbl:sub(1, -2), tbl:sub(1, -2))
+    end
+  end
+
+  if needsMigration("hints", "phase_id", "phases", "id") then
+    migrations["hints"] = [[
+      CREATE TABLE hints (
+        id INTEGER PRIMARY KEY,
+        phase_id INTEGER,
+        hint_text TEXT,
+        UNIQUE(phase_id, hint_text),
+        FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+      );
+    ]]
+    end
+
+  for table_name, create_stmt in pairs(migrations) do
+    db:exec("BEGIN;")
+
+    local old_table = table_name .. "_old"
+    db:exec("ALTER TABLE " .. table_name .. " RENAME TO " .. old_table .. ";")
+    db:exec(create_stmt)
+
+    local columns = {}
+    for row in db:nrows("PRAGMA table_info(" .. old_table .. ")") do
+      table.insert(columns, row.name)
+    end
+    local col_list = table.concat(columns, ", ")
+    db:exec(string.format("INSERT INTO %s (%s) SELECT %s FROM %s;", table_name, col_list, col_list, old_table))
+
+    db:exec("DROP TABLE " .. old_table .. ";")
+    db:exec("COMMIT;")
+  end
 end
 
 function getQuestFromDb(questId)
@@ -257,6 +327,7 @@ function getQuestFromDb(questId)
           table.insert(hints, hintStmt:get_columns()[1])
           hintResult = hintStmt:step()
         end
+      
         phase.hints = hints
 
         table.insert(phases, phase)
@@ -312,9 +383,25 @@ function addQuestToDb(questId, questName, phases)
     for _, hint in ipairs(phase.hints) do
       local hintStmt = db:prepare("INSERT INTO hints (phase_id, hint_text) VALUES (?, ?)")
       hintStmt:bind_values(phaseId, hint)
-      hintStmt:step()
+      hintStmt:step()      
     end
   end
+end
+
+function removeQuestFromDb(quest_id)
+  local success = true
+  if db == nil then initDb() end
+  db:exec("PRAGMA foreign_keys = ON")
+
+  local stmt = db:prepare("DELETE FROM quests WHERE id = ?")
+  if stmt then
+    stmt:bind_values(quest_id)
+    stmt:step()
+    stmt:finalize()
+  else
+    success = false
+  end
+  return success
 end
 
 function strip_html(html)

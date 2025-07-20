@@ -22,6 +22,7 @@ local DRAG_Y = nil
 
 local TEXT_BUFFER = { }
 local FORMATTED_LINES = { }
+local SECTION_STATUS = { }
 
 local EXPANDED = true
 local ANCHOR_LIST = { 
@@ -93,6 +94,7 @@ function drawMiniWindow()
     drawToggleButton()
     drawQuestWindows()
     drawQuestText()
+    drawCollapseText()
     
     WindowShow(WIN, true)
   end
@@ -126,19 +128,28 @@ function setSizeAndPositionToContent()
   end
 
   if EXPANDED then
-    final_height = #TEXT_BUFFER * LINE_HEIGHT + CONFIG.BUTTON_HEIGHT + 4
+    final_height = CONFIG.BUTTON_HEIGHT + 4
 
-    for _, styles in ipairs(TEXT_BUFFER) do
+    for _, line in ipairs(TEXT_BUFFER) do
+      local segments = line["segments"]
+      local section = line["section"]
       local currentWidth = 0
 
-      for _, seg in ipairs(styles) do
-        currentWidth = currentWidth + WindowTextWidth(WIN, BUTTONFONT, seg.text)
-      end
+      if line["is_header"] or SECTION_STATUS[section] then
+        final_height = final_height + LINE_HEIGHT
+        for _, seg in ipairs(segments) do
+          currentWidth = currentWidth + WindowTextWidth(WIN, BUTTONFONT, seg.text)
+        end
 
-      if currentWidth > final_width then
-        final_width = currentWidth
+        currentWidth = currentWidth + 16
+
+        if currentWidth > final_width then
+          final_width = currentWidth
+        end
       end
     end
+    
+    final_height = final_height + LINE_HEIGHT
   end
 
   WINDOW_WIDTH = math.max(final_width, CONFIG.BUTTON_WIDTH)
@@ -274,33 +285,64 @@ function drawQuestText()
       end
 
       local lineText = ""
-      local segments = TEXT_BUFFER[i]
-      for _, s in ipairs(segments) do
-        lineText = lineText .. s.text
-        local w = WindowTextWidth(WIN, BUTTONFONT, s.text)
-        if s.textcolour == ColourNameToRGB("dimgray") then
-          WindowText(WIN, QUESTFONT_STRIKE, s.text, x + 2, y, 0, 0, s.textcolour)
-        else
-          local room_name = string.match(s.text , "^Journey to%s+(.+)$")
-          if room_name then
-            WindowText(WIN, QUESTFONT_UNDERLINE, s.text, x + 2, y, 0, 0, s.textcolour)
-            WindowAddHotspot(WIN, room_name, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_phase_click", "", miniwin.cursor_hand, 0)
-          else
-            WindowText(WIN, BUTTONFONT, s.text, x + 2, y, 0, 0, s.textcolour)
+      local line = TEXT_BUFFER[i]
+      local segments = line["segments"]
+      local section = line["section"]
+
+      if line["is_header"] or SECTION_STATUS[section] then
+
+        local phase_width = WindowTextWidth(WIN, BUTTONFONT, "Phase 99")
+
+        for idx, seg in ipairs(segments) do
+          lineText = lineText .. seg.text
+          local w = WindowTextWidth(WIN, BUTTONFONT, seg.text)
+
+          if seg.textcolour == ColourNameToRGB("dimgray") then
+            WindowText(WIN, QUESTFONT_STRIKE, seg.text, x + 2, y, 0, 0, seg.textcolour)
+          elseif line["is_header"] and idx == 1 and i ~= 1 then
+            WindowText(WIN, QUESTFONT_UNDERLINE, Trim(seg.text), x + 6, y, 0, 0, seg.textcolour)
+            WindowAddHotspot(WIN, section, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_section_click", "", miniwin.cursor_hand, 0)
+          elseif line["is_header"] then
+            WindowText(WIN, QUESTFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
+          elseif SECTION_STATUS[section] then
+            local room_name = string.match(seg.text , "^Journey to%s+(.+)$")
+            if room_name then
+              WindowText(WIN, QUESTFONT_UNDERLINE, seg.text, x + 2, y, 0, 0, seg.textcolour)
+              WindowAddHotspot(WIN, room_name, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_phase_click", "", miniwin.cursor_hand, 0)
+            else
+              WindowText(WIN, BUTTONFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
+            end
           end
-        end      
+          
+          if line["is_header"] and idx == 1 and i ~= 1 then
+            x = phase_width + 12
+          else
+            x = x + w
+          end
+        end
 
-        x = x + w
-      end
-
-      if #lineText > 0 then
-        y = y + LINE_HEIGHT
+        if #lineText > 0 then
+          y = y + LINE_HEIGHT
+        end
       end
     end
   end
 end
 
-function AddLine(segments)
+function drawCollapseText()
+  if EXPANDED then
+    local single_width = WindowTextWidth(WIN, BUTTONFONT, "[+]")
+    local collapse_width = WindowTextWidth(WIN, BUTTONFONT, "[+] [-]")
+    local expand_x = WINDOW_WIDTH - collapse_width
+    local collapse_x = WINDOW_WIDTH - single_width
+    local y = WINDOW_HEIGHT - LINE_HEIGHT
+    WindowText(WIN, QUESTFONT_UNDERLINE, "[+] [-]", expand_x, y, 0, 0, CONFIG.QUEST_FONT.colour)
+    WindowAddHotspot(WIN, "expand_all", expand_x, y, expand_x + single_width, y + LINE_HEIGHT, "", "", "", "", "expand_collapse_click", "", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, "collapse_all", collapse_x, y, WINDOW_WIDTH, y + LINE_HEIGHT, "", "", "", "", "expand_collapse_click", "", miniwin.cursor_hand, 0)
+  end
+end
+
+function AddLine(segments, section, is_header)
   if CONFIG == nil then
     InitializeMiniWindow()
   end
@@ -311,14 +353,37 @@ function AddLine(segments)
     clearMiniWindow()
   end
 
-  table.insert(TEXT_BUFFER, segments)
+  SECTION_STATUS[section] = false
+  table.insert(TEXT_BUFFER, { segments = segments, section = section, is_header = is_header })
 
   drawMiniWindow()
+end
+
+function expand_collapse_click(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    if hotspot_id == "expand_all" then
+      for sec, _ in pairs(SECTION_STATUS) do
+        SECTION_STATUS[sec] = true
+      end
+    elseif hotspot_id == "collapse_all" then
+      for sec, _ in pairs(SECTION_STATUS) do
+        SECTION_STATUS[sec] = false
+      end
+    end
+    drawMiniWindow()
+  end
 end
 
 function quest_phase_click(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
     Execute("mapper find " .. hotspot_id)
+  end
+end
+
+function quest_section_click(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    SECTION_STATUS[hotspot_id] = not SECTION_STATUS[hotspot_id]
+    drawMiniWindow()
   end
 end
 
@@ -534,5 +599,24 @@ function Deserialize(serializedTable)
     return func()
   else
     return nil, "Failed to load string"
+  end
+end
+
+function debug()
+  Note("All Segments: ")
+  for _, line in ipairs(TEXT_BUFFER) do
+    for _, seg in ipairs(line.segments) do
+      Tell(seg.text)
+    end
+    Note("")
+  end
+  Note("")
+  Note("Section status:")
+  for sec, show in pairs(SECTION_STATUS) do
+    if show then
+      Note(sec .. " - yes")
+    else
+      Note(sec .. " - no")
+    end
   end
 end
