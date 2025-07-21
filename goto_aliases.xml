@@ -111,6 +111,138 @@ Go to the orc pursuer in wroth:
     <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
 </alias>
 
+<alias match="^run newr(i(g(e(l)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run newrigel")</send>
+</alias>
+
+<alias match="^run di(o(c(l(e(t(i(a(n)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run diocletian")</send>
+</alias>
+
+<alias match="^run x(a(v(e(n(t(r(y)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run xaventry")</send>
+</alias>
+
+<alias match="^run a(v(a(r(i(c(e)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run avarice")</send>
+</alias>
+
+<alias match="^run des(e(r(t(t(h(o(r(n)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run desertthorn")</send>
+</alias>
+
+<alias match="^run gi(l(v(e(r(y)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run gilvery")</send>
+</alias>
+
+<alias match="^run la(s(l(e(r)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run lasler")</send>
+</alias>
+
+<alias match="^run low(a(n(g(e(n)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run lowangen")</send>
+</alias>
+
+<alias match="^run ma(n(d(r(a(k(e)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run mandrake")</send>
+</alias>
+
+<alias match="^run newk(o(l(v(i(r)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run newkolvir")</send>
+</alias>
+
+<alias match="^run runef(o(r(e(s(t)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run runeforest")</send>
+</alias>
+
+<alias match="^run to(w(e(r(o(f(a(r(t)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run towerofart")</send>
+</alias>
+
+<alias match="^run wr(o(t(h)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run wroth")</send>
+</alias>
+
+<alias match="^run tw(i(n(m(o(o(n(s)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run twinmoons")</send>
+</alias>
+
+<alias match="^run h(i(l(l(g(i(a(n(t(s)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run hillgiants")</send>
+</alias>
+
+<alias match="^run tr(a(v(e(l(e(r(s(r(e(t(r(e(a(t)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run travelersretreat")</send>
+</alias>
+
+<alias match="^run lon(e(l(y(d(r(a(g(o(n)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run lonelydragon")</send>
+</alias>
+
+<alias match="^run j(o(i(n(t(m(a(g(i(c(c(o(n(s(o(r(t(i(u(m)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run jointmagicconsortium")</send>
+</alias>
+
+<alias match="^run jmc$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run jointmagicconsortium")</send>
+</alias>
+
+<alias match="^run ta(v(e(r(n(o(f(t(h(e(b(o(a(r(s)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run tavernoftheboars")</send>
+</alias>
+
+<alias match="^run em(p(e(r(o(r(s(c(r(o(s(s(r(o(a(d)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run emperorscrossroads")</send>
+</alias>
+
+<alias match="^run ec$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run emperorscrossroads")</send>
+</alias>
+
+<alias match="^run vo(s(p(i(r(e)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run vospire")</send>
+</alias>
+
+<alias match="^run tel(l(e(r(i(u(m)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run tellerium")</send>
+</alias>
+
+<alias match="^run tem(p(l(e(t(o(n)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run templeton")</send>
+</alias>
+
+<alias match="^run do(r(a(t(h(o(n)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run dorathon")</send>
+</alias>
+
+<alias match="^run wi(n(t(o(n)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run winton")</send>
+</alias>
+
+<alias match="^run k(e(e(p)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run keep")</send>
+</alias>
+
+<alias match="^run dec(e(i(t)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run deceit")</send>
+</alias>
+
+<alias match="^run va(n(d(e(m(a(a(r)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run vandemaar")</send>
+</alias>
+
+<alias match="^run x(a(l(t)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run xalt")</send>
+</alias>
+
+<alias match="^run mu(l(a(k(a(n(a(t(h(o(s)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run mulakanathos")</send>
+</alias>
+
+<alias match="^run go(r(t(h)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>Send("run gorth")</send>
+</alias>
+
 </aliases>
 
 <triggers>
@@ -176,6 +308,10 @@ function OnPluginInstall()
   Note(" > Added aliases for: goto <direction>, goto qm, goto rep, goto crystal, and goto pursuer")
   Note(" > See goto help for more information!")
   Note("")
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
 end
 
 function OnFirstPrompt()
@@ -373,6 +509,13 @@ end
 
 function handleRunningToPursuer(initial)
   if not running_to_pursuer then return end
+
+  if initial and room == "7461" then
+    -- todo: track if you have the part to turn in
+    getPursuerTarget()
+    running_to_pursuer = false
+    return
+  end
   
   Note("Running to the Orc Pursuer. Type 'goto cancel' to stop when the current leg completes.")  
 
@@ -563,6 +706,18 @@ function get_gmcp_room()
     local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
     luastmt = "gmcpdata = " .. gmcparg
     assert(loadstring(luastmt or ""))()
+end
+
+function checkForUpdates()
+  local updater_installed, updater = pcall("required", "updatehelper")
+
+  if not updater_installed then
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  else
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/goto_aliases.xml" },
+    })
+  end
 end
 
 ]]>
