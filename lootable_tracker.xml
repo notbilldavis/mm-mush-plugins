@@ -75,12 +75,16 @@ the three Archon Boxes, the shelf in Genauras that has manuals, and the Safe of 
     <send>SetOffset("%1")</send>
   </alias>
 
-  <alias match="^lootables?[ ]+rename[ ]+(.*?) (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>RenameLootable("%1", "%2")</send>
+  <alias match="^lootables?[ ]+rename[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>RenameLootable("%1")</send>
   </alias>
 
   <alias match="^lootables?[ ]+force[ ]+(.*?) (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>ForceLootable("%1", "%2")</send>
+  </alias>
+
+  <alias match="^lootables?[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>checkForUpdates()</send>
   </alias>
 </aliases>
 
@@ -143,6 +147,10 @@ function OnPluginBroadcast(msg, id, pname, text)
   end
 end
 
+function OnPluginDisconnect()
+  checkForUpdates()
+end
+
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
   hour_offset = GetVariable("hour_offset") or 1
@@ -155,7 +163,7 @@ function setCharacterName(name)
   else
     character_name = name
     EnsureTables()
-    ShowValidLootables()
+    DoAfterSpecial(1, "ShowValidLootables()", sendto.script)
   end
 end
 
@@ -304,19 +312,25 @@ function ShowLootables(show_indexes)
   for idx, lootable in ipairs(lootables) do
     if show_indexes then
       Tell("* " .. idx .. " > ")
+      Hyperlink("lootables rename " .. idx, lootable["name"], "Click to Rename", "white", "black", false)
     else
       Tell("* ")
+      ColourTell("white", "black", lootable["name"])
     end
-    ColourTell("white", "black", lootable["name"])
+    
     if lootable["zone"] ~= "safe_of_sin_const" then
       Tell(" in ")
       ColourTell("white", "black", lootable["zone"] .. " ")
       Hyperlink("mapper goto " .. lootable["room_number"], "[" .. lootable["room"] .. "]", "", "white", "black", false)
     end
     Tell(" > ")
-    doTimeString(lootable["next_available"])
-    if show_indexes then
-      Tell(" [" .. lootable["next_available"] .. "]")
+    local next_date = lootable["next_available"]
+    doTimeString(next_date)
+    if show_indexes then 
+      if next_date ~= nil then
+        Tell(" [" .. next_date .. "] ")
+      end
+      Hyperlink("lootables remove " .. idx, "[X]", "Click to Remove", "red", "black", false)
     end
     Note("")
     count = count + 1
@@ -377,8 +391,17 @@ function RemoveLootable(idx)
   saveLootables()
 end
 
-function RenameLootable(idx, new_name)
-  local i = tonumber(idx)
+function RenameLootable(input)
+  local space = string.find(input, " ")
+  local i = 0
+  local new_name = nil
+  if space == nil then 
+    i = tonumber(input)
+  else
+    i = tonumber(string.sub(input, 1, space))
+    new_name = string.sub(input, space+1, #space)
+  end
+    
   if i == nil then
     Note("Use syntax lootables rename <index> <new name> where index is the number index from the 'lootables -i' list.")
   elseif new_name == nil or new_name == "" then
@@ -539,6 +562,18 @@ function Deserialize(serializedTable)
     return func()
   else
     return nil, "Failed to load string"
+  end
+end
+
+function checkForUpdates()
+  local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
+
+  if not updater_installed then
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  else
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lootable_tracker.xml" },
+    })
   end
 end
 
