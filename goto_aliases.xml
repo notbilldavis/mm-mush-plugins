@@ -111,136 +111,8 @@ Go to the orc pursuer in wroth:
     <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
 </alias>
 
-<alias match="^run newr(i(g(e(l)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run newrigel")</send>
-</alias>
-
-<alias match="^run di(o(c(l(e(t(i(a(n)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run diocletian")</send>
-</alias>
-
-<alias match="^run x(a(v(e(n(t(r(y)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run xaventry")</send>
-</alias>
-
-<alias match="^run a(v(a(r(i(c(e)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run avarice")</send>
-</alias>
-
-<alias match="^run des(e(r(t(t(h(o(r(n)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run desertthorn")</send>
-</alias>
-
-<alias match="^run gi(l(v(e(r(y)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run gilvery")</send>
-</alias>
-
-<alias match="^run la(s(l(e(r)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run lasler")</send>
-</alias>
-
-<alias match="^run low(a(n(g(e(n)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run lowangen")</send>
-</alias>
-
-<alias match="^run ma(n(d(r(a(k(e)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run mandrake")</send>
-</alias>
-
-<alias match="^run newk(o(l(v(i(r)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run newkolvir")</send>
-</alias>
-
-<alias match="^run runef(o(r(e(s(t)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run runeforest")</send>
-</alias>
-
-<alias match="^run to(w(e(r(o(f(a(r(t)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run towerofart")</send>
-</alias>
-
-<alias match="^run wr(o(t(h)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run wroth")</send>
-</alias>
-
-<alias match="^run tw(i(n(m(o(o(n(s)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run twinmoons")</send>
-</alias>
-
-<alias match="^run h(i(l(l(g(i(a(n(t(s)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run hillgiants")</send>
-</alias>
-
-<alias match="^run tr(a(v(e(l(e(r(s(r(e(t(r(e(a(t)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run travelersretreat")</send>
-</alias>
-
-<alias match="^run lon(e(l(y(d(r(a(g(o(n)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run lonelydragon")</send>
-</alias>
-
-<alias match="^run j(o(i(n(t(m(a(g(i(c(c(o(n(s(o(r(t(i(u(m)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run jointmagicconsortium")</send>
-</alias>
-
-<alias match="^run jmc$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run jointmagicconsortium")</send>
-</alias>
-
-<alias match="^run ta(v(e(r(n(o(f(t(h(e(b(o(a(r(s)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run tavernoftheboars")</send>
-</alias>
-
-<alias match="^run em(p(e(r(o(r(s(c(r(o(s(s(r(o(a(d)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run emperorscrossroads")</send>
-</alias>
-
-<alias match="^run ec$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run emperorscrossroads")</send>
-</alias>
-
-<alias match="^run vo(s(p(i(r(e)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run vospire")</send>
-</alias>
-
-<alias match="^run tel(l(e(r(i(u(m)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run tellerium")</send>
-</alias>
-
-<alias match="^run tem(p(l(e(t(o(n)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run templeton")</send>
-</alias>
-
-<alias match="^run do(r(a(t(h(o(n)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run dorathon")</send>
-</alias>
-
-<alias match="^run wi(n(t(o(n)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run winton")</send>
-</alias>
-
-<alias match="^run k(e(e(p)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run keep")</send>
-</alias>
-
-<alias match="^run dec(e(i(t)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run deceit")</send>
-</alias>
-
-<alias match="^run va(n(d(e(m(a(a(r)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run vandemaar")</send>
-</alias>
-
-<alias match="^run x(a(l(t)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run xalt")</send>
-</alias>
-
-<alias match="^run mu(l(a(k(a(n(a(t(h(o(s)?)?)?)?)?)?)?)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run mulakanathos")</send>
-</alias>
-
-<alias match="^run go(r(t(h)?)?)?$" enabled="y" regexp="y" send_to="12" sequence="100">
-  <send>Send("run gorth")</send>
+<alias match="^run (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <send>tryRun("%1")</send>
 </alias>
 
 </aliases>
@@ -300,6 +172,23 @@ taverns = {
   tavernoftheboars = "2085131",
   twinmoons = "1765641",
   lonelydragon = "2669134"
+}
+
+local alyria_destinations = {
+  "newrigel", "diocletian", "xaventry", "avarice", "desertthorn", "gilvery", "lasler", "lowangen",
+  "mandrake", "newkolvir", "runeforest", "towerofart", "wroth", "twinmoons", "hillgiants", 
+  "travelersretreat", "lonelydragon", "jointmagicconsortium", "jointmagicconsortium", "tavernoftheboars",
+  "emperorscrossroads", "emperorscrossroads", "vospire", "tellerium", "templeton", "dorathon",
+  "winton", "keep", "deceit", "vandemaar", "xalt", "mulakanathos", "gorth", "vesuvius"
+}
+
+local underground_destinations = { 
+  "decara", "ariendyth", "smugglersgulch", "vir" 
+}
+
+local sug_destinations = { 
+  "renn", "hlegmal", "goblam", "grigmorth", 
+  "waylandersretreat", "unreinforcedtunnel", "goblam"
 }
 
 function OnPluginInstall()
@@ -572,6 +461,74 @@ end
 function cancelGoto()
   Note("You will stop when this leg completes.")
   running_to_pursuer = false
+end
+
+function tryRun(dest)
+  local directions = { 
+    "w", "west", "e", "east", "n", "north", "s", "south", 
+    "nw", "northwest", "ne", "northeast", "se", "southeast", 
+    "sw", "southwest" }
+  
+  for _, entry in ipairs(directions) do
+    if dest == entry then
+      Send("run " .. dest)
+      return
+    end
+  end
+
+  get_gmcp_room()
+  local plane = gmcpval("coord.name")
+  local final_destination
+  
+  if plane == "Alyria" then
+    final_dest = determineDestination(alyria_destinations, dest)
+  elseif plane == "Alyrian Underworld" then
+    final_dest = determineDestination(underground_destinations, dest)
+  elseif plane == "Sigil Underground" then
+    final_dest = determineDestination(sug_destinations, dest)
+  end
+
+  if final_dest ~= nil then
+    Send("run " .. final_dest)
+  else
+    Send("run " .. dest)
+  end
+end
+
+function determineDestination(destinations, input)
+  local trimmed = Trim(input:lower())
+  local min_prefix = 3
+  local max_prefix = #trimmed
+  local latest = {}
+
+  for len = min_prefix, max_prefix do
+    local prefix = trimmed:sub(1, len)
+    local matches = {}
+
+    for _, dest in ipairs(destinations) do
+        if dest:sub(1, len) == prefix then
+            table.insert(matches, dest)
+        end
+    end
+
+    if #matches == 1 then
+        return matches[1]
+    elseif #matches == 0 then
+        return input
+    end
+    latest = matches
+  end
+
+  if latest ~= nil and #latest > 0 then
+    Tell("Ambiguous destination, choose between: ")
+    for _, amb in ipairs(latest) do
+      Hyperlink("run " .. amb, "[" .. amb .. "]", "", "white", "black", false)
+      Tell(" ")
+    end
+    Note("")
+  end
+
+  return nil
 end
 
 function isRune(zone, room)
