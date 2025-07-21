@@ -241,12 +241,20 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>SetAffect("%1", "-1", false)</send>
   </trigger>
 
+  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Disease\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "-1", false)</send>
+  </trigger>
+
   <!-- removals -->
 
   <trigger enabled="y" keep_evaluating="y" match="^\[Off\: You lose (.*?)\] (.*?)\.$" regexp="y" send_to="12" sequence="100">
     <send>RemoveAffect("%1")</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" match="^You are surrounded by an ochre glow as the last vestiges of \'(.*?)\' are burned from your body\.$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("%1")</send>
+  </trigger>
+  
   <!-- on first prompt -->
 
   <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
