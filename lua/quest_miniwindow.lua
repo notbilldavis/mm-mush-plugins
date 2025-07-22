@@ -15,14 +15,21 @@ local LINE_HEIGHT = nil
 local CURRENT_BUTTON_COLOR
 local CURRENT_LABEL_COLOR 
 
-local BUTTON_X = nil
-local BUTTON_Y = nil
 local DRAG_X = nil
 local DRAG_Y = nil
 
 local TEXT_BUFFER = { }
 local FORMATTED_LINES = { }
 local SECTION_STATUS = { }
+
+local PURSUER_TARGET = nil
+local CRYSTAL_TARGET = nil
+
+local TIMES = {
+  QUEST_TIME = 0,
+  PURSUER_TIME = 0,
+  CRYSTAL_TIME = 0
+}
 
 local EXPANDED = true
 local ANCHOR_LIST = { 
@@ -40,29 +47,34 @@ end
 function loadSavedData()
   local serialized_config = GetVariable("quest_config") or ""
   if serialized_config == "" then
-    CONFIG = {
-      BUTTON_FONT = { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-      QUEST_FONT = { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 },
-      BUTTON_WIDTH = 100,
-      BUTTON_HEIGHT = 25,
-      LOCK_POSITION = false,
-      EXPAND_DOWN = false,
-      EXPAND_RIGHT = false,
-      HIDE_EMPTY = false,
-      BACKGROUND_COLOR = 0,
-      BORDER_COLOR = 12632256,
-      BUTTON_LABEL = "Quest",
-      ACTIVE_BUTTON_COLOR = 8421504,
-      ACTIVE_LABEL_COLOR = 16777215,
-      DISABLED_BUTTON_COLOR = 6908265,
-      DISABLED_LABEL_COLOR = 8421504
-    }
+    CONFIG = {}
   else
     CONFIG = Deserialize(serialized_config)
   end
-  
-  BUTTON_X = GetVariable("quest_buttonx") or GetInfo(292) - CONFIG.BUTTON_WIDTH - 25
-  BUTTON_Y = GetVariable("quest_buttony") or GetInfo(293) - CONFIG.BUTTON_HEIGHT - 25
+
+  CONFIG.BUTTON_FONT = getValueOrDefault(CONFIG.BUTTON_FONT, { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  CONFIG.QUEST_FONT = getValueOrDefault(CONFIG.QUEST_FONT, { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  CONFIG.BUTTON_WIDTH = getValueOrDefault(CONFIG.BUTTON_WIDTH, 100)
+  CONFIG.BUTTON_HEIGHT = getValueOrDefault(CONFIG.BUTTON_HEIGHT, 25)
+  CONFIG.LOCK_POSITION = getValueOrDefault(CONFIG.LOCK_POSITION, false)
+  CONFIG.EXPAND_DOWN = getValueOrDefault(CONFIG.EXPAND_DOWN, false)
+  CONFIG.EXPAND_RIGHT = getValueOrDefault(CONFIG.EXPAND_RIGHT, false)
+  CONFIG.HIDE_EMPTY = getValueOrDefault(CONFIG.HIDE_EMPTY, false)
+  CONFIG.BACKGROUND_COLOR = getValueOrDefault(CONFIG.BACKGROUND_COLOR, 0)
+  CONFIG.BORDER_COLOR = getValueOrDefault(CONFIG.BORDER_COLOR, 12632256)
+  CONFIG.BUTTON_LABEL = getValueOrDefault(CONFIG.BUTTON_LABEL, "Quest")
+  CONFIG.ACTIVE_BUTTON_COLOR = getValueOrDefault(CONFIG.ACTIVE_BUTTON_COLOR, 8421504)
+  CONFIG.ACTIVE_LABEL_COLOR = getValueOrDefault(CONFIG.ACTIVE_LABEL_COLOR, 16777215)
+  CONFIG.DISABLED_BUTTON_COLOR = getValueOrDefault(CONFIG.DISABLED_BUTTON_COLOR, 6908265)
+  CONFIG.DISABLED_LABEL_COLOR = getValueOrDefault(CONFIG.DISABLED_LABEL_COLOR, 8421504)
+  CONFIG.SILENT_REFRESH = getValueOrDefault(CONFIG.SILENT_REFRESH, false)
+  CONFIG.TRACK_PURSUER = getValueOrDefault(CONFIG.TRACK_PURSUER, true)
+  CONFIG.TRACK_CRYSTAL = getValueOrDefault(CONFIG.TRACK_CRYSTAL, true)
+  CONFIG.BUTTON_X = getValueOrDefault(CONFIG.BUTTON_X, GetVariable("quest_buttonx") or GetInfo(292) - CONFIG.BUTTON_WIDTH - 25)
+  CONFIG.BUTTON_Y = getValueOrDefault(CONFIG.BUTTON_Y, GetVariable("quest_buttony") or GetInfo(293) - CONFIG.BUTTON_HEIGHT - 25)
+
+  pcall("DeleteVariable", "quest_buttonx")
+  pcall("DeleteVariable", "quest_buttony")
 end
 
 function createWindowAndFont()
@@ -83,7 +95,7 @@ function createWindowAndFont()
   WindowFont(WIN, QUESTFONT_STRIKE, questfont.name, questfont.size, false, false, false, true)
   WindowFont(WIN, QUESTFONT_UNDERLINE, questfont.name, questfont.size, false, false, true, false)
 
-  LINE_HEIGHT = WindowFontInfo(WIN, BUTTONFONT, 1) - WindowFontInfo(WIN, BUTTONFONT, 4) + 2
+  LINE_HEIGHT = WindowFontInfo(WIN, QUESTFONT, 1) - WindowFontInfo(WIN, QUESTFONT, 4) + 2
 end
 
 function drawMiniWindow()
@@ -117,18 +129,20 @@ function setSizeAndPositionToContent()
   CURRENT_BUTTON_COLOR = CONFIG.ACTIVE_BUTTON_COLOR
   CURRENT_LABEL_COLOR = CONFIG.ACTIVE_LABEL_COLOR
 
-  if #TEXT_BUFFER == 0 then
+  if #TEXT_BUFFER == 0 and PURSUER_TARGET == nil and CRYSTAL_TARGET == nil then
     CURRENT_BUTTON_COLOR = CONFIG.DISABLED_BUTTON_COLOR
     CURRENT_LABEL_COLOR = CONFIG.DISABLED_LABEL_COLOR
     EXPANDED = false
   end
 
-  if #TEXT_BUFFER == 0 then
+  if #TEXT_BUFFER == 0 and PURSUER_TARGET == nil and CRYSTAL_TARGET == nil then
     EXPANDED = false
   end
 
   if EXPANDED then
     final_height = CONFIG.BUTTON_HEIGHT + 4
+
+    local phase_width = WindowTextWidth(WIN, QUESTFONT, "Phase 99")
 
     for _, line in ipairs(TEXT_BUFFER) do
       local segments = line["segments"]
@@ -138,18 +152,34 @@ function setSizeAndPositionToContent()
       if line["is_header"] or SECTION_STATUS[section] then
         final_height = final_height + LINE_HEIGHT
         for _, seg in ipairs(segments) do
-          currentWidth = currentWidth + WindowTextWidth(WIN, BUTTONFONT, seg.text)
+          currentWidth = currentWidth + WindowTextWidth(WIN, QUESTFONT, seg.text)
         end
 
-        currentWidth = currentWidth + 16
+        if line["is_header"] then
+          currentWidth = currentWidth + phase_width + 4
+        else
+          currentWidth = currentWidth + 12
+        end
 
         if currentWidth > final_width then
           final_width = currentWidth
         end
       end
     end
+
+    if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then 
+      final_width = math.max(final_width, WindowTextWidth(WIN, QUESTFONT, "Orc Pursuer: " .. PURSUER_TARGET) + 12)
+      final_height = final_height + LINE_HEIGHT 
+    end
     
-    final_height = final_height + LINE_HEIGHT
+    if CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      final_width = math.max(final_width, WindowTextWidth(WIN, QUESTFONT, "Crystal: " .. CRYSTAL_TARGET) + 12)
+      final_height = final_height + LINE_HEIGHT 
+    end
+    
+    if #TEXT_BUFFER > 0 then
+      final_height = final_height + LINE_HEIGHT
+    end
   end
 
   WINDOW_WIDTH = math.max(final_width, CONFIG.BUTTON_WIDTH)
@@ -158,19 +188,19 @@ function setSizeAndPositionToContent()
   local new_left = 0
   local new_top = 0
 
-  BUTTON_X = BUTTON_X or left
-  BUTTON_Y = BUTTON_Y or top
+  CONFIG.BUTTON_X = CONFIG.BUTTON_X or left
+  CONFIG.BUTTON_Y = CONFIG.BUTTON_Y or top
 
   if CONFIG.EXPAND_RIGHT then
-    new_left = BUTTON_X
+    new_left = CONFIG.BUTTON_X
   else
-    new_left = BUTTON_X - WINDOW_WIDTH
+    new_left = CONFIG.BUTTON_X - WINDOW_WIDTH
   end
 
   if CONFIG.EXPAND_DOWN then
-    new_top = BUTTON_Y
+    new_top = CONFIG.BUTTON_Y
   else
-    new_top = BUTTON_Y - WINDOW_HEIGHT
+    new_top = CONFIG.BUTTON_Y - WINDOW_HEIGHT
   end
 
   WindowPosition(WIN, new_left, new_top, 4, 2)
@@ -206,7 +236,7 @@ function drawToggleButton()
   WindowText(WIN, BUTTONFONT, CONFIG.BUTTON_LABEL, left + (button_width / 2) - (text_width / 2), top + 8, 0, 0, CURRENT_LABEL_COLOR)
 
   local cursor = miniwin.cursor_arrow
-  if #TEXT_BUFFER > 0 then
+  if #TEXT_BUFFER > 0 or PURSUER_TARGET ~= nil or CRYSTAL_TARGET ~= nil then
     cursor = miniwin.cursor_hand
   end
 
@@ -267,12 +297,23 @@ function drawQuestWindows()
 
     WindowRectOp(WIN, miniwin.rect_fill, 0, top, WINDOW_WIDTH, bottom, CONFIG.BACKGROUND_COLOR)
     WindowRectOp(WIN, miniwin.rect_frame, 0, top, WINDOW_WIDTH, bottom, CONFIG.BORDER_COLOR)
+
+    if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      if #TEXT_BUFFER > 0 then
+        WindowLine(WIN, 0, bottom - LINE_HEIGHT * 2, WINDOW_WIDTH, bottom - LINE_HEIGHT * 2, CONFIG.BORDER_COLOR, miniwin.pen_solid, 1)
+      end
+      WindowLine(WIN, 0, bottom - LINE_HEIGHT, WINDOW_WIDTH, bottom - LINE_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, 1)
+    elseif #TEXT_BUFFER > 0 and ((CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil) or (CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil)) then
+      WindowLine(WIN, 0, bottom - LINE_HEIGHT, WINDOW_WIDTH, bottom - LINE_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, 1)
+    end
+
     WindowRectOp(WIN, miniwin.rect_fill, left_clear, top_clear, right_clear, bottom_clear, ColourNameToRGB("black"))
   end
 end
 
 function drawQuestText()
   if EXPANDED then
+    local rooms = {}
     local y = 4
     if CONFIG.EXPAND_DOWN then
       y = y + CONFIG.BUTTON_HEIGHT
@@ -291,11 +332,11 @@ function drawQuestText()
 
       if line["is_header"] or SECTION_STATUS[section] then
 
-        local phase_width = WindowTextWidth(WIN, BUTTONFONT, "Phase 99")
+        local phase_width = WindowTextWidth(WIN, QUESTFONT, "Phase 99")
 
         for idx, seg in ipairs(segments) do
           lineText = lineText .. seg.text
-          local w = WindowTextWidth(WIN, BUTTONFONT, seg.text)
+          local w = WindowTextWidth(WIN, QUESTFONT, seg.text)
 
           if seg.textcolour == ColourNameToRGB("dimgray") then
             WindowText(WIN, QUESTFONT_STRIKE, seg.text, x + 2, y, 0, 0, seg.textcolour)
@@ -303,14 +344,35 @@ function drawQuestText()
             WindowText(WIN, QUESTFONT_UNDERLINE, Trim(seg.text), x + 6, y, 0, 0, seg.textcolour)
             WindowAddHotspot(WIN, section, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_section_click", "", miniwin.cursor_hand, 0)
           elseif line["is_header"] then
-            WindowText(WIN, QUESTFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
-          elseif SECTION_STATUS[section] then
             local room_name = string.match(seg.text , "^Journey to%s+(.+)$")
             if room_name then
+              if rooms[room_name] == nil then rooms[room_name] = 0 end
+              local dupe_check_room_name = room_name .. "|" .. rooms[room_name]
               WindowText(WIN, QUESTFONT_UNDERLINE, seg.text, x + 2, y, 0, 0, seg.textcolour)
-              WindowAddHotspot(WIN, room_name, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_phase_click", "", miniwin.cursor_hand, 0)
+              WindowAddHotspot(WIN, dupe_check_room_name, x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_phase_click", "", miniwin.cursor_hand, 0)
+              rooms[room_name] = rooms[room_name] + 1
             else
-              WindowText(WIN, BUTTONFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
+              WindowText(WIN, QUESTFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
+            end
+          elseif SECTION_STATUS[section] then
+            local pattern = "%[([^,%]]+),([^%]]+)%]%.?"
+            local si, ei, room_name, zone_name = string.find(seg.text, pattern)
+            if si then
+              local before = seg.text:sub(1, si - 1) .. "["
+              local after = seg.text:sub(ei + 1) .. "," .. zone_name .. "]"
+              local tw = WindowTextWidth(WIN, QUESTFONT, before)
+              local tn = WindowTextWidth(WIN, QUESTFONT, before .. room_name)
+
+              if rooms[room_name] == nil then rooms[room_name] = 0 end
+              local dupe_check_room_name = room_name .. "|" .. rooms[room_name]
+
+              WindowText(WIN, QUESTFONT, before, x + 2, y, 0, 0, seg.textcolour)
+              WindowText(WIN, QUESTFONT_UNDERLINE, room_name, x + tw + 2, y, 0, 0, seg.textcolour)
+              WindowText(WIN, QUESTFONT, after, x + tn + 2, y, 0, 0, seg.textcolour)
+              WindowAddHotspot(WIN, dupe_check_room_name, x + tw + 2, y, x + tn + 2, y + LINE_HEIGHT, "", "", "", "", "quest_phase_click", "", miniwin.cursor_hand, 0)
+              rooms[room_name] = rooms[room_name] + 1
+            else
+              WindowText(WIN, QUESTFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
             end
           end
           
@@ -326,16 +388,36 @@ function drawQuestText()
         end
       end
     end
+
+    local prefix_length = WindowTextWidth(WIN, QUESTFONT, "Orc Pursuer: ")
+    if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, ColourNameToRGB("silver"))
+      WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
+      prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
+      WindowText(WIN, QUESTFONT, "Crystal: ", 6, y + LINE_HEIGHT, 0, 0, ColourNameToRGB("silver"))
+      WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, ColourNameToRGB("white"))
+    elseif CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then
+      WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, ColourNameToRGB("silver"))
+      WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
+    elseif CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
+      WindowText(WIN, QUESTFONT, "Crystal: ", 6, y, 0, 0, ColourNameToRGB("silver"))
+      WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
+    end
   end
 end
 
 function drawCollapseText()
-  if EXPANDED then
-    local single_width = WindowTextWidth(WIN, BUTTONFONT, "[+]")
-    local collapse_width = WindowTextWidth(WIN, BUTTONFONT, "[+] [-]")
+  if EXPANDED and #TEXT_BUFFER > 0 then
+    local single_width = WindowTextWidth(WIN, QUESTFONT, "[+]")
+    local collapse_width = WindowTextWidth(WIN, QUESTFONT, "[+] [-]")
     local expand_x = WINDOW_WIDTH - collapse_width
     local collapse_x = WINDOW_WIDTH - single_width
     local y = WINDOW_HEIGHT - LINE_HEIGHT
+
+    if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then y = y - LINE_HEIGHT end
+    if CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then y = y - LINE_HEIGHT end
+
     WindowText(WIN, QUESTFONT_UNDERLINE, "[+] [-]", expand_x, y, 0, 0, CONFIG.QUEST_FONT.colour)
     WindowAddHotspot(WIN, "expand_all", expand_x, y, expand_x + single_width, y + LINE_HEIGHT, "", "", "", "", "expand_collapse_click", "", miniwin.cursor_hand, 0)
     WindowAddHotspot(WIN, "collapse_all", collapse_x, y, WINDOW_WIDTH, y + LINE_HEIGHT, "", "", "", "", "expand_collapse_click", "", miniwin.cursor_hand, 0)
@@ -353,10 +435,31 @@ function AddLine(segments, section, is_header)
     clearMiniWindow()
   end
 
-  SECTION_STATUS[section] = false
+  if SECTION_STATUS[section] == nil then
+    SECTION_STATUS[section] = false
+  else
+    SECTION_STATUS[section] = SECTION_STATUS[section]
+  end
+  
   table.insert(TEXT_BUFFER, { segments = segments, section = section, is_header = is_header })
 
   drawMiniWindow()
+end
+
+function SetPursuerTarget(target)
+  if CONFIG.TRACK_PURSUER then
+    PURSUER_TARGET = target
+    if PURSUER_TARGET ~= nil then EXPANDED = true end
+    drawMiniWindow()
+  end
+end
+
+function SetCrystalTarget(target)
+  if CONFIG.TRACK_CRYSTAL then
+    CRYSTAL_TARGET = target
+    if CRYSTAL_TARGET ~= nil then EXPANDED = true end
+    drawMiniWindow()
+  end
 end
 
 function expand_collapse_click(flags, hotspot_id)
@@ -376,7 +479,7 @@ end
 
 function quest_phase_click(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
-    Execute("mapper find " .. hotspot_id)
+    Execute("mapper find " .. hotspot_id:match("^(.-)|") or hotspot_id)
   end
 end
 
@@ -389,7 +492,7 @@ end
 
 function quest_button_click(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
-    if #TEXT_BUFFER > 0 then
+    if #TEXT_BUFFER > 0 or PURSUER_TARGET ~= nil or CRYSTAL_TARGET ~= nil then
       EXPANDED = not EXPANDED
       drawMiniWindow()
     end
@@ -436,9 +539,70 @@ end
 
 function saveMiniWindow()
   SetVariable("quest_config", Serialize(CONFIG))
-  SetVariable("quest_buttonx", getButtonX())
-  SetVariable("quest_buttony", getButtonY())
   SaveState()
+end
+
+function ShowTimes()
+  doTimeString(TIMES.QUEST_TIME, "You can get another quest")
+  doTimeString(TIMES.PURSUER_TIME, "You can get another pursuer target")
+  doTimeString(TIMES.CRYSTAL_TIME, "You can get another crystal map")
+end
+
+function SetQuestTime(alyrian_time)
+  if alyrian_time ~= nil then
+    TIMES.QUEST_TIME = os.time() + (tonumber(alyrian_time) / 4) * 60
+  else
+    TIMES.QUEST_TIME = os.time() + 300
+  end 
+end
+
+function SetPursuerTime()
+  TIMES.PURSUER_TIME = os.time() + 60 * 15 -- i am guessing here
+end
+
+function SetCrystalTime()
+  TIMES.CRYSTAL_TIME = os.time() + 60 * 120
+end
+
+function doTimeString(time, text)
+  local color, timer_string = getTimerColorAndString(time)
+  Tell("* ")
+  ColourTell("silver", "black", text)
+  ColourTell(color, "black", timer_string)
+  ColourTell("silver", "black", ".")
+  Note("")
+end
+
+function getTimerColorAndString(time)
+  if (time == nil) then
+    return "green", " right now probably"
+  else
+    local now = os.time()
+    local diff = os.difftime(time, now)
+
+    if diff < 0 then
+      return "green", " right now"
+    else
+      local seconds = diff % 60
+      local minutes = math.floor(diff / 60) % 60
+      local hours = math.floor(diff / 3600) % 24
+  
+      local color = "red"
+      if (minutes < 3) then
+        color = "yellow"
+      end
+
+      if hours > 0 then
+        return color, string.format("in %02d hours, %02d minutes, %02d seconds", hours, minutes, seconds)
+      end
+      
+      return color, string.format("in %02d minutes, %02d seconds", minutes, seconds)
+    end
+  end
+end
+
+function isSilentRefreshEnabled()
+  return CONFIG.SILENT_REFRESH
 end
 
 function configure()
@@ -459,7 +623,12 @@ function configure()
       ACTIVE_LABEL_COLOR = { type = "color", raw_value = CONFIG.ACTIVE_LABEL_COLOR },
       DISABLED_BUTTON_COLOR = { type = "color", raw_value = CONFIG.DISABLED_BUTTON_COLOR },
       DISABLED_LABEL_COLOR = { type = "color", raw_value = CONFIG.DISABLED_LABEL_COLOR },
-      ANCHOR = { type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST }
+      ANCHOR = { type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
+      SILENT_REFRESH = { type = "bool", raw_value = CONFIG.SILENT_REFRESH },
+      TRACK_PURSUER = { type = "bool", raw_value = CONFIG.TRACK_PURSUER },
+      TRACK_CRYSTAL = { type = "bool", raw_value = CONFIG.TRACK_CRYSTAL },
+      BUTTON_X = { type = "number", raw_value = CONFIG.BUTTON_X, min = 0, max = GetInfo(281) - 50 },
+      BUTTON_Y = { type = "number", raw_value = CONFIG.BUTTON_Y, min = 0, max = GetInfo(280) - 50 },
     }
   }
   
@@ -483,43 +652,43 @@ function adjustAnchor(anchor_idx)
   if anchor == nil or anchor == "" or anchor == "None" then
     return
   elseif anchor == "Top Left (Window)" then 
-    BUTTON_X = 10
-    BUTTON_Y = 10
+    CONFIG.BUTTON_X = 10
+    CONFIG.BUTTON_Y = 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Bottom Left (Window)" then 
-    BUTTON_X = 10
-    BUTTON_Y = GetInfo(280) - 10
+    CONFIG.BUTTON_X = 10
+    CONFIG.BUTTON_Y = GetInfo(280) - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Top Right (Window)" then
-    BUTTON_X = GetInfo(281) - CONFIG.BUTTON_WIDTH - 10
-    BUTTON_Y = 10
+    CONFIG.BUTTON_X = GetInfo(281) - CONFIG.BUTTON_WIDTH - 10
+    CONFIG.BUTTON_Y = 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = false
   elseif anchor == "Bottom Right (Window)" then
-    BUTTON_X = GetInfo(281) - CONFIG.BUTTON_WIDTH - 10
-    BUTTON_Y = GetInfo(280) - 10
+    CONFIG.BUTTON_X = GetInfo(281) - CONFIG.BUTTON_WIDTH - 10
+    CONFIG.BUTTON_Y = GetInfo(280) - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = false
   elseif anchor == "Top Left (Output)" then
-    BUTTON_X = GetInfo(290) + 10
-    BUTTON_Y = GetInfo(291) + 10
+    CONFIG.BUTTON_X = GetInfo(290) + 10
+    CONFIG.BUTTON_Y = GetInfo(291) + 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Bottom Left (Output)" then
-    BUTTON_X = GetInfo(290) + 10
-    BUTTON_Y = GetInfo(293) - 10
+    CONFIG.BUTTON_X = GetInfo(290) + 10
+    CONFIG.BUTTON_Y = GetInfo(293) - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = true
   elseif anchor ==  "Top Right (Output)" then
-    BUTTON_X = GetInfo(292) - 10
-    BUTTON_Y = GetInfo(291) + 10
+    CONFIG.BUTTON_X = GetInfo(292) - 10
+    CONFIG.BUTTON_Y = GetInfo(291) + 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = false
   elseif anchor ==  "Bottom Right (Output)" then
-    BUTTON_X = GetInfo(292) - 10
-    BUTTON_Y = GetInfo(293) - 10
+    CONFIG.BUTTON_X = GetInfo(292) - 10
+    CONFIG.BUTTON_Y = GetInfo(293) - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = false
   end
@@ -558,6 +727,14 @@ function convertToBool(bool_value, def_value)
   end
 
   return def_value
+end
+
+function getValueOrDefault(value, default)
+  if value == nil then
+    return default
+  end
+
+  return value
 end
 
 function showWindow()

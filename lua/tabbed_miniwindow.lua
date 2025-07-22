@@ -20,6 +20,7 @@ local TEXT_BUFFERS = { all = {} }
 local FORMATTED_LINES = { all = {} }
 local SCROLL_OFFSETS = { all = 0 }
 local UNREAD_COUNT = { all = 0 }
+local PREINIT_LINES = { }
 local SELECTIONS = { all = { start_x = nil, start_y = nil, end_x = nil, end_y = nil } }
 
 local SCROLLBAR_THUMB_POS
@@ -84,10 +85,21 @@ function InitializeMiniWindow(character_name)
   loadSavedData()
   createWindowAndFont()
   INIT = true
-  drawMiniWindow()
+  if #PREINIT_LINES > 0 then
+    for i = 1, #PREINIT_LINES do
+      AddStyledLine(PREINIT_LINES[i].channel, PREINIT_LINES[i].segments)
+    end
+  else
+    drawMiniWindow()
+  end
 end
 
 function AddStyledLine(channel, styledLineSegments)
+  if not INIT then
+    table.insert(PREINIT_LINES, { channel = channel, segments = styledLineSegments })
+    return
+  end
+
   local currentOffset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
   local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local was_at_bottom = #formattedLines <= currentOffset + WINDOW_LINES + 1
