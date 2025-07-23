@@ -70,14 +70,14 @@
     <send>captureStart("%1", "%2")</send>
   </trigger>
 
-  <trigger enabled="n" keep_evaluating="n" name="capture_name_refresh" match="^This quest \[(.*?)\] is called \'(.*?)\'\,$" regexp="y" omit_from_output="y" sequence="100">
+  <trigger enabled="n" keep_evaluating="y" name="capture_name_refresh" match="^This quest \[(.*?)\] is called \'(.*?)\'\,$" regexp="y" omit_from_output="y" sequence="100">
   </trigger>
 
-  <trigger match=".+" keep_evaluating="y" regexp="y" name="capture_line" send_to="14" sequence="100">
+  <trigger match="*" keep_evaluating="y" name="capture_line" send_to="14" sequence="100">
     <send>captureLine("%0")</send>
   </trigger>
 
-  <trigger enabled="n" keep_evaluating="y" name="capture_line_refresh" regexp="y" match=".+" omit_from_output="y" sequence="100">
+  <trigger enabled="n" keep_evaluating="y" name="capture_line_refresh" match="*" omit_from_output="y" sequence="100">
   </trigger>
 
   <trigger match="^$" keep_evaluating="y" name="capture_end" regexp="y" send_to="14" sequence="100">
@@ -119,6 +119,13 @@
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^The orc pursuer gives you (.+)\.$" regexp="y" send_to="12" sequence="100">
+    <send>
+      SetPursuerTarget()
+      SetPursuerTime()
+    </send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You give the carcass of a captive dodo to an orc woman\.$" regexp="y" send_to="12" sequence="100">
     <send>
       SetPursuerTarget()
       SetPursuerTime()
@@ -172,6 +179,7 @@ require "questsearcher"
 
 local quest_num
 local quest_phases
+local refreshing = false
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
@@ -209,9 +217,13 @@ function captureStart(num, name)
     clearMiniWindow()
     return
   end
-  
+
   EnableTrigger("capture_line", true)
   EnableTrigger("capture_end", true)
+
+  if refreshing then
+    EnableTrigger("capture_line_refresh", true)
+  end
 
   clearMiniWindow()
   
@@ -287,12 +299,13 @@ function displayMultiParts(line, section)
 end
 
 function captureEnd()
+  refreshing = false
+
   EnableTrigger("capture_line", false)
   EnableTrigger("capture_end", false)
 
   EnableTrigger("capture_name_refresh", false)
   EnableTrigger("capture_line_refresh", false)
-  EnableTrigger("capture_prompt_refresh", false)
 end
 
 function clearWindow()
@@ -311,9 +324,8 @@ end
 
 function refreshQuest(quest_id)
   if isSilentRefreshEnabled() then
+    refreshing = true
     EnableTrigger("capture_name_refresh", true)
-    EnableTrigger("capture_line_refresh", true)
-    EnableTrigger("capture_prompt_refresh", true)
     SendNoEcho("quest status " .. quest_id)
   end
 end

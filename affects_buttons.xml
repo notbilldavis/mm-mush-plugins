@@ -270,7 +270,7 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>SetAffect("wolf_familiar", "120")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^There is a slight \*poof\* as an alert wolf vanishes\.$" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" regexp="y" send_to="12" sequence="100">
     <send>RemoveAffect("wolf_familiar")</send>
   </trigger>
 
