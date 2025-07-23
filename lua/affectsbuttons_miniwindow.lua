@@ -219,8 +219,12 @@ function affectsbuttons_drag_release(flags, hotspot_id)
 end
 
 function ABMW.ClearMiniWindow()
+  local possible_wolf = CURRENT_AFFECTS["wolf_familiar"]
   CURRENT_AFFECTS = {}
   PERM_AFFECTS = {}
+  if possible_wolf ~= nil then
+    CURRENT_AFFECTS["wolf_familiar"] = possible_wolf
+  end
 end
 
 function ABMW.CloseMiniWindow()
@@ -242,6 +246,7 @@ function ABMW.SaveMiniWindow()
   SetVariable(CHARACTER_NAME .. "_affectsbuttons_left", WindowInfo(WIN, 10))
   SetVariable(CHARACTER_NAME .. "_affectsbuttons_top", WindowInfo(WIN, 11))
   SetVariable(CHARACTER_NAME .. "_affectsbuttons_buttons", Serialize(BUTTONS))
+  SetVariable(CHARACTER_NAME .. "_affectsbuttons_broadcast", Serialize(BROADCAST))
   
   bad_affects.SaveMiniWindow()
 end
@@ -476,6 +481,13 @@ function abmw.loadSavedData()
     DURATIONS = {}
   else
     DURATIONS = Deserialize(serialized_durations)
+  end
+
+  local serialized_broadcasts = GetVariable(CHARACTER_NAME .. "_affectsbuttons_broadcast") or ""
+  if serialized_broadcasts == "" then
+    BROADCAST = { sanctuary = true }
+  else
+    BROADCAST = Deserialize(serialized_broadcasts)
   end
 end
 
@@ -873,6 +885,8 @@ function ABMW.ToggleBroadcastAffect(affect)
 
   if BROADCAST[affect] then Note("Losing and gaining '" .. affect .. "' will be broadcast.") 
   else Note("Losing and gaining '" .. affect .. "' will NOT be broadcast.") end
+
+  ABMW.SaveMiniWindow()
 end
 
 function abmw.configure()
@@ -881,6 +895,23 @@ end
 
 function abmw.configureDone(group_id, option_id, config)
   abmw.saveButtonsConfiguration(option_id, config)
+end
+
+function ABMW.ShowBroadcasts()
+  if BROADCAST == nil then BROADCAST = {} end
+  local broadcasts = {}
+  for aff, broadcasting in pairs(BROADCAST) do
+    if broadcasting then
+      table.insert(broadcasts, aff)
+    end
+  end
+  if #broadcasts == 0 then 
+    Note("You are not broadcasting any affects. Use 'affects broadcast <affect>' to add one.")
+  else 
+    Tell("You are broadcasting the following affects: ")
+    ColourNote("white", "black", table.concat(broadcasts, ", "))
+    Note("Use 'affects broadcast <affect>' to add more.")
+  end  
 end
 
 -- serialization

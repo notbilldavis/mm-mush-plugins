@@ -44,6 +44,7 @@ and using 'affects edit <title>' will walk you through it that way.
 
 This will move the button around.
 
+ * affects broadcast
  * affects broadcast <affect>
 
 When this affect is applied we can broadcast it for other plugins to pick it up
@@ -145,6 +146,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
   <alias match="^affects[ ]+stretch$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>Buttons.ToggleStretchHeight()</send>
+  </alias>
+
+  <alias match="^affects[ ]+broadcast$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Buttons.ShowBroadcasts()</send>
   </alias>
 
   <alias match="^affects[ ]+broadcast[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
