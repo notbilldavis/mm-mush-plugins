@@ -29,6 +29,8 @@ Sort your boss killed list by kill order, will add other sorts like by category 
 
 ## Capture Quest
 
+![Image](https://github.com/user-attachments/assets/4f4965aa-b5b4-4436-a88b-7baba0470b0a)
+
 Puts a little quest button on the screen to track your current quest in a collapsable mini window. Will also look the quest up on annwn.info for a little help. Can do a quest hint <phase #> for additional info pulled too. It will save quests in a db so it doesn't try to get it multiple times from the site. Can get weird for quests not found on annwn though. Will be adding customization to this soon too.
 
 Will need the quest_miniwindow.lua and questsearcher.lua files in the MUSHclient\lua folder.
