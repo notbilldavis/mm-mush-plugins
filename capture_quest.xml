@@ -104,7 +104,7 @@
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^All parts of your quest (.*?) are complete\." regexp="y" send_to="12" sequence="100">
-    <send>refreshQuest("%1") </send>
+    <send>refreshQuest() </send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^\'Thank you\, (.+)\!\' Tadamir the guildsman exclaims to you\. \'Here is your reward\, as promised\.\'$" regexp="y" send_to="12" sequence="100">
@@ -326,6 +326,7 @@ function refreshQuest(quest_id)
   if isSilentRefreshEnabled() then
     refreshing = true
     EnableTrigger("capture_name_refresh", true)
+    if quest_id == nil then quest_id = quest_num end
     SendNoEcho("quest status " .. quest_id)
   end
 end
