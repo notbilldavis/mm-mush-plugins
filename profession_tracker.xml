@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="profession_tracker"
+   author="Oona"
+   id="680515ae0d330ddc5d65c5c3"
+   language="Lua"
+   purpose="look up whether you need a manual for profession"
+   save_state="y"
+   date_written="2025-05-05 12:00:00"
+   requires="4.71"
+   version="1.0"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+Track the manuals you need for the Mark of Profession so you know what you already turned in 
+and hopefully which you don't need at all. I pulled this list from the ooc wiki but the newest 
+version hasn't been updated completely so it may be missing manuals. Let me know if you come 
+acrossed one like that so I can add it. If the depressed romantic tells you he wants one that 
+isn't on the list then it will give you the option to send me a tell if I am on.
+
+Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
+
+]]>
+
+</description>
+
+</plugin>
+
+<aliases>
+
+  <alias match="^prof[ ]+owned$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showOwned()</send>
+  </alias>
+
+  <alias match="^prof[ ]+needed$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>showNeeded()</send>
+  </alias>
+
+  <alias match="^prof[ ]+add[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>add("%1")</send>
+  </alias>
+
+  <alias match="^prof[ ]+clear$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>clear()</send>
+  </alias>
+
+  <alias match="^prof[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setCharacterName("%1")</send>
+  </alias>
+
+  <alias match="^prof[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>checkForUpdates()</send>
+  </alias>
+
+  <alias enabled="y" match="^prof$" regexp="y" send_to="12" sequence="100">
+    <send>showCommands()</send>
+  </alias>
+ 
+</aliases>
+
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a manual of (.*?) \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+    <send>need("%1", "%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You put a manual of (.*?) in Vandemaar\'s Trunk\.$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>added("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^\'Ohh\, a manual of (.*?)\!\' a depressed romantic exclaims to you\. \'That\'s exactly what I needed\! Thank you\, (.*?)\!\'$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>added("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^.+Could you get me a manual of (.*?)\? It\'s very important to me.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>ensure("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^.+have you brought me that manual of (.*?) like I asked\?.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>ensure("%1")</send>
+  </trigger>  
+
+  <trigger enabled="y" keep_evaluating="y" match="^You focus your powers of observation on Vandemaar\'s Trunk(.*?)$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>startCount()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a gold-leaf binder of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+    <send>addBinders("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a silver-bound folio of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+    <send>addFolios("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^functioning as a grisly keyhole(.*?)$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>endCount()</send>
+  </trigger>
+
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>onFirstPrompt()</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+
+needed_manuals = {
+  "enhanced strength", "refresh",
+  "acid blast", "bless", "blindness", "spark", "call lightning", "calm", "cause critical",
+  "cause light", "change sex", "chill touch", "color spray", "light", "cure blindness", 
+  "cure critical", "cure disease", "cure light", "cure poison", "curse", "cure serious", 
+  "detect alignment", "detect invisibility", "detect illusion", "dispel magic", "hands of wind",
+  "dispel area", "frost", "tremor", "energy drain", "faerie fire", "silence", "fireball",
+  "abjure", "levitation", "gate travel", "plane travel", "harm", "heal", "infravision",
+  "invisibility", "enervation", "kill", "magic dart", "magic lock", "magic unlock", "nexus",
+  "pass door", "plague", "poison", "protection from evil", "recharge item", "sanctuary",
+  "room shield", "counterspell", "circle of fire", "sleep", "stone skin", "blink", "teleport",
+  "weaken", "word of recall", "fire breath", "frost breath", "gas breath", "lightning breath",
+  "animate dead", "earth invocation", "magma invocation", "radiance invocation", "minerals invocation",
+  "vacuum invocation", "fire evocation", "earth evocation", "smoke evocation", "ooze evocation",
+  "magma evocation", "radiance evocation", "minerals evocation", "vacuum evocation",
+  "underwater breathing", "slow", "summon elemental", "find familiar", "dust evocation",
+  "ash evocation", "axe", "dagger", "flail", "spear", "sword", "whip", "shield block", "backstab",
+  "bash", "dart", "kick", "magical fade", "second attack", "fast healing", "hide", "mind shield",
+  "acrobatics", "meditation", "feeding", "tracking", "shape shifting", "stealing", "hook", "lance",
+  "pike", "disarm traps", "throwing star", "throwing spear", "nunchaku", "staff", "scythe",
+  "two-handed sword", "two-handed axe", "maul", "boomerang", "bola", "exotic", "bar",
+  "telesmatic force", "disrupt sight", "knock", "mesmerize", "mimic", "pense", "spook",
+  "telekinetic punch", "telekinetic pierce", "telekinetic explosion", "teleview", "sensory enhancement",
+  "warp", "blind fighting", "snare", "chain lightning", "reflective fireball", "fountain",
+  "telekinetic shield", "combat blink", "sanctify", "poison gas", "spell shield", "confusion",
+  "reanimate", "jinx", "evil eye", "malediction", "repulsion", "ice whip", "elemental shield",
+  "summon mount", "enhanced endurance", "energy orb", "martial arts", "circle of thorns",
+  "induce aggression", "concealment", "iceball", "mental disruption", "augment aura", "malignancy",
+  "leech", "famine", "negation", "impede movement", "hex", "shadow light", "read aura",
+  "consecrate weapon", "consecrate armor", "desecrate armor", "beacon", "nullification",
+  "cancellation", "convocation", "quicksand", "ember carom", "illumination", "channel faith",
+  "magnetic field", "perception", "landslide", "air blast", "air halo", "enhanced fireshield", "sweep",
+  "geisteblitz", "demigod visage", "herald bloodthirst", "blood dance", "guise of nature",
+  "otolithic growth", "fungal growth", "searing touch", "requiem", "whirlwind", "bleakness", "harrow",
+  "irk", "disequilibriate", "tinnitus", "mental clarity", "unnatural strength", "remote sensing",
+  "cover of darkness", "frenzy", "slit purse", "slit armor", "feign death", "feign presence",
+  "feign knowledge", "regenerate cartilage", "withering touch", "raise hell", "faerie ring",
+  "hydroblast", "bubble cluster", "desperation", "aegis", "camouflage", "concentration", "totem",
+  "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
+  "strike pain", "one with the forest", "battle caster", "animate weapon"
+}
+
+owned_manuals = {}
+discovered_manuals = {}
+
+needed_manuals_set = {}
+owned_manuals_set = {}
+
+local character_name
+local confirm_clear = false
+
+local counting = false
+local count_skill = 0
+local count_stats = 0
+local count_folio = 0
+local count_binder = 0
+
+local longest = 20
+
+function OnPluginInstall()
+  EnableTrigger("first_prompt", true)
+end
+
+function OnPluginEnable()
+  character_name = nil
+  EnableTrigger("first_prompt", true)
+end
+
+function OnPluginConnect()
+  character_name = nil
+  EnableTrigger("first_prompt", true)
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
+end
+
+function onFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  Execute("sendgmcp char.base")
+end
+
+function OnPluginBroadcast(msg, id, pname, text)
+  if id == "f67c4339ed0591a5b010d05b" then
+    if (text == "char.base") then
+      if character_name == nil or character_name == "" then
+        local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
+        luastmt = "gmcpdata = " .. gmcparg
+        assert(loadstring(luastmt or ""))()
+        setCharacterName(gmcpval("name"))
+      end
+    end
+  end
+end
+
+function setCharacterName(name)
+  if name == nil or name == "" then
+    Note("Unknown character name, set with 'prof setchar <name>'") 
+  else
+    character_name = name
+    
+    owned_manuals = {}
+    needed_manuals_set = {}
+    owned_manuals_set = {}
+    discovered_manuals = {}
+
+    local owned_manuals_text = GetVariable(character_name .. "_owned_manuals") or ""
+    if (owned_manuals_text ~= "") then
+      owned_manuals = deserialize(owned_manuals_text)
+      for _, ability in ipairs(owned_manuals) do
+        owned_manuals_set[ability] = true
+      end
+    end
+
+    local discovered_manuals_text = GetVariable("prof_tracker_discovered_manuals") or ""
+    if (discovered_manuals_text ~= "") then
+      discovered_manuals = deserialize(discovered_manuals_text)
+      for _, ability in ipairs(discovered_manuals) do
+        table.insert(needed_manuals, ability)
+      end
+    end
+
+    for _, ability in ipairs(needed_manuals) do
+      needed_manuals_set[ability] = true
+      if #ability + 2 > longest then
+        longest = #ability + 2
+      end
+    end
+
+    for _, ability in ipairs(owned_manuals) do
+      owned_manuals_set[ability] = true
+    end    
+  end
+end
+
+function clear()
+  if name == nil or name == "" then
+    Note("The plugin 'profession_tracker' is not ready, try again in a few seconds.")
+  else
+    if confirm_clear then
+      owned_manuals_set = {}
+      owned_manuals = {}
+      SetVariable(character_name .. "_owned_manuals", serialize(owned_manuals))
+      SaveState()
+      Note("Owned manuals have been cleared for this character.")
+      confirm_clear = false
+    else
+      ColourTell("yellow", "black", "WARNING")
+      Note(": This will clear all owned manuals for this character!")
+      Tell("If you are sure then type '")
+      ColourTell("white", "black", "prof clear")
+      Note("' again in the next 5 seconds.")    
+      confirm_clear = true
+      DoAfterSpecial(5, "resetClear()", sendto.script)
+    end
+  end
+end
+
+function resetClear()
+  if confirm_clear then
+    confirm_clear = false
+    Note("You took too long, owned manuals were not cleared for this character.")
+  end
+end
+
+function startCount()
+  count_skill = 0
+  count_stats = 0
+  count_folio = 0
+  count_binder = 0
+
+  counting = true
+end
+
+function endCount()
+  counting = false
+
+  if count_skill > 0 then Note("Total skill manuals: " .. count_skill) end  
+  if count_stats > 0 then Note("Total stat manuals: " .. count_stats) end  
+  if count_folio > 0 then Note("Total silver-folios: " .. count_folio) end  
+  if count_binder > 0 then Note("Total gold-binders: " .. count_binder) end
+
+  count_skill = 0
+  count_stats = 0
+  count_folio = 0
+  count_binder = 0
+end
+
+function add(manual)
+  local lower_manual = manual:lower()
+  if needed_manuals_set[lower_manual] then
+    added(manual)
+  else
+    Note("You don't need that manual for the mark.")
+  end
+end
+
+function ensure(manual)
+  manual = manual:lower()
+  if not needed_manuals_set[manual] then
+    needed_manuals_set[manual] = true
+    table.insert(discovered_manuals, manual)
+    SetVariable("prof_tracker_owned_manuals", serialize(discovered_manuals))
+    SaveState()
+
+    Note("This manual wasn't in the list of known manuals for the mark, oops!")
+    Note("Try to send a tell or mail to Oona so they can add it to the script.")
+    Hyperlink("tell oona the manual of " .. manual .. " is needed for the profession mark, add it to the tracker script!", "[click here to try to send such a tell if Oona is online]", "", "silver", "black", false)
+    Note("")
+  end
+end
+
+function isManualNeeded(name)
+  return needed_manuals_set[name] and not owned_manuals_set[name]
+end
+
+function need(prefix, manual)
+  local isNeededString = " [not needed]"
+  if needed_manuals_set[manual] then
+    if owned_manuals_set[manual] then
+      isNeededString = " [already have]"
+    else
+      isNeededString = " [NEEDED]"
+    end
+  end
+
+  ColourTell("lightgray", "black", prefix .. " a manual of " .. manual .. " (new)")
+  ColourNote("lightgray", "black", isNeededString)
+
+  if counting then
+    local prefix_count = Trim(prefix:gsub("[()]", ""))
+    local prefix_num = tonumber(prefix_count) or 1
+
+    if manual == "hit point enhancement" or manual == "spell point enhancement" or manual == "stamina enhancement" then
+      count_stats = count_stats + prefix_num
+    else  
+      count_skill = count_skill + prefix_num
+    end
+  end
+end
+
+function added(manual)
+  if isManualNeeded(manual) then
+    table.insert(owned_manuals, manual)
+    owned_manuals_set[manual] = true
+    SetVariable(character_name .. "_owned_manuals", serialize(owned_manuals))
+    SaveState()
+    Note("Added the needed manual of " .. manual .. " to the owned manuals.")
+  end
+end
+
+function showOwned()
+  table.sort(owned_manuals, function (a, b) return a < b end)
+
+  displayHeader("Manuals Owned for Mark of Profession", true)
+
+  local count_skill = 0
+  for _, manual in ipairs(owned_manuals) do
+    count_skill = count_skill + 1
+    Tell("|")
+    ColourTell("white", "black", centerString(manual))
+
+    if count_skill % 3 == 0 then        
+      Note("|")
+    end
+  end
+
+  local extra = 0
+  while ((count_skill + extra) % 3 ~= 0)
+  do
+    extra = extra + 1
+    Tell("|")
+    Tell(centerString(""))
+
+    if (count_skill + extra) % 3 == 0 then        
+      Note("|")
+    end
+  end
+
+  displayHeader(count_skill .. " out of " .. #needed_manuals .. " required manuals", false)
+end
+
+function showNeeded()
+  table.sort(needed_manuals, function (a, b) return a < b end)
+
+  displayHeader("Manuals Needed for Mark of Profession", true)
+  
+  local count_skill = 0
+  for _, manual in ipairs(needed_manuals) do
+    if not owned_manuals_set[manual] then
+      count_skill = count_skill + 1
+      Tell("|")
+      ColourTell("white", "black", centerString(manual))
+
+      if count_skill % 3 == 0 then        
+        Note("|")
+      end
+    end
+  end
+
+  local extra = 0
+  while ((count_skill + extra) % 3 ~= 0)
+  do
+    extra = extra + 1
+    Tell("|")
+    Tell(centerString(""))
+
+    if (count_skill + extra) % 3 == 0 then        
+      Note("|")
+    end
+  end
+
+  displayHeader(count_skill .. " more manuals remaining", false)
+end
+
+function addFolios(prefix)
+  if counting then
+    local prefix_count = Trim(prefix:gsub("[()]", ""))
+    local prefix_num = tonumber(prefix_count) or 1
+    
+    count_folio = count_folio + prefix_num
+  end
+end
+
+function addBinders(prefix)
+  if counting then
+    local prefix_count = Trim(prefix:gsub("[()]", ""))
+    local prefix_num = tonumber(prefix_count) or 1
+    
+    count_binder = count_binder + prefix_num
+  end
+end
+
+function displayHeader(header, top)
+  if top == nil then top = true end
+  local div_char = "."
+  if top then div_char = "-" end
+
+  Tell(".")
+  Tell(string.rep("-", longest))
+  Tell(div_char)
+  Tell(string.rep("-", longest))
+  Tell(div_char)
+  Tell(string.rep("-", longest))
+  Note(".")
+
+  Tell("|")
+  Tell(centerString(header, longest * 3 + 2))
+  Note("|")
+
+  if top then div_char = "."
+  else div_char = "-" end
+
+  Tell(".")
+  Tell(string.rep("-", longest))
+  Tell(div_char)
+  Tell(string.rep("-", longest))
+  Tell(div_char)
+  Tell(string.rep("-", longest))
+  Note(".")
+end
+
+function centerString(str, total_length)
+  if total_length == nil or total_length <= 0 then total_length = longest end
+  local str_len = #str
+  if total_length <= str_len then
+    return str
+  end
+
+  local padding = total_length - str_len
+  local left_padding = math.floor(padding / 2)
+  local right_padding = padding - left_padding
+
+  return string.rep(" ", left_padding) .. str .. string.rep(" ", right_padding)
+end
+
+function showCommands()
+  showCommand("prof needed", "show the manuals you need")
+  showCommand("prof owned", "show the manuals you have already collected or turned in")
+  showCommand("prof add <manual>", "manually add to the owned list, use just the name of the skill/spell")
+  showCommand("prof clear", "clear your entire owned list for this character, must confirm")
+  showCommand("prof update", "try to update from github, it will try this on disconnect")
+end
+
+function showCommand(cmd, desc)
+  Tell("* ")
+  ColourTell("white", "black", cmd)
+  Tell(" - ")
+  ColourNote("silver", "black", desc)
+end
+
+function checkForUpdates()
+  local updater_installed, updater = pcall(require, "updatehelper")
+
+  if not updater_installed then
+    ColourNote("red" , "black", "Could not find 'updatehelper.lua' while checking for updates.")
+  else
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/profession_tracker.xml" },
+    })
+  end
+end
+
+function serialize(table)
+  local function serializeValue(value)
+    if type(value) == "table" then
+      return serialize(value)
+    elseif type(value) == "string" then
+      return string.format("%q", value)
+    else
+      return tostring(value)
+    end
+  end
+
+  local result = "{"
+  for k, v in pairs(table) do
+    local key
+    if type(k) == "string" and k:match("^%a[%w_]*$") then
+      key = k
+    else
+      key = "[" .. serializeValue(k) .. "]"
+    end
+    result = result .. key .. "=" .. serializeValue(v) .. ","
+  end
+  result = result .. "}"
+  return result
+end
+
+function deserialize(serializedTable)
+  local func = load("return " .. serializedTable)
+  if func then
+    return func()
+  else
+    return nil, "Failed to load string"
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>

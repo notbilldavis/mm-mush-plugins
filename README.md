@@ -67,6 +67,16 @@ Track lootables so you know when you can loot them again. Has a couple in there 
 
 This is saved per character and will try to update itself on disconnect.
 
+## Profession Tracker
+
+Track the manuals you need for the Mark of Profession so you know what you already turned in and hopefully which you don't need at all. I pulled this list from the ooc wiki but the newest version hasn't been updated completely so it may be missing manuals. Let me know if you come acrossed one like that so I can add it. If the depressed romantic tells you he wants one that isn't on the list then it will give you the option to send me a tell if I am on.
+
+Type 'prof owned' or 'prof needed' to use.
+
+Also counts up your manuals, folios, and binders when you look in trunks to help artifice.
+
+This is saved per character and will try to update itself on disconnect.
+
 ## Split Scroll
 
 ![Image](https://github.com/user-attachments/assets/b041c136-5dc5-491c-ab95-2771f6ae1ce5)
