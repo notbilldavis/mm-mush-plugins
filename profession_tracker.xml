@@ -249,7 +249,7 @@ function setCharacterName(name)
 end
 
 function clear()
-  if name == nil or name == "" then
+  if character_name == nil or character_name == "" then
     Note("The plugin 'profession_tracker' is not ready, try again in a few seconds.")
   else
     if confirm_clear then

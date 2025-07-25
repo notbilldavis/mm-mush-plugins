@@ -178,7 +178,7 @@ local alyria_destinations = {
   "newrigel", "diocletian", "xaventry", "avarice", "desertthorn", "gilvery", "lasler", "lowangen",
   "mandrake", "newkolvir", "runeforest", "towerofart", "wroth", "twinmoons", "hillgiants", 
   "travelersretreat", "lonelydragon", "jointmagicconsortium", "tavernoftheboars",
-  "emperorscrossroads", "vospire", "tellerium", "templeton", "dorathon",
+  "shlarksh", "takhtin", "emperorscrossroads", "vospire", "tellerium", "templeton", "dorathon",
   "winton", "keep", "deceit", "vandemaar", "xalt", "mulakanathos", "gorth", "vesuvius"
 }
 
