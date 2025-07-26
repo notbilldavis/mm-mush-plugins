@@ -38,6 +38,10 @@ local ANCHOR_LIST = {
   "5: Top Left (Output)", "6: Bottom Left (Output)", "7: Top Right (Output)", "8: Bottom Right (Output)",
 }
 
+local EXPAND_LIST = {
+  "0: Never", "1: First Phase", "2: All Phases"
+}
+
 function InitializeMiniWindow()
   loadSavedData()
   createWindowAndFont()
@@ -72,6 +76,7 @@ function loadSavedData()
   CONFIG.TRACK_CRYSTAL = getValueOrDefault(CONFIG.TRACK_CRYSTAL, true)
   CONFIG.BUTTON_X = getValueOrDefault(CONFIG.BUTTON_X, GetVariable("quest_buttonx") or GetInfo(292) - CONFIG.BUTTON_WIDTH - 25)
   CONFIG.BUTTON_Y = getValueOrDefault(CONFIG.BUTTON_Y, GetVariable("quest_buttony") or GetInfo(293) - CONFIG.BUTTON_HEIGHT - 25)
+  CONFIG.EXPAND_PHASES = getValueOrDefault(CONFIG.EXPAND_PHASES, 2)
 
   pcall("DeleteVariable", "quest_buttonx")
   pcall("DeleteVariable", "quest_buttony")
@@ -124,6 +129,19 @@ function setSizeAndPositionToContent()
 
   if TEXT_BUFFER == nil then
     TEXT_BUFFER = { }
+  end
+
+  if CONFIG.EXPAND_PHASES == 2 then
+    for _, line in ipairs(TEXT_BUFFER) do
+      if line.segments[1].text:sub(1, 5) == "Phase" and line.segments[2].textcolour ~= ColourNameToRGB("dimgray") then
+        SECTION_STATUS[line.section] = true
+        break
+      end
+    end
+  elseif CONFIG.EXPAND_PHASES == 3 then
+    for sec, _ in pairs(SECTION_STATUS) do
+      SECTION_STATUS[sec] = true
+    end
   end
 
   CURRENT_BUTTON_COLOR = CONFIG.ACTIVE_BUTTON_COLOR
@@ -629,10 +647,21 @@ function configure()
       TRACK_CRYSTAL = { type = "bool", raw_value = CONFIG.TRACK_CRYSTAL },
       BUTTON_X = { type = "number", raw_value = CONFIG.BUTTON_X, min = 0, max = GetInfo(281) - 50 },
       BUTTON_Y = { type = "number", raw_value = CONFIG.BUTTON_Y, min = 0, max = GetInfo(280) - 50 },
+      EXPAND_PHASES = { type = "list", value = getExpandPhasesText(CONFIG.EXPAND_PHASES), raw_value = CONFIG.EXPAND_PHASES, list = EXPAND_LIST },
     }
   }
   
   config_window.Show(config, configureDone)
+end
+
+function getExpandPhasesText(opt)
+  if opt == 1 then
+    return "None"
+  elseif opt == 2 then
+    return "First Phase"
+  elseif opt == 3 then
+    return "All Phases"
+  end
 end
 
 function configureDone(group_id, option_id, config)
