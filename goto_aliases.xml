@@ -467,7 +467,7 @@ function tryRun(dest)
   local directions = { 
     "w", "west", "e", "east", "n", "north", "s", "south", 
     "nw", "northwest", "ne", "northeast", "se", "southeast", 
-    "sw", "southwest" }
+    "sw", "southwest", "rune" }
   
   for _, entry in ipairs(directions) do
     if dest == entry then
