@@ -504,7 +504,7 @@ function badaffects_button_click(flags, hotspot_id)
 end
 
 function bamw.configure()
-  config_window.Show(BAMW.GetConfiguration(), bamw.configureDone)
+  config_window.Show({ Config = BAMW.GetConfiguration()}, bamw.configureDone)
 end
 
 function bamw.configureDone(group_id, option_id, config)

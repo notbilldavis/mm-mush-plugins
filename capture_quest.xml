@@ -107,6 +107,10 @@
     <send>refreshQuest() </send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" omit_from_output="y" match="^  Spell Points\:(.*?)Quest Points\:(.*?)$" regexp="y" send_to="14" sequence="100">
+    <send>replaceQuestTime("%1", "%2")</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" match="^\'Thank you\, (.+)\!\' Tadamir the guildsman exclaims to you\. \'Here is your reward\, as promised\.\'$" regexp="y" send_to="12" sequence="100">
     <send>
       SetCrystalTarget()
@@ -139,6 +143,14 @@
 
   <trigger enabled="y" keep_evaluating="y" match="^You take a (blood|small) crystal\.$" sequence="100" send_to="10">
     <send>Execute("imap crystal off")</send>
+  </trigger>
+
+  <trigger enabled="y" match="^\* You may ask Tadamir for another map at\: (.*?)$" omit_from_output="y" regexp="y" send_to="14" sequence="100">
+    <send>replaceCrystalTime("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" name="capture_time_offset" match="^The current system time is\: (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>setOffset("%1")</send>
   </trigger>
 
 </triggers>
@@ -180,6 +192,7 @@ require "questsearcher"
 local quest_num
 local quest_phases
 local refreshing = false
+local hour_offset = 1
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
@@ -188,6 +201,20 @@ end
 
 function OnPluginEnable()
   clearMiniWindow()
+end
+
+function OnPluginConnect()
+  local offset = GetVariable("hour_offset")
+  if offset == nil then
+    DoAfterSpecial(1, "tryGetOffset()", sendto.script)
+  else
+
+  end
+end
+
+function tryGetOffset()
+  Note("Sending time to get hour offset from server...")
+  Send("time")
 end
 
 function OnPluginClose()
@@ -407,6 +434,87 @@ function doCrystalLoop(location)
   else
     Note("error accessing MagicMap - code: " .. retcode)
   end
+end
+
+function replaceCrystalTime(time_str)
+  local converted_time, year, month, day, hour, minute, second = convertToTime(time_str)
+  local details = getTimeDiff(converted_time)
+  local formatted_date = getFormattedDateTime(year, month, day, hour, minute, second)
+  ColourNote("lightgray", "black", "* You may ask Tadamir for another map " .. details .. "(" .. formatted_date .. ")")
+end
+
+function replaceQuestTime(sp, qp)
+  local details = "NOW!"
+  if TIMES ~= nil and TIMES.QUEST_TIME ~= nil then
+    details = getTimeDiff(TIMES.QUEST_TIME)
+  end
+  ColourNote("lightgray", "black", "  Spell Points:" .. sp .. "Quest Points:" .. qp .. " [" .. details .. "]")
+end
+
+function getTimeDiff(input_time)
+  local details = "NOW!"
+  local differenceInSeconds = provided_time - os.time()
+  if differenceInSeconds > 0 then
+      local diff_minutes = math.floor(differenceInSeconds / 60)
+      details = "in " .. diff_minutes .. " minutes"
+  end
+
+  return details
+end
+
+function getFormattedDateTime(year, month, day, hour, minute, second)
+  local formatMinute = ""
+  if (minute < 10) then
+    formatMinute = "0"
+  end
+
+  return month .. "/" .. day .. "/" .. year .. " " .. hour .. ":" .. formatMinute .. minute .. " " .. ampm
+end
+
+function convertToTime(time_str)
+  local ampm = "am"
+  local month_map = {
+      Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
+      Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12
+  }
+
+  local day = tonumber(time_str:sub(9, 10))
+  local hour = tonumber(time_str:sub(12, 13))
+  local minute = tonumber(time_str:sub(15, 16))
+  local second = tonumber(time_str:sub(18, 19))
+  local year = tonumber(time_str:sub(22, 25))
+
+  local month_str = time_str:sub(5, 7)
+  local month = month_map[month_str]
+
+  hour = hour + hour_offset;
+
+  local provided_time = os.time {
+      year = year + 2000,
+      month = month,
+      day = day,
+      hour = hour,
+      min = minute,
+      sec = second,
+  }
+
+  if (hour == 24) then hour = 0 end
+  if (hour > 11) then ampm = "pm" end
+  if (hour == 0) then hour = 12 end 
+  if (hour > 12) then hour = hour - 12 end
+
+  return provided_time, year, month, day, hour, minute, second
+end
+
+function setOffset(time_str)
+  EnableTrigger("capture_time_offset", false)
+
+  local input_time, year, month, day, hour, minute, second = convertToTime(time_str)
+  local offset_seconds = os.difftime(input_time, os.time())
+  local offset_hours = math.floor(offset_seconds / 3600 + 0.5)
+  hour_offset = tonumber(offset_hours)
+  SetVariable("hour_offset", hour_offset)
+  SaveState()
 end
 
 function split(str)

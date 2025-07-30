@@ -278,6 +278,9 @@ local GAGS = {
   },
   say = {
     "[CLAN]"
+  },
+  tell = {
+    "'I don't know any skills in which I could train you.'"
   }
 }
 

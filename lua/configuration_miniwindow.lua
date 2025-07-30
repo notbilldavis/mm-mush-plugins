@@ -7,36 +7,43 @@ local FONT_UNDERLINE = WIN .. "_font_underline"
 
 local WINDOW_WIDTH = 225
 local WINDOW_HEIGHT = 25
+local WINDOW_X = nil
+local WINDOW_Y = nil
 local LINE_HEIGHT = nil
 local LABEL_WIDTH = 100
 local VALUE_WIDTH = 100
 local WINDOW_INFO = ""
+local SECTION_STATUS = { }
 local CONFIG = { }
 local SAVE_CALLBACK
 
--- CONFIG = { WINDOW_WIDTH = { name = "Width", type = "number", value = 150 } }
--- number, text, color, font, toggle, list
+function CMW.IsOpen()
+  return WindowInfo(WIN, 5)
+end
 
 function CMW.Show(config, saveCallback)
-  CONFIG = config
-  SAVE_CALLBACK = saveCallback
+  if not CMW.IsOpen() then
+    CONFIG = config
+    SAVE_CALLBACK = saveCallback
+    cmw.initialize()
+  end
+
   cmw.show()
 end
 
-function cmw.show()
+function cmw.initialize()
   WindowCreate(WIN, 0, 0, 0, 0, miniwin.pos_center_all, 0, 0)
   WindowFont(WIN, FONT, "Lucida Console", 9)
   WindowFont(WIN, FONT_UNDERLINE, "Lucida Console", 9, false, false, true)
-  LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 2
+  LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 2  
   WINDOW_HEIGHT = cmw.getHeight(CONFIG)
   WINDOW_WIDTH = LABEL_WIDTH + 25 + VALUE_WIDTH
+  WINDOW_X = ((GetInfo(292) - GetInfo(290)) / 2 + GetInfo(290)) - WINDOW_WIDTH / 2
+  WINDOW_Y = ((GetInfo(293) - GetInfo(291)) / 2 + GetInfo(291)) - WINDOW_HEIGHT / 2
+end
 
-  local output_width = GetInfo(292) - GetInfo(290)
-  local output_height = GetInfo(293) - GetInfo(291)
-  local output_center_x = output_width / 2 + GetInfo(290)
-  local output_center_y = output_height / 2 + GetInfo(291)
-
-  WindowPosition(WIN, output_center_x - WINDOW_WIDTH / 2, output_center_y - WINDOW_HEIGHT / 2, 4, 2)
+function cmw.show()
+  WindowPosition(WIN, WINDOW_X, WINDOW_Y , 4, 2)
   WindowResize(WIN, WINDOW_WIDTH, WINDOW_HEIGHT, ColourNameToRGB("black"))
   
   WindowRectOp(WIN, miniwin.rect_fill, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, ColourNameToRGB("black"))
@@ -46,26 +53,61 @@ function cmw.show()
   WindowLine(WIN, WINDOW_WIDTH - LINE_HEIGHT - 2, 2, WINDOW_WIDTH - 2, LINE_HEIGHT + 2, ColourNameToRGB("white"), miniwin.pen_solid, 2)
   WindowLine(WIN, WINDOW_WIDTH - LINE_HEIGHT - 2, LINE_HEIGHT + 2, WINDOW_WIDTH - 2, 2, ColourNameToRGB("white"), miniwin.pen_solid, 2)
   WindowAddHotspot(WIN, "close_hotspot", WINDOW_WIDTH - LINE_HEIGHT - 2, 2, WINDOW_WIDTH - 2, LINE_HEIGHT + 2, "", "", "", "", "cmw_configure_close", "Close", miniwin.cursor_hand, 0)
+
+  if cmw.getSize(CONFIG) > 1 then 
+    local white = ColourNameToRGB("white")
+    local start_x = WindowTextWidth(WIN, FONT, "Configuration ") 
+    local single, space = WindowTextWidth(WIN, FONT, "[+]"), WindowTextWidth(WIN, FONT, " ")
+    local collapse_color, expand_color = ColourNameToRGB("dimgray"), ColourNameToRGB("dimgray")
+
+    for k, _ in pairs(CONFIG) do
+      if SECTION_STATUS[k] then
+        collapse_color = white
+      else
+        expand_color = white
+      end
+    end
+
+    WindowText(WIN, FONT, "[+] ", start_x, 2, 0, 0, expand_color)
+    WindowText(WIN, FONT, "[-]", start_x + single + space, 2, 0, 0, collapse_color)
+    if expand_color == white then
+      WindowAddHotspot(WIN, "expand_all", start_x, 2, start_x + single, 2 + LINE_HEIGHT, "", "", "", "", "cmw_expand_collapse", "", miniwin.cursor_hand, 0)
+    end
+    if collapse_color == white then
+      WindowAddHotspot(WIN, "collapse_all", start_x + single + space, 2, start_x + space + single * 2, 2 + LINE_HEIGHT, "", "", "", "", "cmw_expand_collapse", "", miniwin.cursor_hand, 0)
+    end
+  end
   
+  local sort_func = function(a, b)
+    local a_sort = a.sort or a.label or ""
+    local b_sort = b.sort or b.label or ""
+    return a_sort < b_sort
+  end
+
   local y = LINE_HEIGHT + 5
   for key, group in cmw.pairsByKeys(CONFIG) do
     if cmw.getSize(CONFIG) > 1 then 
-      WindowText(WIN, FONT, " - " .. key:gsub("_", " ") .. " - ", 2, y, 0, 0, ColourNameToRGB("white"), true) 
+      local marker = " - "
+      if not SECTION_STATUS[key] then marker = " + " end
+      WindowText(WIN, FONT, marker .. key:gsub("_", " "), 2, y, 0, 0, ColourNameToRGB("white"), true)
+      WindowAddHotspot(WIN, key, 0, y, WINDOW_WIDTH, y + LINE_HEIGHT, "", "", "", "", "cmw_expand_collapse", "", miniwin.cursor_hand, 0)
       y = y + LINE_HEIGHT
     end
     
-    for k, v in cmw.pairsByKeys(group) do
-      WindowText(WIN, FONT, "  * " .. v.label, 2, y, 0, 0, ColourNameToRGB("white"), true)
-      if v.type == "color" then
-        WindowRectOp(WIN, miniwin.rect_fill, LABEL_WIDTH + 20, y + 1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, v.raw_value)
-        WindowRectOp(WIN, miniwin.rect_frame, LABEL_WIDTH + 20, y + 1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, ColourNameToRGB("white"))
-      else
-        if v.value == nil then v.value = tostring(v.raw_value) end
-        WindowText(WIN, FONT_UNDERLINE, tostring(v.value), LABEL_WIDTH + 20, y, 0, 0, ColourNameToRGB("white"), true)
+    if SECTION_STATUS[key] then
+      for k, v in cmw.pairsByKeys(group, sort_func) do
+        WindowText(WIN, FONT, "  * " .. v.label, 2, y, 0, 0, ColourNameToRGB("white"), true)
+        if v.type == "color" then
+          WindowRectOp(WIN, miniwin.rect_fill, LABEL_WIDTH + 20, y + 1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, v.raw_value)
+          WindowRectOp(WIN, miniwin.rect_frame, LABEL_WIDTH + 20, y + 1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, ColourNameToRGB("white"))
+        else
+          if v.value == nil then v.value = tostring(v.raw_value) end
+          WindowText(WIN, FONT_UNDERLINE, tostring(v.value), LABEL_WIDTH + 20, y, 0, 0, ColourNameToRGB("white"), true)
+        end
+        WindowAddHotspot(WIN, key .. "|" .. k, LABEL_WIDTH + 20, y+1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, "", "", "", "", "cmw_configure_change", "click to change", miniwin.cursor_hand, 0)
+        
+        y = y + LINE_HEIGHT
       end
-      WindowAddHotspot(WIN, key .. "|" .. k, LABEL_WIDTH + 20, y+1, WINDOW_WIDTH - 5, y + LINE_HEIGHT - 1, "", "", "", "", "cmw_configure_change", "click to change", miniwin.cursor_hand, 0)
-      
-      y = y + LINE_HEIGHT
     end
   end
 
@@ -94,6 +136,23 @@ function cmw_configure_change(flags, hotspot_id)
   end
 
   SAVE_CALLBACK(group_id, option_id, CONFIG[group_id][option_id])
+end
+
+function cmw_expand_collapse(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    if hotspot_id == "expand_all" then
+      for sec, _ in pairs(SECTION_STATUS) do
+        SECTION_STATUS[sec] = true
+      end
+    elseif hotspot_id == "collapse_all" then
+      for sec, _ in pairs(SECTION_STATUS) do
+        SECTION_STATUS[sec] = false
+      end
+    else
+      SECTION_STATUS[hotspot_id] = not SECTION_STATUS[hotspot_id]
+    end
+    cmw.show()
+  end
 end
 
 function cmw.changenumber(flags, group_id, option_id)
@@ -221,14 +280,17 @@ function cmw.getHeight(config)
     if cmw.getSize(CONFIG) > 1 then 
       height = height + LINE_HEIGHT
     end
-    for k, v in cmw.pairsByKeys(group) do
-      height = height + LINE_HEIGHT
-      if v.label == nil then v.label = k:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
-      if v.value == nil then v.value = tostring(v.raw_value) end
-      local label_width = WindowTextWidth(WIN, FONT, "  * " .. v.label)
-      local value_width = WindowTextWidth(WIN, FONT, v.value or v.raw_value)
-      if label_width > LABEL_WIDTH then LABEL_WIDTH = label_width end
-      if value_width > VALUE_WIDTH then VALUE_WIDTH = value_width end
+    if SECTION_STATUS[key] == nil then SECTION_STATUS[key] = true end
+    if SECTION_STATUS[key] then
+      for k, v in cmw.pairsByKeys(group) do
+        height = height + LINE_HEIGHT
+        if v.label == nil then v.label = k:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
+        if v.value == nil then v.value = tostring(v.raw_value) end
+        local label_width = WindowTextWidth(WIN, FONT, "  * " .. v.label)
+        local value_width = WindowTextWidth(WIN, FONT, v.value or v.raw_value)
+        if label_width > LABEL_WIDTH then LABEL_WIDTH = label_width end
+        if value_width > VALUE_WIDTH then VALUE_WIDTH = value_width end
+      end
     end
   end
   return height

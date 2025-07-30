@@ -23,10 +23,6 @@ local UNREAD_COUNT = { all = 0 }
 local PREINIT_LINES = { }
 local SELECTIONS = { all = { start_x = nil, start_y = nil, end_x = nil, end_y = nil } }
 
-local SCROLLBAR_THUMB_POS
-local SCROLLBAR_THUMB_SIZE
-local SCROLLBAR_STEPS
-
 local DRAG_SCROLLING = false
 local IS_SELECTING = false
 local CHARACTER_WIDTH = 0
@@ -34,14 +30,20 @@ local LAST_SELECTION = nil
 local SELECTED_TEXT = ""
 local IS_RESIZING = false
 local IS_DRAGGING = false
-local DRAG_X = nil
-local DRAG_Y = nil
+local RESIZE_DRAG_X = nil
+local RESIZE_DRAG_Y = nil
+local START_DRAG_Y = 0
+local START_DRAG_OFFSET = 0
 
 local POSITION = {
   WINDOW_LEFT = nil,
   WINDOW_TOP = nil,
   WINDOW_WIDTH = nil,
   WINDOW_HEIGHT = nil
+}
+
+local SIZES = {
+  BORDER_WIDTH = GetInfo(277)
 }
 
 local INIT = false
@@ -154,9 +156,10 @@ function loadSavedConfig()
   CONFIG.ACTIVE_COLOR = getValueOrDefault(CONFIG.ACTIVE_COLOR, ColourNameToRGB("darkgreen"))
   CONFIG.INACTIVE_COLOR = getValueOrDefault(CONFIG.INACTIVE_COLOR, ColourNameToRGB("grey"))
   CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("gray"))
-  CONFIG.ACCENT_COLOR = getValueOrDefault(CONFIG.ACCENT_COLOR, ColourNameToRGB("silver"))
-  CONFIG.ARROW_COLOR = getValueOrDefault(CONFIG.ARROW_COLOR, ColourNameToRGB("silver"))
+  CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
+  CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
   CONFIG.SCROLL_COLOR = getValueOrDefault(CONFIG.SCROLL_COLOR, ColourNameToRGB("darkgray"))
+  CONFIG.BACKGROUND_COLOR = getValueOrDefault(CONFIG.BACKGROUND_COLOR, ColourNameToRGB("black"))
 end
 
 function loadSavedTabs()
@@ -191,7 +194,7 @@ function loadSavedPosition()
     serialized_position = GetVariable("capture_position") or ""
     if serialized_position == "" then
       POSITION = {
-        WINDOW_LEFT = GetInfo(274) + GetInfo(276) + GetInfo(277),
+        WINDOW_LEFT = GetInfo(274) + GetInfo(276) + GetInfo(277) - 1,
         WINDOW_TOP = GetInfo(275) + GetInfo(276) + GetInfo(277) - 250,
         WINDOW_WIDTH = 500,
         WINDOW_HEIGHT = 250
@@ -287,7 +290,7 @@ end
 function formatLines(list)
   if TEXT_BUFFERS[list] == nil then return end
 
-  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 10
+  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 10 - GetInfo(277)
 
   FORMATTED_LINES[list] = {}    
 
@@ -345,40 +348,83 @@ function formatLines(list)
 end
 
 function drawWindow()
+  populateSizes()
+
   WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP, 4, 2)
-  WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, ColourNameToRGB("black"))
+  WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
   WindowSetZOrder(WIN, 999)
 
-  WindowRectOp(WIN, miniwin.rect_fill, 0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, ColourNameToRGB("black"))
-  WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, CONFIG.BORDER_COLOR)
+  renderRectangle(SIZES.ENTIRE_WINDOW, SIZES.BORDER_WIDTH)
 
   WindowDeleteAllHotspots(WIN)
+
+  if config_window.IsOpen() then
+    config_window.Show()
+  end
 
   WindowAddHotspot(WIN, "textarea", 0, HEADER_HEIGHT + 2, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_HEIGHT - 2, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)  
   WindowDragHandler(WIN, "textarea", "OnTextAreaMouseMove", "", 0x10)
   WindowScrollwheelHandler(WIN, "textarea", "OnWheel")  
 end
 
+function populateSizes()
+  SIZES.ENTIRE_WINDOW = setSizeConst(0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
+  SIZES.TEXT_AREA = setSizeConst(SIZES.BORDER_WIDTH, HEADER_HEIGHT + SIZES.BORDER_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - CONFIG.SCROLL_WIDTH - 1, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH, CONFIG.BACKGROUND_COLOR)
+
+  local header_right = POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH
+  local scroll_bottom = POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH
+
+  if not CONFIG.LOCK_POSITION then
+    header_right = header_right - CONFIG.SCROLL_WIDTH
+    scroll_bottom = scroll_bottom - CONFIG.SCROLL_WIDTH
+
+    SIZES.DRAG_HANDLE = setSizeConst(header_right, SIZES.BORDER_WIDTH + 1, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, HEADER_HEIGHT - 2, CONFIG.BACKGROUND_COLOR)
+    SIZES.RESIZE_HANDLE = setSizeConst(header_right, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH - 1, CONFIG.BACKGROUND_COLOR)
+  end
+
+  SIZES.ENTIRE_HEADER = setSizeConst(SIZES.BORDER_WIDTH, SIZES.BORDER_WIDTH, header_right, HEADER_HEIGHT - SIZES.BORDER_WIDTH * 2, CONFIG.BACKGROUND_COLOR)
+  SIZES.SINGLE_TAB = setSizeConst(SIZES.BORDER_WIDTH, SIZES.BORDER_WIDTH, 20, HEADER_HEIGHT, ColourNameToRGB("cyan"))
+  SIZES.ENTIRE_SCROLL = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - SIZES.BORDER_WIDTH, HEADER_HEIGHT + SIZES.BORDER_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, scroll_bottom - 1, CONFIG.DETAIL_COLOR)
+  SIZES.SCROLL_SLIDER = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT + 5, SIZES.ENTIRE_SCROLL.TOP + CONFIG.SCROLL_WIDTH, SIZES.ENTIRE_SCROLL.RIGHT - 5, scroll_bottom - CONFIG.SCROLL_WIDTH - 1, CONFIG.BACKGROUND_COLOR)
+  SIZES.SCROLL_TOP = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT, SIZES.ENTIRE_SCROLL.TOP, SIZES.ENTIRE_SCROLL.RIGHT, SIZES.ENTIRE_SCROLL.TOP + CONFIG.SCROLL_WIDTH, CONFIG.BACKGROUND_COLOR)
+  SIZES.SCROLL_BOTTOM = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT, SIZES.ENTIRE_SCROLL.BOTTOM - CONFIG.SCROLL_WIDTH, SIZES.ENTIRE_SCROLL.RIGHT, SIZES.ENTIRE_SCROLL.BOTTOM, CONFIG.BACKGROUND_COLOR)
+  SIZES.SCROLL_THUMB = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - SIZES.BORDER_WIDTH - 1, HEADER_HEIGHT + SIZES.BORDER_WIDTH * 2 + CONFIG.SCROLL_WIDTH + 1, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH, scroll_bottom, CONFIG.SCROLL_COLOR)
+end
+
+function setSizeConst(left, top, right, bottom, color)
+  local sizeConst = {}
+  sizeConst.LEFT = left
+  sizeConst.TOP = top
+  sizeConst.RIGHT = right
+  sizeConst.BOTTOM = bottom
+  sizeConst.COLOR = color
+  sizeConst.WIDTH = right - left
+  sizeConst.HEIGHT = bottom - top
+  return sizeConst
+end
+
 function drawTabs()
-  local x = 1
+  local x = SIZES.BORDER_WIDTH
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
     if tab_name ~= "" then
       local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
       local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
       local center_pos_x = x + ((text_width + 20) / 2) - (text_width / 2)
-      local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + 2
+      local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + SIZES.BORDER_WIDTH
       local tab_tooltip = ""
 
-      WindowRectOp(WIN, miniwin.rect_fill, x, 1, x + text_width + 20, HEADER_HEIGHT, tab_color)
-      WindowRectOp(WIN, miniwin.rect_frame, x, 1, x + text_width + 20, HEADER_HEIGHT, CONFIG.BORDER_COLOR)
+      SIZES.SINGLE_TAB.LEFT = x
+      SIZES.SINGLE_TAB.RIGHT = x + text_width + 20
+      SIZES.SINGLE_TAB.COLOR = tab_color
+      renderRectangle(SIZES.SINGLE_TAB, 1, CONFIG.BORDER_COLOR)
       WindowText(WIN, HEADERFONT, tab_name, center_pos_x, center_pos_y, 0, 0, CONFIG.HEADER_FONT.colour)
 
       if tab["notify"] then
         drawNotification(tab_name, x + text_width)
       end
 
-      WindowLine(WIN, 0, HEADER_HEIGHT, POSITION.WINDOW_WIDTH, HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, 3)
+      WindowLine(WIN, SIZES.ENTIRE_HEADER.LEFT, HEADER_HEIGHT, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH, HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, GetInfo(277))
       
       WindowAddHotspot(WIN, tab_name, x, 0, x + text_width + 20, HEADER_HEIGHT, "", "", "", "", "OnHeaderClick", tab_tooltip, miniwin.cursor_hand, 0)
 
@@ -392,7 +438,7 @@ function drawTabs()
 end
 
 function drawNotifications()
-  local x = 1
+  local x = SIZES.ENTIRE_HEADER.LEFT
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
     if tab_name ~= "" then
@@ -410,28 +456,29 @@ end
 function drawNotification(tab_name, x)
   local cnt = UNREAD_COUNT[tab_name] or 0
   if cnt > 0 then
-    WindowCircleOp(WIN, miniwin.circle_ellipse, x + 12, HEADER_HEIGHT / 2 - 3, x + 16, HEADER_HEIGHT / 2 - 3 + 4, 
+    WindowCircleOp(WIN, miniwin.circle_ellipse, x + 12, HEADER_HEIGHT / 2 - SIZES.BORDER_WIDTH, x + 16, HEADER_HEIGHT / 2 - SIZES.BORDER_WIDTH + 4, 
       CONFIG.NOTIFICATION_COLOR, miniwin.pen_solid, 1, CONFIG.NOTIFICATION_COLOR, miniwin.brush_solid)
     WindowHotspotTooltip(WIN, tab_name, cnt .. " unread")
   end  
 end
 
 function drawLines()
-  WindowRectOp(WIN, miniwin.rect_fill, 1, HEADER_HEIGHT + 1, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 1, POSITION.WINDOW_HEIGHT - 1, ColourNameToRGB("black"))
-  
+  renderRectangle(SIZES.TEXT_AREA)
+    
   local lines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
-  local y = HEADER_HEIGHT + 2
+  local y = SIZES.TEXT_AREA.TOP + 2
 
   SELECTED_TEXT = ""
 
   for i = offset + 1, #lines do
-    if y + LINE_HEIGHT > POSITION.WINDOW_HEIGHT then
+    if y + LINE_HEIGHT > SIZES.TEXT_AREA.BOTTOM then
+      Note("The capture window is trying to display lines off the screen, configure the font settings and size.")
       break
     end
 
     local segments = lines[i]
-    local x = 5
+    local x = SIZES.TEXT_AREA.LEFT + 2
     for _, s in ipairs(segments) do
       local w = WindowTextWidth(WIN, FONT, s.text)
 
@@ -448,13 +495,13 @@ function drawSelection(x, y, w, offset, s)
   local selection = SELECTIONS[CURRENT_TAB_NAME]
   if not hasSelection(selection) then return end
 
-  --local low_y = math.min(selection.start_y, selection.end_y)
-  --local high_y = math.max(selection.start_y, selection.end_y)  
-  --local starting_line = clamp(math.floor((low_y - HEADER_HEIGHT + 2) / LINE_HEIGHT) + offset + 1, 1, #FORMATTED_LINES[CURRENT_TAB_NAME])
-  --local ending_line = clamp(math.floor((high_y - HEADER_HEIGHT + 2) / LINE_HEIGHT) + offset + 1, starting_line, #FORMATTED_LINES[CURRENT_TAB_NAME])
   local drawing_line = math.floor((y - HEADER_HEIGHT + 2) / LINE_HEIGHT) + offset + 1
+  local bg_color = CONFIG.BACKGROUND_COLOR
+  if s.backcolour ~= nil and s.backcolour ~= "" then
+    bg_color = ColourNameToRGB(s.backcolour)
+  end
 
-  WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, ColourNameToRGB(s.backcolour or "black"))
+  WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, bg_color)
 
   if drawing_line >= selection.starting_line and drawing_line <= selection.ending_line then
     local reverse_x = selection.start_x > selection.end_x -- right to left
@@ -496,60 +543,34 @@ function hasSelection(s)
 end
 
 function drawScrollbar()
-  local adjusted_height_top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH
-  local adjusted_height_bottom = POSITION.WINDOW_HEIGHT
-  if not CONFIG.LOCK_POSITION then
-    adjusted_height_top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH * 2
-    adjusted_height_bottom = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH
-  end
-
-  WindowRectOp(WIN, miniwin.rect_fill, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, HEADER_HEIGHT + CONFIG.SCROLL_WIDTH, POSITION.WINDOW_WIDTH,
-    adjusted_height_top, CONFIG.DETAIL_COLOR)
-  WindowRectOp(WIN, miniwin.rect_fill, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH + 5, HEADER_HEIGHT + CONFIG.SCROLL_WIDTH + 5, POSITION.WINDOW_WIDTH - 5,
-    adjusted_height_top - 5, ColourNameToRGB("black"))
-  WindowRectOp(WIN, miniwin.rect_frame, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH + 1, HEADER_HEIGHT + 1, POSITION.WINDOW_WIDTH,
-    POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH, CONFIG.DETAIL_COLOR)
-  WindowRectOp(WIN, miniwin.rect_frame, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, HEADER_HEIGHT, POSITION.WINDOW_WIDTH,
-    HEADER_HEIGHT + CONFIG.SCROLL_WIDTH, CONFIG.DETAIL_COLOR)
-  WindowRectOp(WIN, miniwin.rect_frame, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, adjusted_height_top,
-    POSITION.WINDOW_WIDTH, adjusted_height_bottom, CONFIG.DETAIL_COLOR)  
-
-  local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
-  local TOTAL_LINES = #formattedLines
-  local OFFSET = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
-
-  local scrollbar_height = POSITION.WINDOW_HEIGHT - (3 * CONFIG.SCROLL_WIDTH) - HEADER_HEIGHT
-  if CONFIG.LOCK_POSITION then
-    scrollbar_height = POSITION.WINDOW_HEIGHT - (2 * CONFIG.SCROLL_WIDTH) - HEADER_HEIGHT
-  end
-  SCROLLBAR_THUMB_SIZE = math.min(scrollbar_height, math.max(10, scrollbar_height * (WINDOW_LINES / (TOTAL_LINES))))
-  local maxScroll = TOTAL_LINES - WINDOW_LINES
-
-  if maxScroll <= 0 then
-    SCROLLBAR_THUMB_SIZE = scrollbar_height
-  end
-
-  local scrollRatio = OFFSET / math.max(maxScroll, 1)
-  local SCROLLBAR_THUMB_POS = (scrollRatio * (scrollbar_height - SCROLLBAR_THUMB_SIZE)) + HEADER_HEIGHT + CONFIG.SCROLL_WIDTH
+  renderRectangle(SIZES.ENTIRE_SCROLL)
+  renderRectangle(SIZES.SCROLL_SLIDER)
+  renderRectangle(SIZES.SCROLL_TOP, 1)
+  renderRectangle(SIZES.SCROLL_BOTTOM, 1)
   
+  local current_offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
+  local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
+  local total_lines = #formattedLines  
+  local maxScroll = total_lines - WINDOW_LINES
+  local thumbsize = math.min(SIZES.SCROLL_SLIDER.HEIGHT, math.max(10, SIZES.SCROLL_SLIDER.HEIGHT * (WINDOW_LINES / (total_lines))))
+  local scrollRatio = current_offset / math.max(maxScroll, 1)
+
+  SIZES.SCROLL_THUMB.TOP = (scrollRatio * (SIZES.SCROLL_SLIDER.HEIGHT - thumbsize)) + SIZES.SCROLL_SLIDER.TOP
+  SIZES.SCROLL_THUMB.BOTTOM = SIZES.SCROLL_THUMB.TOP + thumbsize
+
   drawScrollbarDetails()
 
-  WindowRectOp(WIN, miniwin.rect_fill, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH + 1, SCROLLBAR_THUMB_POS, POSITION.WINDOW_WIDTH - 1,
-    SCROLLBAR_THUMB_POS + SCROLLBAR_THUMB_SIZE, CONFIG.SCROLL_COLOR)
-  WindowRectOp(WIN, miniwin.rect_frame, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH + 1, SCROLLBAR_THUMB_POS, POSITION.WINDOW_WIDTH - 1,
-    SCROLLBAR_THUMB_POS + SCROLLBAR_THUMB_SIZE, ColourNameToRGB("black"))
+  renderRectangle(SIZES.SCROLL_THUMB, 1, CONFIG.BACKGROUND_COLOR)
 
   if not DRAG_SCROLLING then
-    WindowAddHotspot(WIN, "up", POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, HEADER_HEIGHT, 0, HEADER_HEIGHT + CONFIG.SCROLL_WIDTH, "", "", "ScrollArrowsMouseDown", "", "", "", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, "down", POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_HEIGHT - (2 * CONFIG.SCROLL_WIDTH), 0, POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH, "", "", "ScrollArrowsMouseDown", "", "", "",  miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, "up", SIZES.SCROLL_TOP.LEFT, SIZES.SCROLL_TOP.TOP, SIZES.SCROLL_TOP.RIGHT, SIZES.SCROLL_TOP.BOTTOM, "", "", "ScrollArrowsMouseDown", "", "", "", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, "down", SIZES.SCROLL_BOTTOM.LEFT, SIZES.SCROLL_BOTTOM.TOP, SIZES.SCROLL_BOTTOM.RIGHT, SIZES.SCROLL_BOTTOM.BOTTOM, "", "", "ScrollArrowsMouseDown", "", "", "",  miniwin.cursor_hand, 0)
 
-    WindowAddHotspot(WIN, "scroll_thumb", POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, SCROLLBAR_THUMB_POS, POSITION.WINDOW_WIDTH, SCROLLBAR_THUMB_POS + SCROLLBAR_THUMB_SIZE, 
+    WindowAddHotspot(WIN, "scroll_thumb", SIZES.SCROLL_THUMB.LEFT, SIZES.SCROLL_THUMB.TOP, SIZES.SCROLL_THUMB.RIGHT, SIZES.SCROLL_THUMB.BOTTOM, 
       "", "", "OnScrollThumbDragStart", "", "", "", miniwin.cursor_hand, 0)
     WindowDragHandler(WIN, "scroll_thumb", "OnScrollThumbDragMove", "OnScrollThumbDragRelease", 0)
   end
 end
-
-local START_DRAG_Y, START_DRAG_OFFSET = 0, 0
 
 function OnScrollThumbDragStart()
   DRAG_SCROLLING = true
@@ -563,9 +584,8 @@ function OnScrollThumbDragMove()
     local total_lines = #FORMATTED_LINES[CURRENT_TAB_NAME]
     local scrollable_lines = math.max(total_lines - WINDOW_LINES, 0)
     local delta = mouse_pos_y - START_DRAG_Y
-    local scrollbar_height = POSITION.WINDOW_HEIGHT - (3 * CONFIG.SCROLL_WIDTH) - HEADER_HEIGHT
-    if CONFIG.LOCK_POSITION then scrollbar_height = POSITION.WINDOW_HEIGHT - (2 * CONFIG.SCROLL_WIDTH) - HEADER_HEIGHT end
-    local pixels_per_line = scrollbar_height / total_lines
+        
+    local pixels_per_line = SIZES.SCROLL_SLIDER.HEIGHT / total_lines
     local delta_lines = math.floor(delta / pixels_per_line)
     
     SCROLL_OFFSETS[CURRENT_TAB_NAME] = math.max(0, math.min(scrollable_lines, START_DRAG_OFFSET + delta_lines))
@@ -581,49 +601,38 @@ function OnScrollThumbDragRelease()
 end
 
 function drawScrollbarDetails()
-  local leftScroll = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH
-
   local upArrow = string.format("%i,%i,%i,%i,%i,%i", 
-    leftScroll + (CONFIG.SCROLL_WIDTH / 3), HEADER_HEIGHT + (CONFIG.SCROLL_WIDTH * 2 / 3),
-    leftScroll + (CONFIG.SCROLL_WIDTH / 2), HEADER_HEIGHT + (CONFIG.SCROLL_WIDTH / 3), 
-    leftScroll + (CONFIG.SCROLL_WIDTH * 2 / 3), HEADER_HEIGHT + (CONFIG.SCROLL_WIDTH * 2 / 3))
+    SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 3), SIZES.SCROLL_TOP.BOTTOM - (SIZES.ENTIRE_SCROLL.WIDTH / 3),
+    SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 2), SIZES.SCROLL_TOP.TOP + (SIZES.ENTIRE_SCROLL.WIDTH / 3), 
+    SIZES.ENTIRE_SCROLL.RIGHT - (SIZES.ENTIRE_SCROLL.WIDTH / 3), SIZES.SCROLL_TOP.BOTTOM - (SIZES.ENTIRE_SCROLL.WIDTH / 3))
 
-  WindowPolygon(WIN, upArrow, CONFIG.ARROW_COLOR, miniwin.pen_solid, 1, CONFIG.ARROW_COLOR, miniwin.brush_solid, true,
-    false)
+  WindowPolygon(WIN, upArrow, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1, CONFIG.DETAIL_COLOR, miniwin.brush_solid, true, false)
 
-  local adjusted_height = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH
-  if CONFIG.LOCK_POSITION then
-    adjusted_height = POSITION.WINDOW_HEIGHT
-  end
   local downArrow = string.format("%i,%i,%i,%i,%i,%i", 
-    leftScroll + (CONFIG.SCROLL_WIDTH / 3), adjusted_height - (CONFIG.SCROLL_WIDTH * 2 / 3), 
-    leftScroll + (CONFIG.SCROLL_WIDTH / 2), adjusted_height - (CONFIG.SCROLL_WIDTH / 3),
-    leftScroll + (CONFIG.SCROLL_WIDTH * 2 / 3), adjusted_height - (CONFIG.SCROLL_WIDTH * 2 / 3))
+    SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 3), SIZES.SCROLL_BOTTOM.TOP + (SIZES.ENTIRE_SCROLL.WIDTH / 3), 
+    SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 2), SIZES.SCROLL_BOTTOM.BOTTOM - (SIZES.ENTIRE_SCROLL.WIDTH / 3),
+    SIZES.ENTIRE_SCROLL.RIGHT - (SIZES.ENTIRE_SCROLL.WIDTH / 3), SIZES.SCROLL_BOTTOM.TOP + (SIZES.ENTIRE_SCROLL.WIDTH / 3))
 
-  WindowPolygon(WIN, downArrow, CONFIG.ARROW_COLOR, miniwin.pen_solid, 1, CONFIG.ARROW_COLOR, miniwin.brush_solid, true,
-    false)
+  WindowPolygon(WIN, downArrow, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1, CONFIG.DETAIL_COLOR, miniwin.brush_solid, true, false)
 end
 
 function drawDragHandle()
-  local left = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH
-  local top = 1
-  local right = left + CONFIG.SCROLL_WIDTH
-  local bottom = top + HEADER_HEIGHT - 1
+  if not CONFIG.LOCK_POSITION then
+    renderRectangle(SIZES.DRAG_HANDLE, 1)
+    WindowLine(WIN, SIZES.DRAG_HANDLE.LEFT + 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 3, SIZES.DRAG_HANDLE.RIGHT - 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 3, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
+    WindowLine(WIN, SIZES.DRAG_HANDLE.LEFT + 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 2, SIZES.DRAG_HANDLE.RIGHT - 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 2, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
+    WindowLine(WIN, SIZES.DRAG_HANDLE.LEFT + 3, SIZES.DRAG_HANDLE.BOTTOM - SIZES.DRAG_HANDLE.HEIGHT / 3, SIZES.DRAG_HANDLE.RIGHT - 3, SIZES.DRAG_HANDLE.BOTTOM - SIZES.DRAG_HANDLE.HEIGHT / 3, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
 
-  WindowRectOp(WIN, miniwin.rect_fill, left, top, right, bottom, CONFIG.DETAIL_COLOR)
-  WindowLine(WIN, left + 3, top + 8, right - 3, top + 8, CONFIG.ACCENT_COLOR, miniwin.pen_solid, 1)
-  WindowLine(WIN, left + 3, top + 12, right - 3, top + 12, CONFIG.ACCENT_COLOR, miniwin.pen_solid, 1)
-  WindowLine(WIN, left + 3, top + 16, right - 3, top + 16, CONFIG.ACCENT_COLOR, miniwin.pen_solid, 1)
-
-  WindowAddHotspot(WIN, "drag_" .. WIN, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, 0, POSITION.WINDOW_WIDTH, HEADER_HEIGHT, "", "", "drag_mousedown", "", "", "", 10, 0)
-  WindowDragHandler (WIN, "drag_" .. WIN, "drag_move", "drag_release", 0)
+    WindowAddHotspot(WIN, "drag_" .. WIN, SIZES.DRAG_HANDLE.LEFT, SIZES.DRAG_HANDLE.TOP, SIZES.DRAG_HANDLE.RIGHT, SIZES.DRAG_HANDLE.BOTTOM, "", "", "drag_mousedown", "", "", "", 10, 0)
+    WindowDragHandler (WIN, "drag_" .. WIN, "drag_move", "drag_release", 0)
+  end
 end
 
 function drag_mousedown(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
     IS_DRAGGING = true
-    DRAG_X = WindowInfo(WIN, 14)
-    DRAG_Y = WindowInfo(WIN, 15)
+    RESIZE_DRAG_X = WindowInfo(WIN, 14)
+    RESIZE_DRAG_Y = WindowInfo(WIN, 15)
   elseif flags == miniwin.hotspot_got_rh_mouse then
     showUnlockedRightClick()
   end
@@ -631,8 +640,8 @@ end
 
 function drag_move(flags, hotspot_id)
   if IS_DRAGGING then
-    local pos_x = clamp(WindowInfo(WIN, 17) - DRAG_X, 0, GetInfo(281) - POSITION.WINDOW_WIDTH)
-    local pos_y = clamp(WindowInfo(WIN, 18) - DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
+    local pos_x = clamp(WindowInfo(WIN, 17) - RESIZE_DRAG_X, 0, GetInfo(281) - POSITION.WINDOW_WIDTH)
+    local pos_y = clamp(WindowInfo(WIN, 18) - RESIZE_DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
 
     SetCursor(miniwin.cursor_hand)
     WindowPosition(WIN, pos_x, pos_y, 0, miniwin.create_absolute_location);
@@ -657,27 +666,22 @@ function clamp(val, min, max)
 end
 
 function drawResizeHandle()
-  if CONFIG.LOCK_POSITION then return end
+  if not CONFIG.LOCK_POSITION then
+    renderRectangle(SIZES.RESIZE_HANDLE, 1)
     
-  local left = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH
-  local top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH
-  local right = left + CONFIG.SCROLL_WIDTH
-  local bottom = top + CONFIG.SCROLL_WIDTH
+    local m = 2
+    local n = 2
 
-  WindowRectOp(WIN, miniwin.rect_fill, left, top, right, bottom, CONFIG.DETAIL_COLOR)
+    while (SIZES.RESIZE_HANDLE.LEFT + m + 2 <= SIZES.RESIZE_HANDLE.RIGHT - 3 and SIZES.RESIZE_HANDLE.TOP + n + 1 <= SIZES.RESIZE_HANDLE.BOTTOM - 4) do
+      WindowLine(WIN, SIZES.RESIZE_HANDLE.LEFT + m + 1, SIZES.RESIZE_HANDLE.BOTTOM - 4, SIZES.RESIZE_HANDLE.RIGHT - 3, SIZES.RESIZE_HANDLE.TOP + n, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
+      WindowLine(WIN, SIZES.RESIZE_HANDLE.LEFT + m + 2, SIZES.RESIZE_HANDLE.BOTTOM - 4, SIZES.RESIZE_HANDLE.RIGHT - 3, SIZES.RESIZE_HANDLE.TOP + n + 1, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
+      m = m + 3
+      n = n + 3
+    end
 
-  local m = 2
-  local n = 2
-
-  while (left + m + 2 <= right - 3 and top + n + 1 <= bottom - 4) do
-    WindowLine(WIN, left + m + 1, bottom - 4, right - 3, top + n, CONFIG.ACCENT_COLOR, miniwin.pen_solid, 1)
-    WindowLine(WIN, left + m + 2, bottom - 4, right - 3, top + n + 1, CONFIG.ACCENT_COLOR, miniwin.pen_solid, 1)
-    m = m + 3
-    n = n + 3
-  end
-
-  WindowAddHotspot(WIN, "resizer", POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, "", "", "OnResizerDown", "", "", "", miniwin.cursor_nw_se_arrow, 0)
-  WindowDragHandler(WIN, "resizer", "OnResizerDrag", "OnResizerRelease", 0)
+    WindowAddHotspot(WIN, "resizer", SIZES.RESIZE_HANDLE.LEFT, SIZES.RESIZE_HANDLE.TOP, SIZES.RESIZE_HANDLE.RIGHT, SIZES.RESIZE_HANDLE.BOTTOM, "", "", "OnResizerDown", "", "", "", miniwin.cursor_nw_se_arrow, 0)
+    WindowDragHandler(WIN, "resizer", "OnResizerDrag", "OnResizerRelease", 0)
+  end  
 end
 
 function drawScrollToBottom()
@@ -685,8 +689,8 @@ function drawScrollToBottom()
   local offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
 
   if offset + WINDOW_LINES < #lines then
-    local left = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH * 4
-    local top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH * 3
+    local left = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH * 4 - GetInfo(277)
+    local top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH * 3 - GetInfo(277)
     local right = left + CONFIG.SCROLL_WIDTH * 2
     local bottom = top + CONFIG.SCROLL_WIDTH * 2
 
@@ -699,7 +703,7 @@ function drawScrollToBottom()
 
     local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
 
-    WindowPolygon(WIN, downArrow, CONFIG.SCROLL_COLOR, miniwin.pen_solid, 1, CONFIG.ACCENT_COLOR, miniwin.brush_solid, true, false)
+    WindowPolygon(WIN, downArrow, CONFIG.SCROLL_COLOR, miniwin.pen_solid, 1, CONFIG.DETAIL_COLOR, miniwin.brush_solid, true, false)
 
     WindowAddHotspot(WIN, "scroll_to_bottom", left, top, right, bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
   end
@@ -1106,34 +1110,37 @@ function showWindow()
 end
 
 function hideWindow()
+  config_window.Hide()
   WindowShow(WIN, false)
 end
 
 function configure()
   local config = {
-    Capture = {
-
+    Colors = {
+      BACKGROUND_COLOR = { sort = 1, type = "color", raw_value = CONFIG.BACKGROUND_COLOR },
+      BORDER_COLOR = { sort = 2, type = "color", raw_value = CONFIG.BORDER_COLOR },
+      ACTIVE_COLOR = { sort = 3, label = "Active Tab Color", type = "color", raw_value = CONFIG.ACTIVE_COLOR },
+      INACTIVE_COLOR = { sort = 4, label = "Inactive Tab Color", type = "color", raw_value = CONFIG.INACTIVE_COLOR },
+      NOTIFICATION_COLOR = { sort = 5, type = "color", raw_value = CONFIG.NOTIFICATION_COLOR },      
+      SCROLL_COLOR = { sort = 6, label = "Scroll Handle Color", type = "color", raw_value = CONFIG.SCROLL_COLOR },
+      DETAIL_COLOR = { sort = 7, type = "color", raw_value = CONFIG.DETAIL_COLOR },
+    },
+    Fonts = {
       CAPTURE_FONT = { type = "font", value = CONFIG.CAPTURE_FONT.name .. " (" .. CONFIG.CAPTURE_FONT.size .. ")", raw_value = CONFIG.CAPTURE_FONT },
-      HEADER_FONT = { type = "font", value = CONFIG.HEADER_FONT.name .. " (" .. CONFIG.HEADER_FONT.size .. ")", raw_value = CONFIG.HEADER_FONT },
-      LOCK_POSITION = { type = "bool", raw_value = CONFIG.LOCK_POSITION },
-      SCROLL_WIDTH = { label = "Scrollbar Width", type = "number", raw_value = CONFIG.SCROLL_WIDTH, min = 5, max = 50 },
-      MAX_LINES = { type = "number", raw_value = CONFIG.MAX_LINES, min = 50, max = 50000 },
-      NOTIFICATION_COLOR = { type = "color", raw_value = CONFIG.NOTIFICATION_COLOR },
-      BORDER_COLOR = { label = "Border Color", type = "color", value = CONFIG.BORDER_COLOR, raw_value = CONFIG.BORDER_COLOR },
-      ACTIVE_COLOR = { label = "Active Tab Color", type = "color", value = CONFIG.ACTIVE_COLOR, raw_value = CONFIG.ACTIVE_COLOR },
-      INACTIVE_COLOR = { label = "Inactive Tab Color", type = "color", value = CONFIG.INACTIVE_COLOR, raw_value = CONFIG.INACTIVE_COLOR },
-      DETAIL_COLOR = { label = "Detail Color", type = "color", value = CONFIG.DETAIL_COLOR, raw_value = CONFIG.DETAIL_COLOR },
-      ACCENT_COLOR = { label = "Accent Color", type = "color", value = CONFIG.ACCENT_COLOR, raw_value = CONFIG.ACCENT_COLOR },
-      ARROW_COLOR = { label = "Scroll Arrow Color", type = "color", value = CONFIG.ARROW_COLOR, raw_value = CONFIG.ARROW_COLOR },
-      SCROLL_COLOR = { label = "Scroll Handle Color", type = "color", value = CONFIG.SCROLL_COLOR, raw_value = CONFIG.SCROLL_COLOR },
-      ANCHOR = { label = "Anchor", type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
-      STRETCH = { type = "list", value = "None", raw_value = 1, list = STRETCH_LIST }
+      HEADER_FONT = { type = "font", value = CONFIG.HEADER_FONT.name .. " (" .. CONFIG.HEADER_FONT.size .. ")", raw_value = CONFIG.HEADER_FONT }
+    },
+    Other = {
+      LOCK_POSITION = { sort = 1, type = "bool", raw_value = CONFIG.LOCK_POSITION },
+      SCROLL_WIDTH = { sort = 2, label = "Scrollbar Width", type = "number", raw_value = CONFIG.SCROLL_WIDTH, min = 5, max = 50 },
+      MAX_LINES = { sort = 3, type = "number", raw_value = CONFIG.MAX_LINES, min = 50, max = 50000 }, 
+      ANCHOR = { sort = 4, type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
+      STRETCH = { sort = 5, type = "list", value = "None", raw_value = 1, list = STRETCH_LIST },      
     },
     Position = {
-      WINDOW_LEFT = { type = "number", raw_value = POSITION.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
-      WINDOW_TOP = { type = "number", raw_value = POSITION.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
-      WINDOW_WIDTH = { type = "number", raw_value = POSITION.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
-      WINDOW_HEIGHT = { type = "number", raw_value = POSITION.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
+      WINDOW_LEFT = { sort = 1, type = "number", raw_value = POSITION.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
+      WINDOW_TOP = { sort = 2, type = "number", raw_value = POSITION.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
+      WINDOW_WIDTH = { sort = 3, type = "number", raw_value = POSITION.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
+      WINDOW_HEIGHT = { sort = 4, type = "number", raw_value = POSITION.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
     }
   }
   
@@ -1164,7 +1171,7 @@ function adjustAnchor(anchor_id)
     return
   end
 
-  local output_left = GetInfo(272) - GetInfo(276) - GetInfo(277)
+  local output_left = GetInfo(272) - GetInfo(276) - GetInfo(277) - 1
   local output_top = GetInfo(273) - GetInfo(276) - GetInfo(277)
   local output_right = GetInfo(274) + GetInfo(276) + GetInfo(277)
   local output_bottom = GetInfo(275) + GetInfo(276) + GetInfo(277)
@@ -1271,6 +1278,17 @@ function getValueOrDefault(value, default)
   end
 
   return value
+end
+
+function renderRectangle(size_const, border, border_color)
+  border = border or 0
+  border_color = border_color or CONFIG.BORDER_COLOR
+
+  WindowRectOp(WIN, miniwin.rect_fill, size_const.LEFT, size_const.TOP, size_const.RIGHT, size_const.BOTTOM, size_const.COLOR)
+  
+  for i = 0, border - 1 do
+    WindowRectOp(WIN, miniwin.rect_frame, size_const.LEFT + i, size_const.TOP + i, size_const.RIGHT - i, size_const.BOTTOM - i, border_color)
+  end  
 end
 
 function doDebug()

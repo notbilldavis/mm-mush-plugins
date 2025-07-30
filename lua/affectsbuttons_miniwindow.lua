@@ -119,9 +119,13 @@ function ABMW.DrawMiniWindow()
   if AB_CONFIGURATION.STRETCH_HEIGHT then height = GetInfo(280) end
 
   WindowPosition(WIN, WINDOW_LEFT, WINDOW_TOP, 4, 2)
-  WindowResize(WIN, AB_CONFIGURATION.WINDOW_WIDTH, height - 2, ColourNameToRGB("black"))
+  WindowResize(WIN, AB_CONFIGURATION.WINDOW_WIDTH, height, ColourNameToRGB("black"))
   WindowRectOp(WIN, miniwin.rect_fill, 0, 0, AB_CONFIGURATION.WINDOW_WIDTH, height, AB_CONFIGURATION.BACKGROUND_COLOR)
   WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, AB_CONFIGURATION.BORDER_COLOR)
+
+  for i = 0, GetInfo(277) - 1 do
+    WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, AB_CONFIGURATION.WINDOW_WIDTH - i, height - i, AB_CONFIGURATION.BORDER_COLOR)
+  end
 
   local top_pos = 6
   if AB_CONFIGURATION.SHOW_HEADER then
@@ -337,6 +341,7 @@ function abmw.getButtonsConfiguration()
     STRETCH_HEIGHT = { label = "Stretch Height", type = "bool", value = tostring(AB_CONFIGURATION.STRETCH_HEIGHT), raw_value = AB_CONFIGURATION.STRETCH_HEIGHT },
     BACKGROUND_COLOR = { label = "Background Color", type = "color", value = AB_CONFIGURATION.BACKGROUND_COLOR, raw_value = AB_CONFIGURATION.BACKGROUND_COLOR },
     BORDER_COLOR = { label = "Border Color", type = "color", value = AB_CONFIGURATION.BORDER_COLOR, raw_value = AB_CONFIGURATION.BORDER_COLOR },
+    BUTTON_BORDER_COLOR = { label = "Button Border Color", type = "color", value = AB_CONFIGURATION.BUTTON_BORDER_COLOR, raw_value = AB_CONFIGURATION.BUTTON_BORDER_COLOR },
     NEUTRAL_COLOR = { label = "Neutral Color", type = "color", value = AB_CONFIGURATION.NEUTRAL_COLOR, raw_value = AB_CONFIGURATION.NEUTRAL_COLOR },
     EXPIRED_COLOR = { label = "Uncasted Color", type = "color", value = AB_CONFIGURATION.EXPIRED_COLOR, raw_value = AB_CONFIGURATION.EXPIRED_COLOR },
     CASTED_COLOR = { label = "Casted Color", type = "color", value = AB_CONFIGURATION.CASTED_COLOR, raw_value = AB_CONFIGURATION.CASTED_COLOR },
@@ -436,6 +441,7 @@ function abmw.loadSavedData()
   AB_CONFIGURATION.HEADER_TEXT = abmw.getValueOrDefault(AB_CONFIGURATION.HEADER_TEXT, "~ Affects ~")
   AB_CONFIGURATION.BACKGROUND_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.BACKGROUND_COLOR, 0)
   AB_CONFIGURATION.BORDER_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.BORDER_COLOR, 12632256)
+  AB_CONFIGURATION.BUTTON_BORDER_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.BUTTON_BORDER_COLOR, 8421504)
   AB_CONFIGURATION.NEUTRAL_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.NEUTRAL_COLOR, 8421504)
   AB_CONFIGURATION.EXPIRED_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.EXPIRED_COLOR, 255)
   AB_CONFIGURATION.CASTED_COLOR = abmw.getValueOrDefault(AB_CONFIGURATION.CASTED_COLOR, 32768)
@@ -538,13 +544,13 @@ function abmw.drawAffect(affect, title, command, top_pos, favorite)
   end
 
   WindowText(WIN, BUTTONFONT, title, middle_pos, middle_y, 0, 0, AB_CONFIGURATION.BUTTON_FONT.colour, true)
-  WindowRectOp(WIN, 1, 7, top_pos, outer_width, bottom_position, AB_CONFIGURATION.BORDER_COLOR)
+  WindowRectOp(WIN, 1, 7, top_pos, outer_width, bottom_position, AB_CONFIGURATION.BUTTON_BORDER_COLOR)
 
   -- hotspot
   WindowAddHotspot(WIN, title .. "~" .. command .. "~" .. (affect or ""), 8, top_pos, inner_width, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, "", "", "affectsbuttons_button_mousedown", "affectsbuttons_button_mousedown_cancel", "affectsbuttons_button_mouseup", tooltip, 1, 0)
 
   -- expiration meter
-  gauge(WIN, nil, current, max_duration, 8, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, AB_CONFIGURATION.WINDOW_WIDTH - 16, 8, button_color, AB_CONFIGURATION.BACKGROUND_COLOR, 0, nil, AB_CONFIGURATION.BORDER_COLOR)
+  gauge(WIN, nil, current, max_duration, 8, top_pos + AB_CONFIGURATION.BUTTON_HEIGHT, AB_CONFIGURATION.WINDOW_WIDTH - 16, 8, button_color, AB_CONFIGURATION.BACKGROUND_COLOR, 0, nil, AB_CONFIGURATION.BUTTON_BORDER_COLOR)
 
   return top_pos + AB_CONFIGURATION.BUTTON_HEIGHT + 12
 end
