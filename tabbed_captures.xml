@@ -364,12 +364,8 @@ end
 function doCapture(trigger_style_runs, line, type)
   if shouldSkip(type, line) then return end
 
-  if CONFIG.TIME_24 then 
-    captureText("silver", "black", "[".. os.date("%H:%M:%S") .. "] ", type)
-  else 
-    captureText("silver", "black", "[".. os.date("%I:%M:%S %p") .. "] ", type)
-  end
-  
+  captureText("silver", "black", "[".. getDateString() .. "] ", type)
+
   for i = 1, #trigger_style_runs do
     local txt = trigger_style_runs[i].text
 
@@ -422,7 +418,7 @@ end
 
 function captureAffects(text)
   captureText("silver", "black", "\r\n", "affects")
-  captureText("silver", "black", "[".. os.date("%H:%M:%S") .. "] ", "affects")
+  captureText("silver", "black", "[".. getDateString() .. "] ", "affects")
   captureText("springgreen", "black", "[AFFECTS] ", "affects")
   captureText("white", "black", text, "affects")
   captureText("silver", "black", "\r\n", "affects")
@@ -437,7 +433,7 @@ function captureGlobalEcho()
 
   if msg ~= nil and #msg > 0 then
     captureText("silver", "black", "\r\n", "announce")
-    captureText("silver", "black", "[".. os.date("%H:%M:%S") .. "] ", "announce")
+    captureText("silver", "black", "[".. getDateString() .. "] ", "announce")
 
     local aux = strip_crlfs(msg)
 

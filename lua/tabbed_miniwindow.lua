@@ -1004,6 +1004,13 @@ function saveMiniWindow()
   SaveState()
 end
 
+function getDateString()
+  if CONFIG.TIME_24 then
+    return os.date("%H:%M:%S")
+  end
+  return os.date("%I:%M:%S %p")  
+end
+
 function Serialize(table)
   local function serializeValue(value)
     if type(value) == "table" then
@@ -1298,9 +1305,9 @@ function doDebug()
   --Note("LineHeight: " .. LINE_HEIGHT)
   --Note("HeaderHeight: " .. HEADER_HEIGHT)
   --Note("WindowLines: " .. WINDOW_LINES)
-  AddStyledLine("clan", { { text = "[".. os.date("%H:%M:%S") .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[CLAN] ClanMember: Wow, cool capture plugin!", textcolour = ColourNameToRGB("yellow"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("alliance", { { text = "[".. os.date("%H:%M:%S") .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[ALLIED 1] AllianceMember: Tabs? I've always wanted tabs.", textcolour = ColourNameToRGB("gold"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("tell", { { text = "[".. os.date("%H:%M:%S") .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "Someguy tell you 'Can I get that plugin?'", textcolour = ColourNameToRGB("red"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("form", { { text = "[".. os.date("%H:%M:%S") .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "You tell the formation 'You guys, using this capture plugins?", textcolour = ColourNameToRGB("cyan"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("announce", { { text = "[".. os.date("%H:%M:%S") .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "YO THIS PLUGIN IS NEAT AND STUFF.", textcolour = ColourNameToRGB("white"), backcolour = ColourNameToRGB("black") }})
+  AddStyledLine("clan", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[CLAN] ClanMember: Wow, cool capture plugin!", textcolour = ColourNameToRGB("yellow"), backcolour = ColourNameToRGB("black") }})
+  AddStyledLine("alliance", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[ALLIED 1] AllianceMember: Tabs? I've always wanted tabs.", textcolour = ColourNameToRGB("gold"), backcolour = ColourNameToRGB("black") }})
+  AddStyledLine("tell", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "Someguy tell you 'Can I get that plugin?'", textcolour = ColourNameToRGB("red"), backcolour = ColourNameToRGB("black") }})
+  AddStyledLine("form", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "You tell the formation 'You guys, using this capture plugins?", textcolour = ColourNameToRGB("cyan"), backcolour = ColourNameToRGB("black") }})
+  AddStyledLine("announce", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "YO THIS PLUGIN IS NEAT AND STUFF.", textcolour = ColourNameToRGB("white"), backcolour = ColourNameToRGB("black") }})
 end
