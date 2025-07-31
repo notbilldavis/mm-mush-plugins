@@ -605,9 +605,7 @@ end
 function checkForUpdates()
   local updater_installed, updater = pcall(require, "updatehelper")
 
-  if not updater_installed then
-    ColourNote("red" , "black", "Could not find 'updatehelper.lua' while checking for updates.")
-  else
+  if updater_installed then
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/profession_tracker.xml" },
     })

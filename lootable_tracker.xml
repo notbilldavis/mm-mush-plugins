@@ -557,11 +557,9 @@ function Deserialize(serializedTable)
 end
 
 function checkForUpdates()
-  local updater_installed, updater = pcall("required", "updatehelper")
+  local updater_installed, updater = pcall(require, "updatehelper")
 
-  if not updater_installed then
-    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
-  else
+  if updater_installed then
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lootable_tracker.xml" },
     })

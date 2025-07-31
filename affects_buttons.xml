@@ -320,7 +320,7 @@ function tryRequire(required_name, required_remote_url)
   end
 
   if not is_installed then
-    ColourNote("red" , "black", "Could not get download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
+    ColourNote("red" , "black", "Could not download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
   end
 
   return is_installed, required_ref
@@ -377,6 +377,8 @@ function OnPluginSaveState()
 end
 
 function OnPluginDisconnect()
+  Buttons.CloseMiniWindow()
+  Configuration.Hide()
   checkForUpdates()
 end
 

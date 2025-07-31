@@ -154,7 +154,7 @@ function OnPluginConnect()
 end
 
 function OnPluginDisconnect()
-  local updater_installed, updater = pcall("required", "updatehelper")
+  local updater_installed, updater = pcall(require, "updatehelper")
   if updated_installer then
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/cooking_helper.xml" },
