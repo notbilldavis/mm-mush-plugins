@@ -228,8 +228,6 @@ function OnPluginDisable()
 end
 
 function OnPluginDisconnect()
-  SaveState()
-  hideWindow()
   checkForUpdates()
 end
 
@@ -442,7 +440,7 @@ function replaceCrystalTime(time_str)
   local converted_time, year, month, day, hour, minute, second = convertToTime(time_str)
   local details = getTimeDiff(converted_time)
   local formatted_date = getFormattedDateTime(year, month, day, hour, minute, second)
-  ColourNote("lightgray", "black", "* You may ask Tadamir for another map " .. details .. "(" .. formatted_date .. ")")
+  ColourNote("lightgray", "black", "* You may ask Tadamir for another map " .. details .. " (" .. formatted_date .. ")")
 end
 
 function replaceQuestTime(sp, qp)
@@ -455,7 +453,7 @@ end
 
 function getTimeDiff(input_time)
   local details = "NOW!"
-  local differenceInSeconds = provided_time - os.time()
+  local differenceInSeconds = input_time - os.time()
   if differenceInSeconds > 0 then
       local diff_minutes = math.floor(differenceInSeconds / 60)
       details = "in " .. diff_minutes .. " minutes"
@@ -465,6 +463,12 @@ function getTimeDiff(input_time)
 end
 
 function getFormattedDateTime(year, month, day, hour, minute, second)
+  local ampm = "am"
+  if (hour == 24) then hour = 0 end
+  if (hour > 11) then ampm = "pm" end
+  if (hour == 0) then hour = 12 end 
+  if (hour > 12) then hour = hour - 12 end
+
   local formatMinute = ""
   if (minute < 10) then
     formatMinute = "0"
@@ -474,7 +478,6 @@ function getFormattedDateTime(year, month, day, hour, minute, second)
 end
 
 function convertToTime(time_str)
-  local ampm = "am"
   local month_map = {
       Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
       Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12
@@ -499,11 +502,6 @@ function convertToTime(time_str)
       min = minute,
       sec = second,
   }
-
-  if (hour == 24) then hour = 0 end
-  if (hour > 11) then ampm = "pm" end
-  if (hour == 0) then hour = 12 end 
-  if (hour > 12) then hour = hour - 12 end
 
   return provided_time, year, month, day, hour, minute, second
 end
@@ -531,7 +529,7 @@ function checkForUpdates()
   local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
 
   if not updater_installed then
-    ColourNote("red" , "black", "Could not download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
   else
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/capture_quest.xml" },

@@ -315,7 +315,6 @@ function OnPluginSaveState()
 end
 
 function OnPluginDisconnect()
-  hideWindow()
   checkForUpdates()
 end
 
@@ -365,8 +364,12 @@ end
 function doCapture(trigger_style_runs, line, type)
   if shouldSkip(type, line) then return end
 
-  captureText("silver", "black", "[".. os.date("%H:%M:%S") .. "] ", type)
-
+  if CONFIG.TIME_24 then 
+    captureText("silver", "black", "[".. os.date("%H:%M:%S") .. "] ", type)
+  else 
+    captureText("silver", "black", "[".. os.date("%I:%M:%S %p") .. "] ", type)
+  end
+  
   for i = 1, #trigger_style_runs do
     local txt = trigger_style_runs[i].text
 
@@ -508,7 +511,7 @@ function checkForUpdates()
   local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
 
   if not updater_installed then
-    ColourNote("red" , "black", "Could not download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
   else
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/tabbed_captures.xml" },

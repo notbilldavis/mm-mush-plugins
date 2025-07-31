@@ -71,7 +71,7 @@ function loadSavedData()
   CONFIG.ACTIVE_LABEL_COLOR = getValueOrDefault(CONFIG.ACTIVE_LABEL_COLOR, 16777215)
   CONFIG.DISABLED_BUTTON_COLOR = getValueOrDefault(CONFIG.DISABLED_BUTTON_COLOR, 6908265)
   CONFIG.DISABLED_LABEL_COLOR = getValueOrDefault(CONFIG.DISABLED_LABEL_COLOR, 8421504)
-  CONFIG.SILENT_REFRESH = getValueOrDefault(CONFIG.SILENT_REFRESH, true)
+  CONFIG.SILENT_REFRESH = getValueOrDefault(CONFIG.SILENT_REFRESH, false)
   CONFIG.TRACK_PURSUER = getValueOrDefault(CONFIG.TRACK_PURSUER, true)
   CONFIG.TRACK_CRYSTAL = getValueOrDefault(CONFIG.TRACK_CRYSTAL, true)
   CONFIG.BUTTON_X = getValueOrDefault(CONFIG.BUTTON_X, GetVariable("quest_buttonx") or GetInfo(292) - CONFIG.BUTTON_WIDTH - 25)
@@ -193,6 +193,15 @@ function setSizeAndPositionToContent()
     if CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       final_width = math.max(final_width, WindowTextWidth(WIN, QUESTFONT, "Crystal: " .. CRYSTAL_TARGET) + 12)
       final_height = final_height + LINE_HEIGHT 
+    end
+
+    if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      if #TEXT_BUFFER > 0 then
+        final_height = final_height + 1
+      end
+      final_height = final_height + 1
+    elseif #TEXT_BUFFER > 0 and ((CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil) or (CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil)) then
+      final_height = final_height + 1
     end
     
     if #TEXT_BUFFER > 0 then
@@ -409,16 +418,20 @@ function drawQuestText()
 
     local prefix_length = WindowTextWidth(WIN, QUESTFONT, "Orc Pursuer: ")
     if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
+      y = y + 1
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, ColourNameToRGB("silver"))
       WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
+      y = y + 1
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y + LINE_HEIGHT, 0, 0, ColourNameToRGB("silver"))
       WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, ColourNameToRGB("white"))
     elseif CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then
+      y = y + 1
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, ColourNameToRGB("silver"))
       WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
     elseif CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
+      y = y + 1
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y, 0, 0, ColourNameToRGB("silver"))
       WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, ColourNameToRGB("white"))
     end
@@ -611,10 +624,10 @@ function getTimerColorAndString(time)
       end
 
       if hours > 0 then
-        return color, string.format("in %02d hours, %02d minutes, %02d seconds", hours, minutes, seconds)
+        return color, string.format(" in %02d hours, %02d minutes, %02d seconds", hours, minutes, seconds)
       end
       
-      return color, string.format("in %02d minutes, %02d seconds", minutes, seconds)
+      return color, string.format(" in %02d minutes, %02d seconds", minutes, seconds)
     end
   end
 end

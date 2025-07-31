@@ -160,6 +160,7 @@ function loadSavedConfig()
   CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
   CONFIG.SCROLL_COLOR = getValueOrDefault(CONFIG.SCROLL_COLOR, ColourNameToRGB("darkgray"))
   CONFIG.BACKGROUND_COLOR = getValueOrDefault(CONFIG.BACKGROUND_COLOR, ColourNameToRGB("black"))
+  CONFIG.TIME_24 = getValueOrDefault(CONFIG.TIME_24, true)
 end
 
 function loadSavedTabs()
@@ -1133,8 +1134,9 @@ function configure()
       LOCK_POSITION = { sort = 1, type = "bool", raw_value = CONFIG.LOCK_POSITION },
       SCROLL_WIDTH = { sort = 2, label = "Scrollbar Width", type = "number", raw_value = CONFIG.SCROLL_WIDTH, min = 5, max = 50 },
       MAX_LINES = { sort = 3, type = "number", raw_value = CONFIG.MAX_LINES, min = 50, max = 50000 }, 
-      ANCHOR = { sort = 4, type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
-      STRETCH = { sort = 5, type = "list", value = "None", raw_value = 1, list = STRETCH_LIST },      
+      TIME_24 = { sort = 4, label = "24-Hour Time", type = "bool", raw_value = CONFIG.TIME_24 }, 
+      ANCHOR = { sort = 5, type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
+      STRETCH = { sort = 6, type = "list", value = "None", raw_value = 1, list = STRETCH_LIST }, 
     },
     Position = {
       WINDOW_LEFT = { sort = 1, type = "number", raw_value = POSITION.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
