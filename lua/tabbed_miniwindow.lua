@@ -1005,7 +1005,7 @@ function saveMiniWindow()
 end
 
 function getDateString()
-  if CONFIG.TIME_24 then
+  if CONFIG == nil or CONFIG.TIME_24 then
     return os.date("%H:%M:%S")
   end
   return os.date("%I:%M:%S %p")  
