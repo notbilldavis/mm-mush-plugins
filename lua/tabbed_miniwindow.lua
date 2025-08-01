@@ -77,7 +77,7 @@ function PrepareMiniWindow()
     WindowCreate(WIN, temp_config.left, temp_config.top, temp_config.width, temp_config.height, 12, 2, 0)
     WindowRectOp(WIN, miniwin.rect_fill, 0, 0, temp_config.width, temp_config.height, 0)
     WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, temp_config.border)
-    CONFIG.TIME_24 = temp_config.time_24
+    CONFIG = { TIME_24 = temp_config.time_24 }
     WindowShow(WIN, true)
   end
 end
@@ -475,7 +475,9 @@ function drawLines()
 
   for i = offset + 1, #lines do
     if y + LINE_HEIGHT > SIZES.TEXT_AREA.BOTTOM then
-      Note("The capture window is trying to display lines off the screen, configure the font settings and size.")
+      if offset >= #lines - WINDOW_LINES then
+        Note("The capture window is trying to display lines off the screen, configure the font settings and size.")
+      end
       break
     end
 
