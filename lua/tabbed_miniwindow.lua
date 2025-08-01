@@ -77,6 +77,7 @@ function PrepareMiniWindow()
     WindowCreate(WIN, temp_config.left, temp_config.top, temp_config.width, temp_config.height, 12, 2, 0)
     WindowRectOp(WIN, miniwin.rect_fill, 0, 0, temp_config.width, temp_config.height, 0)
     WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, temp_config.border)
+    CONFIG.TIME_24 = temp_config.time_24
     WindowShow(WIN, true)
   end
 end
@@ -749,7 +750,7 @@ function OnHeaderClick(flags, hotspot_id)
     OnScrollToBottom()
     UNREAD_COUNT[hotspot_id] = 0
     drawMiniWindow()
-  else
+  elseif flags == miniwin.hotspot_got_rh_mouse then
     doRightClickHeaderMenu(hotspot_id)
   end
 end
@@ -994,7 +995,7 @@ function saveMiniWindow()
   local sticky_options = { 
     left = WindowInfo(WIN, 10), top = WindowInfo(WIN, 11), 
     width = WindowInfo(WIN, 3), height = WindowInfo(WIN, 4), 
-    border = CONFIG.BORDER_COLOR,
+    border = CONFIG.BORDER_COLOR, time_24 = CONFIG.TIME_24
   }
 
   SetVariable("last_capture_config", Serialize(sticky_options))
