@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+<muclient>
+
+<plugin
+   name="world_map"
+   author="Oona"
+   id="adc3a873d6667348da7cb426"
+   language="Lua"
+   purpose="Shows your position in a zoomable world map."
+   save_state="y"
+   date_written="2025-08-01 09:12:00"
+   version="1.0">
+
+<description trim="y">
+
+<![CDATA[
+
+This is a work in progress, thus there are no commands. Just a right-click configure menu.
+
+Make sure you have the worldmap_miniwindow.lua file in your lua folder and the WorldMap folder
+that is full of the map images for each zoom level in the same spot as this plugin file.
+
+Coming soon:
+
+* hiding/showing with a command
+* more icons to choose from
+* marking one or more spots
+* labels, city names and such
+* more customization, anchoring, etc
+
+]]>
+
+</description>
+
+</plugin>
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+require "worldmap_miniwindow"
+
+function OnPluginInstall()
+  InitializeMiniWindow()
+end
+
+function OnPluginConnect()
+  Execute("sendgmcp room.info")
+end
+
+function OnPluginClose()
+  SaveState()
+  HideWindow()
+end
+
+function OnPluginDisable()
+  SaveState()
+  HideWindow()
+end
+
+function OnPluginDisconnect()
+  checkForUpdates()
+end
+
+function OnPluginBroadcast(msg, id, name, text)
+  if (id =="f67c4339ed0591a5b010d05b") then -- GMCP message
+    if (text == "room.info") then -- room.info
+      local res, room_info = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
+      SetCoords(room_info)
+    end
+  end
+end
+
+function checkForUpdates()
+  local updater_installed, updater = pcall(require, "updatehelper")
+
+  if updater_installed then
+    updater.Update({
+      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/world_map.xml" },
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/worldmap_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/worldmap_miniwindow.lua"},
+      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua" },
+    })
+  end
+end
+
+]]>
+
+</script>
+
+</muclient>
