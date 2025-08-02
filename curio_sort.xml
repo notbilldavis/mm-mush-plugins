@@ -65,7 +65,7 @@ The location links will "run" or "mapper goto" where appropriate.
 
 <triggers>
   <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="12" sequence="100" omit_from_output="y" match="^(.*?) altar not active\.$">
-    <send>addToAltar("%1", "[not active]", "")</send>
+    <send>addToAltar("%1", "- not active", "")</send>
   </trigger>
 
   <trigger group="get_curios" keep_evaluating="y" regexp="y" send_to="12" sequence="101" omit_from_output="y" match="^(.*) (\d+) (.*)$">
@@ -108,41 +108,41 @@ character_name = nil
 longest = {}
 
 altar_locations = {
-  ["Curious Altar"] = { zone = "run runeforest", zone_label = "[Rune Forest]", room = "mapper goto 946163", room_label = "[A Misty Path]" },
-  ["Excited Altar"] = { zone = "mapper goto 15235", zone_label = "[Focault]", room = "", room_label = "[Focault]" },
-  ["Jealous Altar"] = { zone = "run wroth", zone_label = "[Wroth]", room = "mapper goto 7920", room_label = "[Gateway Portal]" },
-  ["Confused Altar"] = { zone = "run tavernoftheboars", zone_label = "[Tavern of the Boars]", room = "mapper goto 7998", room_label = "[A Dirt Path]" },
-  ["Triumphant Altar"] = { zone = "run avarice", zone_label = "[Avarice]", room = "", room_label = "[Dracolich]" },
-  ["Compassionate Altar"] = { zone = "run avarice", zone_label = "[Avarice]", room = "mapper goto 13957", room_label = "[Sacrifice]" },
-  ["Loving Altar"] = { zone = "run twinmoons", zone_label = "[Twin Moons]", room = "mapper goto 154884", room_label = "[An Old Outhouse]" },
-  ["Envious Altar"] = { zone = "run lonelydragon", zone_label = "[Lonely Dragon]", room = "mapper goto 155235", room_label = "[The Western Alcove]" },
-  ["Nostalgic Altar"] = { zone = "", zone_label = "[Aequtus]", room = "mapper goto 195862", room_label = "[Cargo Hold]" },
-  ["Joyful Altar"] = { zone = "run diocletian", zone_label = "[Diocletian]", room = "mapper goto 28952", room_label = "[Main Basilica Hallway]" },
-  ["Fearful Altar"] = { zone = "run sigil", zone_label = "[Sigil]", room = "mapper goto 28042", room_label = "[The Inner Sanctum]" },
-  ["Bored Altar"] = { zone = "run sigil", zone_label = "[Sigil]", room = "", room_label = "[Manticore]" },
-  ["Ambitious Altar"] = { zone = "run vesuvius", zone_label = "[Vesuvius]", room = "", room_label = "[Vyst]" },
-  ["Angry Altar"] = { zone = "run tellerium", zone_label = "[Tellerium]", room = "mapper goto 41205", room_label = "[Northwest Corner of Town Square]" },
-  ["Hopeful Altar"] = { zone = "", zone_label = "[Ogre Village]", room = "mapper goto 167051", room_label = "[Bentnose]" },
-  ["Suspicious Altar"] = { zone = "", zone_label = "[Begora's Sanctuary]", room = "mapper goto 96034", room_label = "[Sanctuary]" },
-  ["Sad Altar"] = { zone = "", zone_label = "[Jalur Lumber Camp]", room = "mapper goto 336837", room_label = "[The Camp Square]" },
-  ["Content Altar"] = { zone = "run pc", zone_label = "[Pirate's Cove]", room = "mapper goto 30301", room_label = "[Kraken's Throne Room]" },
-  ["Serene Altar"] = { zone = "run deceit", zone_label = "[Deceit]", room = "", room_label = "[Yourban]" },
-  ["Rebellious Altar"] = { zone = "", zone_label = "[Seelie]", room = "mapper goto 32503", room_label = "[The Spymaster's Armory]" },
-  ["Proud Altar"] = { zone = "", zone_label = "[Seelie]", room = "mapper goto 32109", room_label = "[The King's Chamber]" },
-  ["Regretful Altar"] = { zone = "", zone_label = "[Unseelie]", room = "mapper goto 33099", room_label = "[A High Throne]" },
-  ["Peaceful Altar"] = { zone = "", zone_label = "[Rahdiyr]", room = "", room_label = "[Lathimus]" },
-  ["Mischievous Altar"] = { zone = "run vir", zone_label = "[Vir]", room = "", room_label = "[Beyonder]" },
-  ["Vengeful Altar"] = { zone = "run vir", zone_label = "[Vir]", room = "mapper goto 146915", room_label = "[Inside the Forge]" },
-  ["Frustrated Altar"] = { zone = "run arienduth", zone_label = "[Arien'dyth]", room = "mapper goto 151274", room_label = "[East Side of the Gateguard's Tower]" },
-  ["Overwhelmed Altar"] = { zone = "", zone_label = "[Swiveling Hooks]", room = "mapper goto 12336", room_label = "[A Sphereical Habitat]" },
-  ["Determined Altar"] = { zone = "", zone_label = "[Sea Hag]", room = "mapper goto 152944", room_label = "[Musty Bedroom]" },
-  ["Grateful Altar"] = { zone = "", zone_label = "[Hellbent]", room = "mapper goto 107297", room_label = "[Hidden Alcove]" },
-  ["Lonely Altar"] = { zone = "run avarice", zone_label = "[Waylander's Retreat]", room = "mapper goto 33869", room_label = "[A Babbling Brook]" },
-  ["Tranquil Altar"] = { zone = "", zone_label = "[Kalywak]", room = "mapper goto 153834", room_label = "[In The Coven Building Proper]" },
-  ["Inspired Altar"] = { zone = "", zone_label = "[Future Anguish]", room = "mapper goto 24091", room_label = "[The Vivisection Chamber]" },
-  ["Breathtaking Altar"] = { zone = "", zone_label = "[Van Pelt]", room = "mapper goto 253834", room_label = "[Emporium]" },
-  ["Priceless Altar"] = { zone = "", zone_label = "[Van Pelt]", room = "mapper goto 353849", room_label = "[Tapestry-Lined Corridor]" },
-  ["Chemically Altered Altar"] = { zone = "", zone_label = "[Unknown]", room = "", room_label = "[Unknown]" }
+  ["Curious Altar"] = { zone = "run runeforest", zone_label = "Rune Forest", room = "mapper goto 946163", room_label = "A Misty Path", },
+  ["Excited Altar"] = { zone = "mapper goto 15235", zone_label = "Focault", room = "", room_label = "Focault", },
+  ["Jealous Altar"] = { zone = "run wroth", zone_label = "Wroth", room = "mapper goto 7920", room_label = "Gateway Portal", },
+  ["Confused Altar"] = { zone = "run tavernoftheboars", zone_label = "Tavern of the Boars", room = "mapper goto 7998", room_label = "A Dirt Path", },
+  ["Triumphant Altar"] = { zone = "run avarice", zone_label = "Avarice", room = "", room_label = "Dracolich", },
+  ["Compassionate Altar"] = { zone = "run avarice", zone_label = "Avarice", room = "mapper goto 13957", room_label = "Sacrifice", },
+  ["Loving Altar"] = { zone = "run twinmoons", zone_label = "Twin Moons", room = "mapper goto 154884", room_label = "An Old Outhouse", },
+  ["Envious Altar"] = { zone = "run lonelydragon", zone_label = "Lonely Dragon", room = "mapper goto 155235", room_label = "The Western Alcove", },
+  ["Nostalgic Altar"] = { zone = "", zone_label = "Aequtus", room = "mapper goto 195862", room_label = "Cargo Hold", },
+  ["Joyful Altar"] = { zone = "run diocletian", zone_label = "Diocletian", room = "mapper goto 28952", room_label = "Main Basilica Hallway", },
+  ["Fearful Altar"] = { zone = "run sigil", zone_label = "Sigil", room = "mapper goto 28042", room_label = "The Inner Sanctum", },
+  ["Bored Altar"] = { zone = "run sigil", zone_label = "Sigil", room = "", room_label = "Manticore", },
+  ["Ambitious Altar"] = { zone = "run vesuvius", zone_label = "Vesuvius", room = "", room_label = "Vyst", },
+  ["Angry Altar"] = { zone = "run tellerium", zone_label = "Tellerium", room = "mapper goto 41205", room_label = "Northwest Corner of Town Square", },
+  ["Hopeful Altar"] = { zone = "", zone_label = "Ogre Village", room = "mapper goto 167051", room_label = "Bentnose", },
+  ["Suspicious Altar"] = { zone = "", zone_label = "Begora's Sanctuary", room = "mapper goto 96034", room_label = "Sanctuary", },
+  ["Sad Altar"] = { zone = "", zone_label = "Jalur Lumber Camp", room = "mapper goto 336837", room_label = "The Camp Square", },
+  ["Content Altar"] = { zone = "run pc", zone_label = "Pirate's Cove", room = "mapper goto 30301", room_label = "Kraken's Throne Room", },
+  ["Serene Altar"] = { zone = "run deceit", zone_label = "Deceit", room = "", room_label = "Yourban", },
+  ["Rebellious Altar"] = { zone = "", zone_label = "Seelie", room = "mapper goto 32503", room_label = "The Spymaster's Armory", },
+  ["Proud Altar"] = { zone = "", zone_label = "Seelie", room = "mapper goto 32109", room_label = "The King's Chamber", },
+  ["Regretful Altar"] = { zone = "", zone_label = "Unseelie", room = "mapper goto 33099", room_label = "A High Throne", },
+  ["Peaceful Altar"] = { zone = "", zone_label = "Rahdiyr", room = "", room_label = "Lathimus", },
+  ["Mischievous Altar"] = { zone = "run vir", zone_label = "Vir", room = "", room_label = "Beyonder", },
+  ["Vengeful Altar"] = { zone = "run vir", zone_label = "Vir", room = "mapper goto 146915", room_label = "Inside the Forge", },
+  ["Frustrated Altar"] = { zone = "run arienduth", zone_label = "Arien'dyth", room = "mapper goto 151274", room_label = "East Side of the Gateguard's Tower", },
+  ["Overwhelmed Altar"] = { zone = "", zone_label = "Swiveling Hooks", room = "mapper goto 12336", room_label = "A Sphereical Habitat", },
+  ["Determined Altar"] = { zone = "", zone_label = "Sea Hag", room = "mapper goto 152944", room_label = "Musty Bedroom", },
+  ["Grateful Altar"] = { zone = "", zone_label = "Hellbent", room = "mapper goto 107297", room_label = "Hidden Alcove", },
+  ["Lonely Altar"] = { zone = "run avarice", zone_label = "Waylander's Retreat", room = "mapper goto 33869", room_label = "A Babbling Brook", },
+  ["Tranquil Altar"] = { zone = "", zone_label = "Kalywak", room = "mapper goto 153834", room_label = "In The Coven Building Proper", },
+  ["Inspired Altar"] = { zone = "", zone_label = "Future Anguish", room = "mapper goto 24091", room_label = "The Vivisection Chamber", },
+  ["Breathtaking Altar"] = { zone = "", zone_label = "Van Pelt", room = "mapper goto 253834", room_label = "Emporium", },
+  ["Priceless Altar"] = { zone = "", zone_label = "Van Pelt", room = "mapper goto 353849", room_label = "Tapestry-Lined Corridor", },
+  ["Chemically Altered Altar"] = { zone = "", zone_label = "Unknown", room = "", room_label = "Unknown", }
 }
 
 function OnPluginConnect()
@@ -210,6 +210,12 @@ function beginCurioSort(ext)
       show_all = false 
     end
 
+    longest.altar = 0
+    longest.zone = 0
+    longest.room = 0
+    longest.affect = 0
+    longest.expire = 0
+
     EnableTriggerGroup("get_curios", true)
     altars = {}
     Send("curio")
@@ -223,6 +229,9 @@ function addToAltar(name, affect, expiration)
     if (parsed_expiration ~= nil) then
       parsed_expiration = parsed_expiration + (hour_offset * 3600)
     end
+
+    local summon = affect:match("1 increased uses to (.+)")
+    if summon ~= nil and #summon > 0 then affect = "1 " .. Trim(summon) end
 
     local location = altar_locations[altar_name]
     local color, timer_string = getTimerColorAndString(parsed_expiration)
@@ -384,7 +393,7 @@ function showSortedAltars()
           Note("|")
 
           if color == "red" then expired_count = expired_count + 1
-          elseif color == "yellow" then expiring_count = expiring_count + 1 
+          elseif color == "yellow" or color == "orange" then expiring_count = expiring_count + 1 
           end
         end
       else
@@ -424,12 +433,12 @@ function getTimerColorAndString(time)
   
       local color = "green"
       if (days < 3) then
-        color = "red"
+        color = "orange"
       elseif (days < 7) then
         color = "yellow"
       end
 
-      local expiration = string.format("%d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
+      local expiration = string.format("%02d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
 
       return color, expiration
     end
@@ -460,7 +469,7 @@ function doLocation(name)
 end
 
 function parseDate(str)
-  if str == nil or str == "[not active]" or str == "" then
+  if str == nil or str == "not active" or str == "" then
     return nil
   else
     str = str:gsub("^Expires on ", ""):gsub("%s+", " "):gsub("%.$", ""):gsub("^%s+", ""):gsub("%s+$", "")
