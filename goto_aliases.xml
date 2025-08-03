@@ -179,7 +179,8 @@ local alyria_destinations = {
   "mandrake", "newkolvir", "runeforest", "towerofart", "wroth", "twinmoons", "hillgiants", 
   "travelersretreat", "lonelydragon", "jointmagicconsortium", "tavernoftheboars",
   "shlarksh", "takhtin", "emperorscrossroads", "vospire", "tellerium", "templeton", "dorathon",
-  "winton", "keep", "deceit", "vandemaar", "xalt", "mulakanathos", "gorth", "vesuvius"
+  "winton", "keep", "deceit", "vandemaar", "xalt", "mulakanathos", "gorth", "vesuvius", "frostgiantskeep",
+  "sigil", "piratescove", "aroxa", "oilwells", "desertoasis"
 }
 
 local underground_destinations = { 

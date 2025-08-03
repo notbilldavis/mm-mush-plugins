@@ -101,6 +101,10 @@
   <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You take a stamp commemorating (.*?).$">
     <send>addStamp("%1")</send>
   </trigger>
+
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>onFirstPrompt()</send>
+  </trigger>
 </triggers>
 
 <script>
@@ -108,41 +112,74 @@
 <![CDATA[
 
 require "tableshelper"
+require "gmcphelper"
 
+character = nil
 plushies = {}
 plates = {}
 stamps = {}
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  EnsureTables()
+  EnableTrigger("first_prompt", true)
+  character = nil
 end
 
 function OnPluginEnable()
-  EnsureTables()
+  EnableTrigger("first_prompt", true)
+  character = nil
 end
 
 function OnPluginConnect()
-  EnsureTables()
+  EnableTrigger("first_prompt", true)
+  character = nil
 end
 
-function EnsureTables()
-  local plushies_text = GetVariable("plushies_list") or ""
+function onFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  Execute("sendgmcp char.base")
+end
+
+function OnPluginBroadcast(msg, id, name, text)
+  if (id == "f67c4339ed0591a5b010d05b") then
+    if (text == "char.base") then
+      if character == nil or character == "" then
+        local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
+        luastmt = "gmcpdata = " .. gmcparg
+        assert(loadstring(luastmt or ""))()
+        local name = gmcpval("name")
+        setCharacterName(name)
+      end
+    end
+  end
+end
+
+function setCharacterName(name)
+  if name == nil or name == "" then
+    Note("Unknown character name, set with 'collectables setchar <name>'") 
+  else
+    character = name
+    loadSavedData()
+  end
+end
+
+function loadSavedData()
+  if character == nil then return end
+  local plushies_text = GetVariable(character .. "_plushies_list") or ""
   if plushies_text ~= "" then
     plushies = Deserialize(plushies_text)
   end
-  local plates_text = GetVariable("plates_list") or ""
+  local plates_text = GetVariable(character .. "_plates_list") or ""
   if plates_text ~= "" then
     plates = Deserialize(plates_text)
   end
-  local stamps_text = GetVariable("stamps_list") or ""
+  local stamps_text = GetVariable(character .. "_stamps_list") or ""
   if stamps_text ~= "" then
     stamps = Deserialize(stamps_text)
   end
 end
 
 function processPlushie(name)
-  --name = Trim(name)
   if getTableIndex(plushies, name) == nil then
     Execute("mapper stop")
     local true_name = "a" .. name .. " plushie"
@@ -214,7 +251,7 @@ function addCollectable(what, owned, possible, collectable, prefix)
     end
   end
 
-  SetVariable(what .. "_list", Serialize(owned))
+  SetVariable(character.. "_" .. what .. "_list", Serialize(owned))
   SaveState()
 end
 
@@ -356,19 +393,19 @@ end
 
 function clearPlushies()
   plushies = {}
-  SetVariable("plushies_list", "")
+  SetVariable(character .. "_plushies_list", "")
   SaveState()
 end
 
 function clearPlates()
   plates = {}
-  SetVariable("plates_list", "")
+  SetVariable(character .. "_plates_list", "")
   SaveState()
 end
 
 function clearStamps()
   stamps = {}
-  SetVariable("stamps_list", "")
+  SetVariable(character .. "_stamps_list", "")
   SaveState()
 end
 
@@ -549,7 +586,7 @@ possiblePlates = {
   "precious tourmalines, valued by the Lords and Ladies of Alyria",
   "precious maleficarum roots at the bottom of the Proving Grounds",
   "the magical Worldgates that appear throughout the land",
-  "a family immigrating from Auryn to Beltane on the Medraco",
+  "a family immigrating from Auryn to Beltane on the Merdraco",
   "the Power of land and terrain, Maradas",
   "an adventurer being rewarded by the Powers for doing something heroic",
   "a group of teenaged clerics, in the city of Xaventry",
