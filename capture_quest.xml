@@ -207,7 +207,7 @@ function OnPluginEnable()
   clearMiniWindow()
 end
 
-function OnFirstPrompt()
+function onFirstPrompt()
   EnableTrigger("first_prompt", false)
   DoAfterSpecial(1, "tryGetOffset()", sendto.script)
 end
