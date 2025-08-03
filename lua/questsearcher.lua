@@ -73,8 +73,8 @@ function find_quest_link(quest_number, quest_name)
     local no_num = nil
 
     for quest_id, link_text in html:gmatch(pattern) do
-        local clean_text = link_text:gsub("%s+", " "):gsub("%s%[.*%]", ""):lower()
-        local expected = quest_name:lower()
+        local clean_text = Trim(link_text:gsub("%s+", " "):gsub("%s%[.*%]", ""):lower())
+        local expected = Trim(quest_name:lower())
         local bracket_num = link_text:match("%[(%d+)%]")
 
         if clean_text == expected then
