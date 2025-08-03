@@ -168,14 +168,7 @@ function EnsureTables()
   table.insert(lootables, { name = "Safe of Sin", zone = "safe_of_sin_const", room = "", room_number = "", next_available = nil})
 
   local lootables_text = GetVariable(character_name .. "_lootables_list") or ""
-  if lootables_text == "" then
-    local old_lootables_text = GetVariable("lootables_list") or ""
-    local convert_old = utils.msgbox("There are no lootables saved for this character, convert the existing lootables from a previous version?", "Convert Lootables?", "yesno", "?")
-    if convert_old then
-      lootables = Deserialize(old_lootables_text)
-      saveLootables()
-    end
-  else
+  if lootables_text ~= "" and #lootables_text > 0 then
     lootables = Deserialize(lootables_text)
   end
 end

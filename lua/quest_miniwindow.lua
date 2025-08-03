@@ -416,6 +416,10 @@ function drawQuestText()
       end
     end
 
+    if #TEXT_BUFFER > 0 then
+      y = y + LINE_HEIGHT
+    end
+
     local prefix_length = WindowTextWidth(WIN, QUESTFONT, "Orc Pursuer: ")
     if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       y = y + 1

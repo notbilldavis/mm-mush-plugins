@@ -55,7 +55,7 @@ function SetCoords(serialized_room_info)
   end
 
   if CONFIG.HIDE_WILDS then
-    if room_info.coord.code ~= nil then
+    if room_info.coord.code == nil then
       HideWindow()
     else
       ShowWindow()

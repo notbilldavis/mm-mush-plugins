@@ -399,13 +399,6 @@ end
 function handleRunningToPursuer(initial)
   if not running_to_pursuer then return end
 
-  if initial and room == "7461" then
-    -- todo: track if you have the part to turn in
-    getPursuerTarget()
-    running_to_pursuer = false
-    return
-  end
-  
   Note("Running to the Orc Pursuer. Type 'goto cancel' to stop when the current leg completes.")  
 
   get_gmcp_room()
@@ -413,7 +406,11 @@ function handleRunningToPursuer(initial)
   local room = gmcpval("num") 
   
   if zone == "Dungeon Wroth" or room == "1960870" then -- or outside wroth
-    if room == "7682" then
+    if initial and room == "7461" then
+      -- todo: track if you have the part to turn in
+      getPursuerTarget()
+      running_to_pursuer = false
+    elseif room == "7682" then
       Send("enter portal")
       Send("south")
       running_to_pursuer = false

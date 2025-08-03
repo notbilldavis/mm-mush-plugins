@@ -153,6 +153,10 @@
     <send>setOffset("%1")</send>
   </trigger>
 
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>onFirstPrompt()</send>
+  </trigger>
+
 </triggers>
 
 <script>
@@ -203,18 +207,21 @@ function OnPluginEnable()
   clearMiniWindow()
 end
 
-function OnPluginConnect()
-  local offset = GetVariable("hour_offset")
-  if offset == nil then
-    DoAfterSpecial(1, "tryGetOffset()", sendto.script)
-  else
-
-  end
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  DoAfterSpecial(1, "tryGetOffset()", sendto.script)
 end
 
 function tryGetOffset()
-  Note("Sending time to get hour offset from server...")
-  Send("time")
+  hour_offset = GetVariable("hour_offset")
+  if hour_offset == nil then
+    EnableTrigger("capture_time_offset", true)
+    Note("Sending time to get hour offset from server...")
+    Send("time")
+  else
+    EnableTrigger("capture_time_offset", false)
+  end
+  
 end
 
 function OnPluginClose()
@@ -462,7 +469,7 @@ function getTimeDiff(input_time)
   return details
 end
 
-function getFormattedDateTime(year, month, day, hour, minute, second)
+function getFormattedDateTime(year, month, day, hour, minute, second)  
   local ampm = "am"
   if (hour == 24) then hour = 0 end
   if (hour > 11) then ampm = "pm" end
@@ -529,7 +536,7 @@ function checkForUpdates()
   local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
 
   if not updater_installed then
-    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+    ColourNote("red" , "black", "Could not download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
   else
     updater.Update({
       { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/capture_quest.xml" },
