@@ -100,12 +100,11 @@ require "gmcphelper"
 
 altars = {}
 ignore = {}
-
+affects = {}
+longest = {}
 hour_offset = 1
 show_all = true
 character_name = nil
-
-longest = {}
 
 altar_locations = {
   ["Curious Altar"] = { zone = "run runeforest", zone_label = "Rune Forest", room = "mapper goto 946163", room_label = "A Misty Path", },
@@ -194,6 +193,13 @@ function setCharacterName(name)
       ignore = deserialize(ignore_text)
     end
 
+    affects = {}
+
+    local affects_text = GetVariable(character_name .. "_altar_affects") or ""   
+    if affects_text ~= "" then
+      affects = deserialize(affects_text)
+    end
+
     DoAfterSpecial(3, "showExpiringAltars()", sendto.script)
   end
 end
@@ -235,6 +241,12 @@ function addToAltar(name, affect, expiration)
 
     local location = altar_locations[altar_name]
     local color, timer_string = getTimerColorAndString(parsed_expiration)
+
+    if affect ~= "- not active" then
+      affects[name] = affect
+    else if affects[name] ~= nil then
+      affect = affects[name]
+    end
 
     if shouldShow(altar_name) and (show_all or color ~= "green") then
       longest.altar = getLongest(longest.altar, altar_name)
@@ -408,6 +420,9 @@ function showSortedAltars()
   end
 
   displayFooter(total_count, ignored_count, expiring_count, expired_count)
+
+  SetVariable(character_name .. "_altar_affects", serialize(affects))
+  SaveState()
 end
 
 function showExpiringAltars()
