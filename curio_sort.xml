@@ -244,7 +244,7 @@ function addToAltar(name, affect, expiration)
 
     if affect ~= "- not active" then
       affects[name] = affect
-    else if affects[name] ~= nil then
+    elseif affects[name] ~= nil then
       affect = affects[name]
     end
 
