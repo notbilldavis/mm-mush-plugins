@@ -34,6 +34,11 @@ Coming soon:
 </description>
 
 </plugin>
+<aliases>
+  <alias match="^worldmap[ ]+crystal[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setCrystal("%1")</send>
+  </alias>
+</aliases>
 <script>
 
 <![CDATA[
@@ -64,11 +69,25 @@ function OnPluginDisconnect()
 end
 
 function OnPluginBroadcast(msg, id, name, text)
-  if (id =="f67c4339ed0591a5b010d05b") then -- GMCP message
-    if (text == "room.info") then -- room.info
+  if (id =="f67c4339ed0591a5b010d05b") then
+    if (text == "room.info") then
       local res, room_info = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
       SetCoords(room_info)
     end
+  elseif (id == "892911b648d09c18e1ecd4e6") then
+    if (msg == 1) then
+      setCrystal(text)
+    end
+  end
+end
+
+function setCrystal(crystal)
+  local coords = utils.split(crystal, ",")
+  if #coords == 1 then coords = utils.split(crystal, " ") end
+  if #coords == 2 then
+    SetCrystalCoords(coords[1], coords[2])
+  else
+    SetCrystalCoords(nil, nil)
   end
 end
 
