@@ -71,6 +71,9 @@ local refresh_type = {
 }
 
 function PrepareMiniWindow()
+  INIT = false
+  CHARACTER_NAME = nil
+  CONFIG = { TIME_24 = true }
   local serialized_config = GetVariable("last_capture_config")
   if serialized_config ~= nil then
     local temp_config = Deserialize(serialized_config)
@@ -92,6 +95,7 @@ function InitializeMiniWindow(character_name)
     for i = 1, #PREINIT_LINES do
       AddStyledLine(PREINIT_LINES[i].channel, PREINIT_LINES[i].segments)
     end
+    PREINIT_LINES = {}
   else
     drawMiniWindow()
   end
