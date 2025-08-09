@@ -1,7 +1,5 @@
 local M = {}
 
-require("serializationhelper")
-
 local WIN = "configuration_" .. GetPluginID()
 local FONT = WIN .. "_font"
 local FONT_UNDERLINE = WIN .. "_font_underline"
@@ -152,9 +150,9 @@ function drawOption(indents, y, parent_key, key, option)
     WindowText(WIN, FONT, "-", LABEL_WIDTH + 20 + BORDER_WIDTH, y, 0, 0, minus_color, true)
     WindowText(WIN, FONT_UNDERLINE, tostring(option.value), LABEL_WIDTH + 20 + BORDER_WIDTH + b_width * 2, y, 0, 0, ColourNameToRGB("white"), true)
     WindowText(WIN, FONT, "+", LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 3, y, 0, 0, ColourNameToRGB("white"), true)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", LABEL_WIDTH + 20 + BORDER_WIDTH, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + b_width, y + LINE_HEIGHT - 1, "", "", "", "", "onConfigureChangeClick", "click to decrease", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", LABEL_WIDTH + 20 + BORDER_WIDTH, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + b_width, y + LINE_HEIGHT - 1, "", "", "", "", "onConfigureChangeClick", "click to decrease (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
     WindowAddHotspot(WIN, parent_key .. "|" .. key, LABEL_WIDTH + 20 + BORDER_WIDTH + b_width * 2, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 2, y + LINE_HEIGHT - 1, "", "", "", "", "onConfigureChangeClick", "click to change", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 3, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 4, y + LINE_HEIGHT - 1, "", "", "", "", "onConfigureChangeClick", "click to increase", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 3, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 4, y + LINE_HEIGHT - 1, "", "", "", "", "onConfigureChangeClick", "click to increase (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
   else
     if option.value == nil then option.value = tostring(option.raw_value) end
     local v_width = WindowTextWidth(WIN, FONT, option.value)
@@ -179,13 +177,24 @@ function onConfigureChangeClick(flags, hotspot_id)
   local opt_mode = ids[3]
   local nested_groups = utils.split(group_id, "^")
   local group = CONFIG[nested_groups[1]]
+  local num = 1
 
   for i = 2, #nested_groups do
     group = group[nested_groups[i]]
   end
 
+  if opt_mode then
+    if bit.band(flags, 0x01) ~= 0 and bit.band(flags, 0x02) then
+      num = 100
+    elseif bit.band(flags, 0x01) ~= 0 then
+      num = 50
+    elseif bit.band(flags, 0x02) ~= 0 then
+      num = 10
+    end
+  end
+
   local option = group[option_id]
-  if option.type == "number" then changeNumber(option, opt_mode)
+  if option.type == "number" then changeNumber(option, opt_mode, num)
   elseif option.type == "text" then changeText(option)
   elseif option.type == "color" then changeColor(option)
   elseif option.type == "font" then changeFont(option)
@@ -213,16 +222,18 @@ function onConfigureExpandCollapseClick(flags, hotspot_id)
   end
 end
 
-function changeNumber(option, opt_mode)
+function changeNumber(option, opt_mode, num)
   if opt_mode ~= nil then
     local current = option.raw_value
     if opt_mode == "minus" then    
-      option.value = tostring(current - 1)
       option.raw_value = current - 1
     elseif opt_mode == "add" then
-      option.value = tostring(current + 1)
       option.raw_value = current + 1
     end
+    if option.min ~= nil and option.max ~= nil then
+      option.raw_value = math.max(option.min, math.min(option.raw_value, max))
+    end
+    option.value = tostring(option.raw_value)
   else
     local min, max = option.min, option.max
     local message = "Choose a new number"
