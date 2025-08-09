@@ -459,7 +459,7 @@ function captureGlobalEcho()
           end
 
         else
-          captureText(fg, bg, txt, "announce")
+          captureText(fg, bg, txt .. "\r\n", "announce")
         end
       end
     end

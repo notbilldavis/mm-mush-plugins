@@ -188,7 +188,7 @@ local underground_destinations = {
 }
 
 local sug_destinations = { 
-  "renn", "hlegmal", "goblam", "grigmorth", 
+  "renn", "hlegmal", "goblam", "grigmorth", "cogworkcity",
   "waylandersretreat", "unreinforcedtunnel", "goblam"
 }
 

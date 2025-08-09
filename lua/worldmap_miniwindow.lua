@@ -73,6 +73,11 @@ function SetCrystalCoords(x, y)
   drawMiniWindow()
 end
 
+function IsAutoUpdateEnabled()
+  if CONFIG == nil then return false end
+  return CONFIG.AUTOUPDATE or false
+end
+
 function ShowWindow()
   WindowShow(WIN, true)
 end
@@ -114,6 +119,7 @@ function loadSavedData()
   CONFIG.MAX_CACHE_SIZE = getValueOrDefault(CONFIG.MAX_CACHE_SIZE, 16)
   CONFIG.HIDE_WILDS = getValueOrDefault(CONFIG.HIDE_WILDS, true)
   CONFIG.OFFSETS = getValueOrDefault(CONFIG.OFFSETS, getDefaultOffsets())
+  CONFIG.AUTOUPDATE = getValueOrDefault(CONFIG.AUTUPDATE, true)
 
   local serialized_zoom_level = GetVariable("worldmap_zoom") or ""
   if serialized_zoom_level == "" then
@@ -136,11 +142,11 @@ function getDefaultOffsets()
     alyria = {}, underground = {}, sigil = {}, faerie = {}, lasler = {}, verity = {}, social = {}
   }
 
-  for i = 1, 5 do
-    for plane, details in pairs(PLANE_DETAILS) do
+  for plane, details in pairs(PLANE_DETAILS) do
+    for i = 1, details.z + 1 do
       planes[plane][i] = { x = 0, y = 0 }
     end
-  end
+  end  
 
   planes.alyria[1]={y=0,x=0,}
   planes.alyria[2]={y=1,x=2,}
@@ -152,6 +158,11 @@ function getDefaultOffsets()
   planes.underground[3]={y=5,x=3,}  
   planes.underground[4]={y=7,x=3,}
   planes.underground[5]={y=10,x=2,}
+  planes.sigil[1]={y=1,x=3,}
+  planes.sigil[2]={y=0,x=2,}
+  planes.sigil[3]={y=4,x=1,}
+  planes.sigil[4]={y=0,x=-1,}
+  planes.sigil[5]={y=0,x=-5,}
   planes.faerie[1]={y=8,x=4,}
   planes.faerie[2]={y=10,x=3,}
   planes.faerie[3]={y=15,x=3,}
@@ -186,7 +197,7 @@ function drawMiniWindow()
     WindowShow(WIN, false)
 
     if CURRENT_PLANE == nil then 
-      Note("Unknown plane!")
+      --Note("Unknown plane!")
       return
     end
 
@@ -212,15 +223,15 @@ function drawMiniWindow()
     
     table.insert(debug_boxes, drawTile(tile_x, tile_y, offset_x, offset_y, "main", 32768))
 
-    if offset_x > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y, offset_x - 1150, offset_y, "left", 255)) end
-    if offset_x < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y, offset_x + 1150, offset_y, "right", 255)) end
-    if offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y + 1, offset_x, offset_y - 750, "up", ColourNameToRGB("blue"))) end
-    if offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y - 1, offset_x, offset_y + 750, "down", ColourNameToRGB("blue"))) end
+    if offset_x > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y, offset_x - 1151, offset_y, "left", 255)) end
+    if offset_x < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y, offset_x + 1151, offset_y, "right", 255)) end
+    if offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y + 1, offset_x, offset_y - 751, "up", ColourNameToRGB("blue"))) end
+    if offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y - 1, offset_x, offset_y + 751, "down", ColourNameToRGB("blue"))) end
       
-    if offset_x > 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y + 1, offset_x - 1150, offset_y - 750, "left-up", ColourNameToRGB("yellow"))) end
-    if offset_x < 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y - 1, offset_x + 1150, offset_y + 750, "right-down", ColourNameToRGB("cyan"))) end
-    if offset_x > 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y - 1, offset_x - 1150, offset_y + 750, "left-down", ColourNameToRGB("yellow"))) end
-    if offset_x < 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y + 1, offset_x + 1150, offset_y - 750, "right-up", ColourNameToRGB("cyan"))) end
+    if offset_x > 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y + 1, offset_x - 1151, offset_y - 751, "left-up", ColourNameToRGB("yellow"))) end
+    if offset_x < 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y - 1, offset_x + 1151, offset_y + 751, "right-down", ColourNameToRGB("cyan"))) end
+    if offset_x > 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y - 1, offset_x - 1151, offset_y + 751, "left-down", ColourNameToRGB("yellow"))) end
+    if offset_x < 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y + 1, offset_x + 1151, offset_y - 751, "right-up", ColourNameToRGB("cyan"))) end
         
     for i = 0, BORDER_WIDTH - 1 do
       WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, width - i, height - i, CONFIG.BORDER_COLOR)
@@ -292,7 +303,7 @@ function drawTile(tile_x, tile_y, offset_x, offset_y, debug, color)
     BORDER_WIDTH - offset_y, 
     1150 + BORDER_WIDTH - offset_x, 
     750 + BORDER_WIDTH - offset_y, 
-    miniwin.image_stretch)
+    miniwin.image_copy)--miniwin.image_stretch)
 
   return { 
     left = BORDER_WIDTH - offset_x, 
@@ -378,35 +389,41 @@ function configure()
       BORDER_COLOR = { sort = 1, type = "color", raw_value = CONFIG.BORDER_COLOR },
       HIDE_WILDS = { sort = 2, label = "Hide When Inside", type = "bool", raw_value = CONFIG.HIDE_WILDS },
       MAX_CACHE_SIZE = { sort = 3, type = "number", raw_value = CONFIG.MAX_CACHE_SIZE, min = 0, max = 200 },
+      AUTOUPDATE = { sort = 4, label = "Auto Update", type = "bool", raw_value = CONFIG.AUTOUPDATE },
     },
     Position = {
       WINDOW_LEFT = { sort = 1, type = "number", raw_value = CONFIG.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
       WINDOW_TOP = { sort = 2, type = "number", raw_value = CONFIG.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
       WINDOW_WIDTH = { sort = 3, type = "number", raw_value = CONFIG.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
-      --WINDOW_HEIGHT = { sort = 4, type = "number", raw_value = CONFIG.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
-    },
-    Offset = {
-      X = { sort = 1, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x, min = -1000, max = 1000 },
-      Y = { sort = 2, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y, min = -1000, max = 1000 },
-    }
+      WINDOW_HEIGHT = { sort = 4, type = "number", raw_value = CONFIG.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
+    }    
   }
+
+  for i = 1, PLANE_DETAILS[CURRENT_PLANE].z do
+    config["Offset_" .. i .. "_(" .. CURRENT_PLANE .. ")"] = {
+      X = { sort = 1, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][i].x, min = -1000, max = 1000 },
+      Y = { sort = 2, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][i].y, min = -1000, max = 1000 },
+    }
+  end
   
   CONFIG_WINDOW.Show(config, configureDone)
 end
 
 function configureDone(group_id, option_id, config)
-  if group_id == "Offset" then
+  local pattern = "^Offset_(%d)_%(([%w_]+)%)$"
+  local zoom_level, plane = group_id:match(pattern)
+  if zoom_level and plane then
     if option_id == "X" then
-      CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x = config.raw_value
+      CONFIG.OFFSETS[plane][zoom_level].x = config.raw_value
     else
-      CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y = config.raw_value
+      CONFIG.OFFSETS[plane][zoom_level].y = config.raw_value
     end
   else
     CONFIG[option_id] = config.raw_value
 
-    if option_id == "WINDOW_WIDTH" then
-      CONFIG.WINDOW_HEIGHT = 750 * (CONFIG.WINDOW_WIDTH / 1150)
-    end
+    -- if option_id == "WINDOW_WIDTH" then
+    --   CONFIG.WINDOW_HEIGHT = 750 * (CONFIG.WINDOW_WIDTH / 1150)
+    -- end
   end
   
   saveMiniWindow()

@@ -104,7 +104,7 @@
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^All parts of your quest (.*?) are complete\." regexp="y" send_to="12" sequence="100">
-    <send>refreshQuest() </send>
+    <send>refreshQuest("%1") </send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" omit_from_output="y" match="^  Spell Points\:(.*?)Quest Points\:(.*?)$" regexp="y" send_to="14" sequence="100">
@@ -357,6 +357,10 @@ function removeQuest(quest_id)
 end
 
 function refreshQuest(quest_id)
+  if string.find(quest_id, "Daily Quest") ~= nil then return end
+  if string.find(quest_id, "Weekly Quest") ~= nil then return end
+  if string.find(quest_id, "Archon Meta") ~= nil then return end
+  
   if isSilentRefreshEnabled() then
     refreshing = true
     EnableTrigger("capture_name_refresh", true)
