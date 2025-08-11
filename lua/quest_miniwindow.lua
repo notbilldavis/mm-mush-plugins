@@ -22,14 +22,10 @@ local TEXT_BUFFER = { }
 local FORMATTED_LINES = { }
 local SECTION_STATUS = { }
 
+local CURRENT_INFO = nil
 local PURSUER_TARGET = nil
 local CRYSTAL_TARGET = nil
-
-local TIMES = {
-  QUEST_TIME = 0,
-  PURSUER_TIME = 0,
-  CRYSTAL_TIME = 0
-}
+local COLLECTED_PART = nil
 
 local EXPANDED = true
 local ANCHOR_LIST = { 
@@ -77,6 +73,7 @@ function loadSavedData()
   CONFIG.BUTTON_X = getValueOrDefault(CONFIG.BUTTON_X, GetVariable("quest_buttonx") or GetInfo(292) - CONFIG.BUTTON_WIDTH - 25)
   CONFIG.BUTTON_Y = getValueOrDefault(CONFIG.BUTTON_Y, GetVariable("quest_buttony") or GetInfo(293) - CONFIG.BUTTON_HEIGHT - 25)
   CONFIG.EXPAND_PHASES = getValueOrDefault(CONFIG.EXPAND_PHASES, 2)
+  CONFIG.TIMES = getValueOrDefault(CONFIG.TIMES, { QUEST_TIME = 0, PURSUER_TIME = 0, CRYSTAL_TIME = 0 })
 
   pcall("DeleteVariable", "quest_buttonx")
   pcall("DeleteVariable", "quest_buttony")
@@ -345,7 +342,7 @@ function drawQuestText()
     if CONFIG.EXPAND_DOWN then
       y = y + CONFIG.BUTTON_HEIGHT
     end
-    
+
     for i = 1, #TEXT_BUFFER do
       local x = 4
       if y + LINE_HEIGHT > WINDOW_HEIGHT then
@@ -401,6 +398,10 @@ function drawQuestText()
             else
               WindowText(WIN, QUESTFONT, seg.text, x + 2, y, 0, 0, seg.textcolour)
             end
+          end
+
+          if i == 1 and seg.text == CURRENT_INFO.quest_number then
+            WindowAddHotspot(WIN, "goto_annwn", x, y, x + w, y + LINE_HEIGHT, "", "", "", "", "quest_number_click", "Open link to annwn.info page", miniwin.cursor_hand, 0)
           end
           
           if line["is_header"] and idx == 1 and i ~= 1 then
@@ -459,6 +460,10 @@ function drawCollapseText()
   end
 end
 
+function SetQuestInfo(quest_num, quest_name, annwn_id)
+  CURRENT_INFO = { quest_number = quest_num, quest_name = quest_name, annwn_id = annwn_id }
+end
+
 function AddLine(segments, section, is_header)
   if CONFIG == nil then
     InitializeMiniWindow()
@@ -484,6 +489,7 @@ end
 function SetPursuerTarget(target)
   if CONFIG.TRACK_PURSUER then
     PURSUER_TARGET = target
+    COLLECTED_PART = nil
     if PURSUER_TARGET ~= nil then EXPANDED = true end
     drawMiniWindow()
   end
@@ -494,6 +500,13 @@ function SetCrystalTarget(target)
     CRYSTAL_TARGET = target
     if CRYSTAL_TARGET ~= nil then EXPANDED = true end
     drawMiniWindow()
+  end
+end
+
+function CheckBodyPartDrop(part, victim)
+  if PURSUER_TARGET ~= nil and PURSUER_TARGET:lower():find(Trim(victim:lower())) ~= nil then
+    Send("get '" .. part .. "'")
+    COLLECTED_PART = part
   end
 end
 
@@ -559,6 +572,16 @@ function quest_button_click(flags, hotspot_id)
   end
 end
 
+function quest_number_click(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    if CURRENT_INFO ~= nil and CURRENT_INFO.annwn_id ~= nil and Trim(CURRENT_INFO.annwn_id) ~= "" then
+      OpenBrowser("https://annwn.info/quest/" .. CURRENTINFO.annwn_id)
+    elseif CURRENT_INFO ~= nil and CURRENT_INFO.quest_name ~= nil and CURRENT_INFO.quest_name ~= "" then
+      OpenBrowser("https://annwn.info/quest/search/?search=quest&keyword=" .. CURRENT_INFO.quest_name:gsub(" ", "+"))
+    end
+  end
+end
+
 function clearMiniWindow() 
   TEXT_BUFFER = {}
   FORMATTED_LINES = {}
@@ -578,25 +601,50 @@ function saveMiniWindow()
 end
 
 function ShowTimes()
-  doTimeString(TIMES.QUEST_TIME, "You can get another quest")
-  doTimeString(TIMES.PURSUER_TIME, "You can get another pursuer target")
-  doTimeString(TIMES.CRYSTAL_TIME, "You can get another crystal map")
+  doTimeString(CONFIG.TIMES.QUEST_TIME, "You can get another quest")
+  doTimeString(CONFIG.TIMES.PURSUER_TIME, "You can get another pursuer target")
+  doTimeString(CONFIG.TIMES.CRYSTAL_TIME, "You can get another crystal map")
 end
 
 function SetQuestTime(alyrian_time)
   if alyrian_time ~= nil then
-    TIMES.QUEST_TIME = os.time() + (tonumber(alyrian_time) / 4) * 60
+    CONFIG.TIMES.QUEST_TIME = os.time() + (tonumber(alyrian_time) / 4) * 60
   else
-    TIMES.QUEST_TIME = os.time() + 300
+    CONFIG.TIMES.QUEST_TIME = os.time() + 300
   end 
+  saveMiniWindow()
 end
 
 function SetPursuerTime()
-  TIMES.PURSUER_TIME = os.time() + 60 * 15 -- i am guessing here
+  CONFIG.TIMES.PURSUER_TIME = os.time() + 60 * 20
+  saveMiniWindow()
 end
 
 function SetCrystalTime()
-  TIMES.CRYSTAL_TIME = os.time() + 60 * 120
+  CONFIG.TIMES.CRYSTAL_TIME = os.time() + 60 * 120
+  saveMiniWindow()
+end
+
+function ShowOrcPursuerOptions()
+  if PURSUER_TARGET ~= nil and Trim(PURSUER_TARGET) ~= "" then
+    if COLLECTED_PART ~= nil and Trim(COLLECTED_PART) ~= "" then
+      Send("give '" .. COLLECTED_PART .. "' orc")
+    else
+      Note("You are still looking for a body part from " .. PURSUER_TARGET)
+    end
+  else
+    local color, timer_string = getTimerColorAndString(CONFIG.TIMES.PURSUER_TIME)
+    Tell("You can ")
+    Hyperlink("!!" .. GetPluginID() .. ":getPursuerTarget()", "[get a target]", "", "silver", "black", false)
+    Tell(" from the orc pursuer")
+    ColourTell(color, "black", timer_string)
+    Note(".")
+  end
+end
+
+function getPursuerTarget()
+  Send("sayto orc yes")
+  Send("nod orc")
 end
 
 function doTimeString(time, text)

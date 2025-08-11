@@ -3,17 +3,10 @@ local ltn12 = require("ltn12")
 
 local db
 
--- Utility: log errors
-function log_error(msg)
-    if Note then Note(msg) else print(msg) end
-end
-
--- Utility: finalize prepared statements safely
 function finalize(stmt)
     if stmt then stmt:finalize() end
 end
 
--- Utility: run a prepared statement
 function exec_prepared(db, sql, ...)
     local stmt = db:prepare(sql)
     if stmt then
@@ -70,7 +63,7 @@ function find_quest_link(quest_number, quest_name)
 
     local html = table.concat(response)
     local pattern = '<a href="/quest/(%d+)">([^<]+)'
-    local no_num = nil
+    local fallback_id = nil
 
     for quest_id, link_text in html:gmatch(pattern) do
         local clean_text = Trim(link_text:gsub("%s+", " "):gsub("%s%[.*%]", ""):lower())
@@ -79,14 +72,14 @@ function find_quest_link(quest_number, quest_name)
 
         if clean_text == expected then
             if bracket_num and tonumber(bracket_num) == tonumber(quest_number) then
-                return "/quest/" .. quest_id
-            elseif not bracket_num and not no_num then
-                no_num = "/quest/" .. quest_id
+                return "/quest/" .. quest_id, quest_id
+            elseif not bracket_num and not fallback_id then
+                fallback_id = "/quest/" .. quest_id
             end
         end
     end
 
-    return no_num, "No exact match, fallback selected"
+    return "/quest/" .. fallback_id, fallback_id
 end
 
 -- Fetch HTML from full URL path
@@ -177,8 +170,20 @@ function initDb()
     db = assert(sqlite3.open(GetInfo(66) .. "annwn_quests.db"))
     db:exec("PRAGMA foreign_keys = ON")
 
+    local columnExists = false
+    for row in db:nrows("PRAGMA table_info(quests)") do
+        if row.name == "annwn_id" then
+            columnExists = true
+            break
+        end
+    end
+
+    if not columnExists then
+        db:exec("DROP TABLE IF EXISTS quests")
+    end
+
     local schema = [[
-        CREATE TABLE IF NOT EXISTS quests (id INTEGER PRIMARY KEY, name TEXT);
+        CREATE TABLE IF NOT EXISTS quests (id INTEGER PRIMARY KEY, name TEXT, annwn_id TEXT);
         CREATE TABLE IF NOT EXISTS phases (
             id INTEGER PRIMARY KEY, quest_id INTEGER, phase_number INTEGER,
             description TEXT, UNIQUE(quest_id, phase_number),
@@ -216,11 +221,11 @@ function insert_entities(table_name, column_name, phase_id, values)
 end
 
 -- Add quest to database
-function addQuestToDb(questId, questName, phases)
+function addQuestToDb(questId, questName, phases, annwn_id)
   initDb()
 
-  local questStmt = db:prepare("INSERT INTO quests (id, name) VALUES (?, ?)")
-  questStmt:bind_values(questId, questName)
+  local questStmt = db:prepare("INSERT INTO quests (id, name, annwn_id) VALUES (?, ?, ?)")
+  questStmt:bind_values(questId, questName, annwn_id)
   questStmt:step()
   questStmt:finalize()
 
@@ -274,6 +279,7 @@ function getQuestFromDb(questId)
   if stmt:step() == sqlite3.ROW then
     quest.id = questId
     quest.name = stmt:get_named_values().name
+    quest.annwn_id = stmt:get_named_values().annwn_id
     stmt:finalize()
 
     quest.phases = {}
@@ -339,22 +345,21 @@ function getQuestInfo(quest_num, quest_name)
     local quest = getQuestFromDb(quest_num)
 
     if quest == nil then
-        local link, err = find_quest_link(quest_num, quest_name)
+        local link, annwn_id = find_quest_link(quest_num, quest_name)
         if not link then
-            log_error(err)
             return nil
         end
 
         local html, fetch_err = fetch_html(link)
         if not html then
-            log_error(fetch_err)
+            Note(fetch_err)
             return nil
         end
 
         local phases = parse_phases(html)
-        addQuestToDb(quest_num, quest_name, phases)
-        quest = { phases = phases }
+        addQuestToDb(quest_num, quest_name, phases, annwn_id)
+        quest = { phases = phases, annwn_id = annwn_id }
     end
 
-    return quest.phases
+    return quest.phases, quest.annwn_id
 end

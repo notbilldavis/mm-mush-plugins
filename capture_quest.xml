@@ -136,6 +136,14 @@
     </send>
   </trigger>
 
+  <trigger match="^The severed (.*?) of (.*?) falls to the ground\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>CheckBodyPartDrop("%1", "%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) savage\-looking orc stands here\, his every limb chained to the wall\.$">
+    <send>ShowOrcPursuerOptions()</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" multi_line="y" lines_to_match="23" regexp="y" send_to="12" sequence="100"
     match="It looks like this map depicts(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n">
     <send>locateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
@@ -194,7 +202,10 @@ require "quest_miniwindow"
 require "questsearcher"
 
 local quest_num
+local quest_name
 local quest_phases
+local quest_annwn_id
+local captured_lines = {}
 local refreshing = false
 local hour_offset = 1
 
@@ -252,6 +263,8 @@ function captureStart(num, name)
     return
   end
 
+  captured_lines = {}
+
   EnableTrigger("capture_line", true)
   EnableTrigger("capture_end", true)
 
@@ -269,8 +282,9 @@ function captureStart(num, name)
   addNewLine("quest" .. num, true)
 
   if quest_num ~= num then
-    quest_num = num;
-    quest_phases = getQuestInfo(num, name)
+    quest_num = num
+    quest_name = name
+    quest_phases, quest_annwn_id = getQuestInfo(num, name)
   end
 end
 
@@ -340,6 +354,8 @@ function captureEnd()
 
   EnableTrigger("capture_name_refresh", false)
   EnableTrigger("capture_line_refresh", false)
+
+  doFinalDisplay()
 end
 
 function clearWindow()
@@ -357,9 +373,15 @@ function removeQuest(quest_id)
 end
 
 function refreshQuest(quest_id)
-  if string.find(quest_id, "Daily Quest") ~= nil then return end
-  if string.find(quest_id, "Weekly Quest") ~= nil then return end
-  if string.find(quest_id, "Archon Meta") ~= nil then return end
+  if quest_id == quest_name then
+    quest_id = quest_num
+  elseif quest_id ~= quest_num then
+    return
+  end
+
+  if string.find(quest_name, "Daily Quest") ~= nil then return end
+  if string.find(quest_name, "Weekly Quest") ~= nil then return end
+  if string.find(quest_name, "Archon Meta") ~= nil then return end
   
   if isSilentRefreshEnabled() then
     refreshing = true
@@ -392,7 +414,7 @@ function addToLine(txt, text_color, back_color, section, is_header)
   end
 
   if (txt == "\r\n") then
-    AddLine(styles, section, is_header)
+    table.insert(captured_lines, { styles = styles, section = section, is_header = is_header})
     styles = {}
   else
     if back_color == nil then back_color = "black" end
@@ -406,6 +428,13 @@ end
 
 function addNewLine(section, is_header)
   addToLine("\r\n", "silver", "black", section, is_header)
+end
+
+function doFinalDisplay()
+  SetQuestInfo(quest_num, quest_name, quest_annwn_id)
+  for idx, line in ipairs(captured_lines) do
+    AddLine(line.styles, line.section, line.is_header)
+  end
 end
 
 function locateCrystal(location)
