@@ -364,10 +364,6 @@ function drawWindow()
 
   WindowDeleteAllHotspots(WIN)
 
-  if config_window.IsOpen() then
-    config_window.Show()
-  end
-
   WindowAddHotspot(WIN, "textarea", 0, HEADER_HEIGHT + 2, POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_HEIGHT - 2, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)  
   WindowDragHandler(WIN, "textarea", "OnTextAreaMouseMove", "", 0x10)
   WindowScrollwheelHandler(WIN, "textarea", "OnWheel")  
