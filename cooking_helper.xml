@@ -3,95 +3,163 @@
 
 <muclient>
 
-<plugin
-   name="cooking_helper"
-   author="Oona"
-   id="853dc761db5b4b38b3e42167"
-   language="Lua"
+<plugin name="cooking_helper" author="Oona" id="853dc761db5b4b38b3e42167"
    purpose="help with cooking, tracking who eats your stuff, etc"
-   save_state="y"
-   date_written="2025-05-27 11:28:11"
-   requires="4.71"
-   version="1.0"
-   >
+   save_state="y" language="Lua" requires="4.71" version="1.0">
 
 <description trim="y">
+
+<![CDATA[
+
+This plugin helps you track recipes, who eats them, and manage your cooking-related tasks.
+
+Looking at a recipe index card will automatically track the recipe and its ingredients while
+giving you helpful links to get ingredients, track ingredients, and more.
+
+Commands:
+
+* cooking - shows current tracked recipes and who has eaten them
+* cooking track <consumer name> r:<recipe name> - add a consumer to a recipe
+* cooking clear - clear all tracked recipes
+* cooking clear <recipe name> - remove a recipe from tracking
+* cooking clean - clean up duplicates in all recipes
+* cooking clean <recipe name> - clean up duplicates in a recipe
+* cooking npcs - shows NPCs that will eat your food
+* cooking containers - shows available containers for ingredients
+* cooking containers <container> - set the containers to use for getting ingredients (comma-separated)
+* cooking search - search your inventory for ingredients of your current recipe
+* cooking getall <container> - get all ingredients for your current recipe from a specified container
+* cooking find <ingredient> - find a specific ingredient by looking it up in the database
+* cooking pouch - toggle pouch tracking which will open a pouch of plenitude, get all from it, and store what you want
+* cooking pouch track <ingredient> - track an ingredient in the pouch to keep in your container, drop the rest
+* cooking pouch container <container> - set the container you want to put tracked ingredients in (default is trunk)
+
+]]>
 
 </description>
 
 </plugin>
 
 <aliases>
+  <alias match="^cooking[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>SetCharacterName("%1")</send>
+  </alias>
+
   <alias match="^cooking$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>showCooking()</send>
+    <send>ShowCooking()</send>
   </alias>
 
-  <alias match="^cooking[ ]+track (.*?) r:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>addConsumer("%1", "%2")</send>
+  <alias match="^cooking[ ]+track(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>TrackRecipe("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+clear (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>clearCooking("%1")</send>
+  <alias match="^cooking[ ]+clear(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ClearRecipe("%1")</send>
   </alias>
 
   <alias match="^cooking[ ]+clean(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>cleanCooking("%1")</send>
+    <send>CleanRecipe("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+(npcs|trucks|foodtrucks)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>showFoodTrucks()</send>
+  <alias match="^cooking[ ]+npcs?(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>ShowNpcs("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+containers(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>setContainers("%1")</send>
+  <alias match="^cooking[ ]+config(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure("%1")</send>
   </alias>
 
   <alias match="^cooking[ ]+search$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>search()</send>
+    <send>SearchCurrentRecipe()</send>
   </alias>
 
-  <alias match="^cooking[ ]+getall[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>getAll("%1")</send>
+  <alias match="^cooking[ ]+getall(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>GetAll("%1")</send>
   </alias>
 
   <alias match="^cooking[ ]+find[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>findIngredient("%1")</send>
+    <send>FindIngredient("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+pouch$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure("automate")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+pouch[ ]+track(.*)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>TrackPouchIngredient("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+cook(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>CookRecipe("%1")</send>
   </alias>
 </aliases>
 
 <triggers>
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) hungrily gobbles (.*?) down\.$">
-    <send>addNpcTracking("%1", "%2")</send>
+    <send>AddNpcTracking("%1", "%2")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) is not impressed by your cuisine and discards the meal\. But they are feeling generous today\, and will allow you to try again\.$">
+    <send>RemoveLastNpc("%1")</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^The recipe for (.*?)\:$">
-    <send>
-      EnableTriggerGroup("get_recipe", true)
-      clearRecipe()
-      recipe_name = "%1"
-    </send>
+    <send>StartRecipeCapture("%1")</send>
   </trigger>
 
   <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(\s+)\[(.*?)\]$">
-    <send>addToRecipe("%2")</send>
+    <send>AddIngredientToRecipe("%2")</send>
   </trigger>
 
   <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^cooking recipe that you do not already have the mark for\.  $">
-    <send>
-      EnableTriggerGroup("get_recipe", false)
-      displayHelperOptions()
-    </send>
+    <send>EndRecipeCapture()</send>
   </trigger>
 
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?) found in(.*?)$">
-    <send>found("%1", "%2")</send>
+    <send>SearchFoundIngredient("%1", "%2")</send>
   </trigger>
 
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^No matching items found\.$">
-    <send>notFound()</send>
+    <send>SearchNotFoundIngredient()</send>
   </trigger>
 
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^\.\.\.and more (.*?)\.$">
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^[ ]+a pouch of plenitude \(new\)$" regexp="y" send_to="14" omit_from_output="y" sequence="100">
+    <send>DisplayPouchStatus(TriggerStyleRuns, "%0")</send>
+  </trigger>
+
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^Your a pouch of plenitude glows white as it accumulates possessions from the ether\.$" regexp="y" send_to="12" sequence="100">
+    <send>LootPouch()</send>
+  </trigger>
+
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You open a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
+    <send>StartPouchAutomation()</send>
+  </trigger>
+
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You close a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
+    <send>StopPouchAutomation()</send>
+  </trigger>
+
+  <trigger enabled="y" group="cooking_open_pouch" keep_evaluating="y" match="^You take (\d+ of )?(.*?) from a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
+    <send>HandlePouchIngredient("%2")</send>
+  </trigger>
+
+  <trigger enabled="y" group="cooking_open_pouch" keep_evaluating="y" match="^(.*?) emits a bright flare of white light as you take it and it binds with you\.$" regexp="y" send_to="12" sequence="100">
+    <send>HandlePouchIngredient("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You do not have the required items to cook that\.$" regexp="y" send_to="12" sequence="100">
+    <send>EndCooking()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^With care and precision, you practice your craft, creating a powerful work of art: (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>HandleMealCooked("%1")</send>
   </trigger>
 </triggers>
 
@@ -99,22 +167,56 @@
 
 <![CDATA[
 
-recipes = { }
-current_recipe = { }
-recipe_name = ""
-search_count = 0
-search_found = { }
-containers = { }
+function OnPluginInstall() PluginStart() end
+function OnPluginEnable() PluginStart() end
+function OnPluginConnect() PluginStart() end
 
-set_containers = { "bag", "2.bag", "trunk", "2.trunk" }
+function OnPluginBroadcast(msg, id, name, text)
+  HandlePluginBroadcast(msg, id, name, text)
+end
 
-npcs = { 
+local updater_installed, update_helper = pcall(require, "updatehelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+
+if updater_installed and update_helper.version == nil  then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
+end
+
+if updater_installed then
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  
+  local db_file = io.open(GetInfo(66) .. "recipes.db", "r")
+  if db_file then io.close(db_file)
+  else update_helper.Update(GetInfo(66), "recipes.db")
+  end
+end
+
+local config = nil
+local tracked_recipes = { }
+local current_recipe = { }
+local search_count = 0
+local search_found = { }
+local search_containers = {}
+local npc_names = {}
+local last_npc_food = {}
+local character_name = nil
+local cooking = false
+local cooking_amount = 1
+local cooking_infinite = false
+local pulled_food = false
+local db = nil
+
+local npcs = { 
   { name = "Faltel", area = "Templeton", room = "Fox Fur Tavern", num = "45972", race = "Elf" },
   { name = "Shady", area = "Templeton", room = "Fool's Gold Tavern", num = "47034", race = "Human" },
   { name = "Grundel", area = "Templeton", room = "Fisherman's Cafe", num = "46452", race = "Human" },
-  { name = "Urkfet", area = "Tellerium", room = "Seagull Tavern", num = "41835", race = "Troll" },
-  { name = "Bovel", area = "Tellerium", room = "Peachtree Tavern", num = "41807", race = "Mino" },
-  { name = "Miller", area = "Winton", room = "The Trash Compactor Bar and Grill", num = "335857", race = "Human" },
+  { name = "Urkfet, the bartender", area = "Tellerium", room = "Seagull Tavern", num = "41835", race = "Troll" },
+  { name = "Bovel, the barkeep", area = "Tellerium", room = "Peachtree Tavern", num = "41807", race = "Mino" },
+  { name = "Miller the bartender", area = "Winton", room = "The Trash Compactor Bar and Grill", num = "335857", race = "Human" },
   { name = "Flam", area = "Rune", room = "Flam's Steak House", num = "10722", race = "Dracon" },
   { name = "Friedburg", area = "Lowangen", room = "Friedburg's Training", num = "16090", race = "Human" },
   { name = "Finn", area = "A Hill Giant Refuge", room = "Finn's Tavern", num = "345845", race = "Giant" },
@@ -133,266 +235,247 @@ npcs = {
   { name = "a famished ghast", area = "Domain of Arbaces", room = "", num = "", race = "" },
 }
 
-npc_names = {}
+local non_food_items = {
+  ["a cold glass of milk"] = true,
+  ["some buche syrup"] = true,
+  ["a bottle of lager"] = true,
+  ["a bottle of pesto"] = true,
+  ["a dollop of whipped cream"] = true,
+  ["a carton of soup stock"] = true,
+  ["a small salt crystal"] = true,
+  ["a chilled pastry crust"] = true,
+  ["a bag of powdered sugar"] = true,
+  ["a sack of brown sugar"] = true,
+  ["a vorma seed"] = true,
+  ["a wineskin of gomutra ghanvati"] = true,
+  ["a bottle of white wine"] = true,
+}
 
-local db
-
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  EnsureTables()
-  EnsureDb()
-end
-
-function OnPluginEnable()
-  EnsureTables()
-  EnsureDb()
-end
-
-function OnPluginConnect()
-  EnsureTables()
-  EnsureDb()
-end
-
-function OnPluginDisconnect()
-  local updater_installed, updater = pcall(require, "updatehelper")
-  if updated_installer then
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/cooking_helper.xml" },
-    })
-  end
-end
-
-function EnsureTables()
-  recipes = { }
-  local recipes_text = GetVariable("recipes") or ""
-  if recipes_text ~= "" then
-    recipes = Deserialize(recipes_text)
-  end
-
-  set_containers = { "bag", "2.bag", "trunk", "2.trunk" }
-  local containers_text = GetVariable("containers") or ""
-  if containers_text ~= "" then
-    set_containers = Deserialize(containers_text)
-  end
-
+function PluginStart()
+  EnableTrigger("first_prompt", true)
+  EnableTriggerGroup("cooking_open_pouch", false)
+  character_name = nil
   for _, npc in ipairs(npcs) do
     npc_names[npc.name:lower()] = true
   end
 end
 
-function EnsureDb()
-  if db == nil then
-    local path = GetInfo(66)
-    local filename = "recipes.db"
-
-    if (not fileExists(path .. filename)) then
-      local res = tryDownloadDatabase(path, filename)
-
-      if (res ~= 0) then
-        Note("Try downloading the recipes.db file manually and reinstalling this plugin.")
-      end
+function HandlePluginBroadcast(msg, id, name, text)
+  if (id == "f67c4339ed0591a5b010d05b" and text == "char.base") then
+    if character_name == nil or character_name == "" then
+      local character = serialization_helper.GetGmcpValue(text)
+      SetCharacterName(character.name)
     end
-
-    db = assert(sqlite3.open(GetInfo(66) .. "recipes.db"))
-
-    db:exec[[
-      CREATE TABLE IF NOT EXISTS ingredients (
-        id integer not null primary key autoincrement,
-        name varchar(255) null,
-        area varchar(255) null,
-        details varchar(255) null,
-        notes varchar(255) null,
-        unique (`id`)
-      );
-    ]]
   end
 end
 
-function fileExists(path)
-  local f = io.open(path, "r")
+function OnFirstPrompt()
+  EnableTrigger("first_prompt", false)
+  Execute("sendgmcp char.base")
+end
 
-  if (f) then
-    io.close(f)
-    return true
+function SetCharacterName(name)
+  if name == nil or Trim(name) == "" then
+    Note("Unknown character name, set with 'cooking setchar <name>'") 
   else
-    return false
+    character_name = Trim(name)
+    tracked_recipes = serialization_helper.GetSerializedVariable(character_name .. "_cooking_recipes", {}, "recipes")
+    config = serialization_helper.GetSerializedVariable(character_name .. "_cooking_config")
+    
+    config.storage_container = serialization_helper.GetValueOrDefault(config.storage_container, "trunk")
+    config.tracked_ingredients = serialization_helper.GetValueOrDefault(config.tracked_ingredients, {})
+    config.automate_pouch = serialization_helper.GetValueOrDefault(config.automate_pouch, true)
+    config.autoupdate = serialization_helper.GetValueOrDefault(config.autoupdate, true)
+    
+    DoAfterSpecial(1, "notifyPouchStatus()", sendto.script)
   end
 end
 
-function tryDownloadDatabase(path, filename)
-  local http = require "socket.http"
-  local url = "https://github.com/notbilldavis/mm-mush-plugins/raw/refs/heads/main/recipes.db"
-
-  Note("Downloading ingredients database...")
-  SetStatus ("Downloading recipes.db: " .. url .. " to: " .. path .. filename .. "...")
-
-  local file, dl_res, header = http.request(url)
-  if (dl_res ~= 200) then
-    ColourNote("red" , "black", "There was an error accessing " .. url .. " - code: " .. dl_res)
-    return -1
-  end
-
-  Note("Download complete, saving database...")
-  SetStatus ("Ready")
-
-  local f, save_res, rescode = io.open(lpath, "wb")
-  if (f == nil) then
-    ColourNote("red" , "black", "There was an error creating database file: " .. save_res .. " - code: " .. rescode)
-    return -1
-  end
-
-  f:write(file)
-  f:flush()
-  f:close()
-
-  ColourNote("green" , "black", "Save complete!")
-
-  return 0
-end
-
-function showCooking()
-  if #recipes == 0 then
-    Note("You are not currently tracking any recipes.")
-    Tell("-- type 'cooking track ")
-    ColourTell("silver", "black", "<consumer name>")
-    Tell(" r:")
-    ColourTell("silver", "black", "<recipe name>")
-    Note("' to add that person --")
+function notifyPouchStatus()
+  if config.automate_pouch then
+    ColourTell("white", "black", "Pouch of Plenty automation is enabled. [")
+    Hyperlink("!!" .. GetPluginID() .. ":Configure(\"automate\")", "disable", "Disable Automation", "red", "black", false)
+    ColourNote("white", "black", "]")
+    EnableTriggerGroup("cooking_pouch", true)
+    LootPouch()
   else
-    Note("You are currently tracking the following recipes:")
-    for idx, recipe in ipairs(recipes) do
+    ColourTell("silver", "black", "Pouch of Plenty automation is disabled. [")
+    Hyperlink("!!" .. GetPluginID() .. ":Configure(\"automate\")", "enable", "Enable Automation", "green", "black", false)
+    ColourNote("silver", "black", "]")
+    EnableTriggerGroup("cooking_pouch", false)
+  end
+end
+
+function ShowCooking()
+  local total_tracked = 0
+  for _, recipe in pairs(tracked_recipes) do
+    if total_tracked == 0 then
+      Note("You are currently tracking the following recipes:")
+    end
+    if recipe.name and recipe.name ~= "" then
+      total_tracked = total_tracked + 1
       ColourTell("cyan", "black", " * ")
-      ColourTell("white", "black", recipe["name"]:upper())
-      ColourNote("cyan", "black", " (" .. #recipe["eaten"] .. " people have eaten)")
-      showEaten(recipe["eaten"])
+      ColourTell("white", "black", recipe.name:upper())
+      ColourTell("gray", "black", " [")
+      Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(\"" .. recipe.name .. "\")", "n", "Show NPCs that will eat this", "silver", "black", false)
+      ColourTell("gray", "black", "]")
+      ColourTell("gray", "black", " [")
+      Hyperlink("!!" .. GetPluginID() .. ":ClearRecipe(\"" .. recipe.name .. "\")", "X", "Clear", "red", "black", false)
+      ColourNote("gray", "black", "]")
+      showEaten(recipe.eaten)
     end
-    Note("")
-    ColourTell("cyan", "black", " > ")
-    Tell("add new with '")
-    ColourTell("silver", "black", "cooking track ")
-    ColourTell("white", "black", "<consumer name>")
-    ColourTell("silver", "black", " r:")
-    ColourTell("white", "black", "<recipe name>")
-    Note("'")
+  end
+  if total_tracked == 0 then
+    Note("You are not currently tracking any recipes.")
+  end
+  Tell("-- type '")
+  ColourTell("white", "black", "cooking track ")
+  ColourTell("silver", "black", "<recipe name>")
+  ColourTell("white", "black", " c:")
+  ColourTell("silver", "black", "<consumer name>")
+  Note("' to track a new recipe and/or consumer --")
+
+  Tell("-- type '")
+  Hyperlink("cooking npcs", "cooking npcs", "", "white", "black", false)
+  Note("' to view npcs that will eat your food --")
+
+  if config.automate_pouch then
+    Tell("-- type '")
+    Hyperlink("cooking pouch track", "cooking pouch track", "", "white", "black", false)
+    Note("' to view your tracked ingredients --")
   end
 end
 
 function showEaten(eaten)
-  if #eaten == 0 then
+  local total_eaten = 0
+  for _, consumer in pairs(eaten) do
+    if consumer.name and consumer.name ~= "" then
+      total_eaten = total_eaten + 1
+      ColourTell("magenta", "black", "  - ")
+      ColourTell("white", "black", consumer.name)
+      ColourNote("yellow", "black", " (" .. consumer.date .. ")")
+    end
+  end
+  if total_eaten == 0 then
     ColourTell("magenta", "black", "  - ")
     ColourNote("white", "black", "no one has eaten this yet!")
-  else
-    for idx, consumer in ipairs(eaten) do
-      ColourTell("magenta", "black", "  - ")
-      ColourTell("white", "black", consumer["name"])
-      ColourNote("yellow", "black", " (" .. consumer["date"] .. ")")
-    end
   end
 end
 
-function addConsumer(consumer, name)
-  if consumer == nil or consumer == "" or name == nil or name == "" then
-    Tell("-- type 'cooking track ")
-    ColourTell("silver", "black", "<consumer name>")
-    Tell(" r:")
-    ColourTell("silver", "black", "<recipe name>")
-    Note("' to add that person --")
-  else
+function TrackRecipe(args)
+  local recipe_name, consumer = args:match("^(.-)%s+c:(.+)$")
+  if not recipe_name then recipe_name = args end
+
+  if recipe_name == nil or Trim(recipe_name) == "" then
+    Note("You must specify a recipe name to track.")
+    return
+  end
+
+  recipe_name = Trim(recipe_name)
+  if not tracked_recipes[recipe_name:upper()] then
     local found = false
-    consumer = Trim(consumer:gsub("^%l", string.upper))
-    name = Trim(name)
-    for idx, recipe in ipairs(recipes) do
-      if (string.find(string.lower(recipe["name"]), string.lower(name)) ~= nil) then
-        local rep = false
-        for _, con in ipairs(recipe["eaten"]) do
-          if consumer == con["name"] then 
-            rep = true
-            break
-          end
-        end
-        
-        if rep then
-          Note("Consumer '" .. consumer .. "' has already eaten '" .. recipe["name"] .. "'")
-        else
-          Note("Adding '" .. consumer .. "' as a consumer of '" .. recipe["name"] .. "'")
-          table.insert(recipe["eaten"], { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') })
-          found = true
-          break
-        end
-      end
-    end
-
-    if not found then
-      table.insert(recipes, { name = name, eaten = { }})
-      addConsumer(consumer, name)
-      return
-    end
-
-    SetVariable("recipes", Serialize(recipes))
-    SaveState()
-  end
-end
-
-function addNpcTracking(npc, recipe)
-  if npc_names[string.lower(npc)] then
-    addConsumer(npc, recipe)
-  end
-end
-
-function clearCooking(name)
-  if name == nil or name == "" or name == "all" then
-    recipes = {}
-  else
-    name = Trim(name)
-    for idx, recipe in ipairs(recipes) do
-      if (string.find(string.lower(recipe["name"]), string.lower(name)) ~= nil) then
-        Note("Removing '" .. recipe["name"] .. "' from list of tracked recipes.")
-        table.remove(recipes, idx)
+    for _, recipe in pairs(tracked_recipes) do
+      if string.find(recipe.name:upper(), recipe_name:upper()) ~= nil then
+        recipe_name = recipe.name
+        found = true
         break
       end
     end
+    if not found then tracked_recipes[recipe_name:upper()] = { name = recipe_name, eaten = { } } end
   end
-  
-  SetVariable("recipes", Serialize(recipes))
-  SaveState()
+
+  if consumer ~= nil and Trim(consumer) ~= "" then
+    consumer = Trim(consumer)
+    if tracked_recipes[recipe_name:upper()].eaten[consumer:upper()] then
+      Note("Consumer '" .. consumer .. "' has already eaten '" .. recipe_name .. "'")
+    else
+      tracked_recipes[recipe_name:upper()].eaten[consumer:upper()] = { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') }
+      Note("Consumer '" .. consumer .. "' has been recorded as having eaten '" .. recipe_name .. "'")
+    end
+  end
+
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking recipes", tracked_recipes)
 end
 
-function cleanCooking(name)
-  name = string.lower(Trim(name or ""))
+function ClearRecipe(args)
+  if Trim(args) == "" then
+    tracked_recipes = { }
+    Note("All tracked recipes have been cleared.")
+  else
+    local recipe_name = Trim(args)
+    if tracked_recipes[recipe_name:upper()] then
+      tracked_recipes[recipe_name:upper()] = nil
+      Note("Recipe '" .. recipe_name .. "' has been removed from tracking.")
+    else
+      Note("Recipe '" .. recipe_name .. "' is not being tracked.")
+    end
+  end
+
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking recipes", tracked_recipes)
+end
+
+function CleanRecipe(args)
   local cleaned = false
-  for idx, recipe in ipairs(recipes) do
-    if (name == "" or name == "all" or string.find(string.lower(recipe["name"]), name) ~= nil) then
-      local consumer_set = {}
-      local cleaned_recipe = { name = recipe["name"], eaten = {}}
-      for _, consumer in ipairs(recipe["eaten"]) do
-        if not consumer_set[consumer["name"]] then
-          consumer_set[consumer["name"]] = true
-          table.insert(cleaned_recipe["eaten"], consumer)
-        end
+  args = Trim(args or ""):upper()
+  for _, recipe in ipairs(tracked_recipes) do
+    if args == "" or args == "ALL" or string.find(recipe.name:upper(), args) ~= nil then
+      local consumers = {}
+      for _, consumer in ipairs(recipe.eaten) do
+        consumers[consumer.name:upper()] = consumer
       end
-      local dupes = #recipe["eaten"] - #cleaned_recipe["eaten"]
+
+      local dupes = #recipe.eaten - #consumers
       if dupes > 0 then
-        Note("Cleaned up '" .. recipe["name"] .. "' removing " .. dupes .. " duplicates.")
-        recipes[idx] = cleaned_recipe
+        Note("Cleaned up '" .. recipe.name .. "' removing " .. dupes .. " duplicates.")
+        tracked_recipes[recipe.name:upper()].eaten = consumers
         cleaned = true
       end
     end
   end
-  
-  if cleaned then
-    SetVariable("recipes", Serialize(recipes))
-    SaveState()
+
+  if not cleaned then
+    Note("No duplicates found for '" .. (args == "" and "all recipes" or args) .. "'")
+  else
+    serialization_helper.SaveSerializedVariable(character_name .. "_cooking recipes", tracked_recipes)
   end
 end
 
-function showFoodTrucks()
-  Note("NPCs that will eat your food:")
-  for _, npc in ipairs(npcs) do
-    showFoodTruck(npc.name, npc.area, npc.room, npc.num, npc.race)
+function ShowNpcs(filter)
+  if Trim(filter) ~= "" then
+    local found = false
+    local found_recipe = nil
+    for _, recipe in pairs(tracked_recipes) do
+      if string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
+        filter = recipe.name
+        found_recipe = recipe
+        found = true
+        break
+      end
+    end
+    if not found then 
+      Note("You aren't tracking a recipe called " .. filter .. "!")
+    else
+      local feed_count = 0
+      for _, npc in ipairs(npcs) do
+        if not found_recipe.eaten[npc.name:upper()] then
+          if feed_count == 0 then 
+            Note("You can still feed " .. filter .. " to the following npcs:")
+          end
+          feed_count = feed_count + 1
+          showNpcDetails(npc.name, npc.area, npc.room, npc.num, npc.race)
+        end
+      end
+    end
+  else
+    Note("NPCs that will eat your food:")
+    for _, npc in ipairs(npcs) do
+      showNpcDetails(npc.name, npc.area, npc.room, npc.num, npc.race)
+    end
   end
+  SendNoEcho("")
 end
 
-function showFoodTruck(name, town, room, num, race)
+function showNpcDetails(name, town, room, num, race)
   ColourTell("cyan", "black", " * ")
   ColourTell("white", "black", name)
   ColourTell("yellow", "black", " (" .. town .. ") ")
@@ -406,213 +489,513 @@ function showFoodTruck(name, town, room, num, race)
   end
 end
 
----------------------
--- current recipe
----------------------
-
-function clearRecipe()
-  current_recipe = { }
-end
-
-function addToRecipe(ingredient)
-  table.insert(current_recipe, ingredient)
-end
-
-function displayHelperOptions()
-  Note("")
-  Hyperlink("cooking search", "[Search for Ingredients]", "", "silver", "black", false)
-  Tell(" - ")
-  if recipe_name ~= nil and #recipe_name > 0 then
-    Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
-    Tell(" - ")
-  end
-  ColourTell("silver", "black", "Get from: ")
- 
-  for _, container in ipairs(set_containers) do
-    Hyperlink("cooking getall " .. container, "[" .. container .. "]", "", "silver", "black", false)
-    Tell(" ")
-  end
-end
-
-function setContainers(cont)
-  cont = Trim(cont or "")
-  if cont ~= "" then
-    set_containers = {}
-    local split_cont = utils.split(cont, ",")
-    for _, container in ipairs(split_cont) do
-      table.insert(set_containers, Trim(container))
+function Configure(args)
+  if not args or Trim(args) == "" then
+    local ingredients_text, ingredients_text_display = "", ""
+    for ing, tracked in pairs(config.tracked_ingredients) do
+      if tracked then
+        if ingredients_text ~= "" then ingredients_text = ingredients_text .. ", " end
+        ingredients_text = ingredients_text .. ing
+      end
     end
-    SetVariable("containers", Serialize(set_containers))
-    SaveState()
-    Tell("You have set the following containers: ")
-  else
-    Tell("You have the following containers set: ")
-  end
-    
-  for i, container in ipairs(set_containers) do
-    ColourTell("white", "black", container)
-    if i < #set_containers then Tell(", ") end
-  end
-  Note(".")
+    ingredients_text_display = ingredients_text
+    if #ingredients_text > 20 then ingredients_text_display = ingredients_text:sub(1, 17) .. "..." end
 
-  if (cont == "") then
-    Note("Use 'cooking containers <containers>' to set this by providing a comma-delimited string.")
-  end
+    local config_options = {
+      Options = {
+        storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
+        tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
+        automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
+        autoupdate = { sort = 4, type = "bool", label = "Auto-Update on Close", raw_value = true },
+      }
+    }
+
+    config_window.Show(config_options, configureDone)
+  else
+    local args_split = utils.split(Trim(args), " ", 1)
+    local option, value = Trim(args_split[1]:lower()), Trim(args_split[2] or "")
+    
+    if option == "container" then
+      if Trim(value) == "" then 
+        value = utils.inputbox("Container", "Enter the name of the container you store your ingredients in:", config.storage_container) 
+      end
+      if value ~= nil then configureDone("Options", "storage_container", { label = "Container", raw_value = value }) end
+    elseif option == "ingredients" then
+      if Trim(value) == "" then 
+        value = utils.inputbox("Track Ingredients", "Enter a comma-separated list of ingredients to save when automating the pouch of plenitude:", table.concat(config.tracked_ingredients, ", ")) 
+      end
+      if value ~= nil then configureDone("Options", "tracked_ingredients", { label = "Ingredients", raw_value = value }) end
+    elseif option == "automate" then
+      if Trim(value) == "" then
+        value = not config.automate_pouch
+      else
+        value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
+      end
+      if value ~= nil then configureDone("Options", "automate_pouch", { label = "Automate Pouch", raw_value = value }) end
+    elseif option == "autoupdate" then
+      if Trim(value) == "" then
+        value = not config.autoupdate
+      else
+        value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
+      end
+      if value ~= nil then configureDone("Options", "autoupdate", { label = "Auto-Update on Close", raw_value = value }) end
+    else
+      Note("Unknown configuration option: " .. option)
+      Note("Available options: container, ingredients, automate, autoupdate")
+      Note("Use 'cooking config' to see and change all settings.")
+    end
+  end  
 end
 
-function search()
+function configureDone(group_id, option_id, config_changed)
+  if option_id == "tracked_ingredients" then
+    config.tracked_ingredients = {}
+    for _, ingredient in ipairs(utils.split(Trim(config_changed.raw_value):lower(), ",")) do
+      if ingredient ~= "" then
+        config.tracked_ingredients[ingredient] = true
+      end
+    end
+  else
+    config[option_id] = config_changed.raw_value
+  end
+
+  local changed_value = tostring(config_changed.raw_value)
+  if type(config_changed.raw_value) == "boolean" then changed_value = (config_changed.raw_value and "enabled" or "disabled") end
+  Note(config_changed.label .. " has been updated to: " .. changed_value)
+
+  if config_changed.label == "Automate Pouch" then
+    if config.automate_pouch then
+      EnableTriggerGroup("cooking_pouch", true)
+      LootPouch()
+    else
+      EnableTriggerGroup("cooking_pouch", false)
+    end
+  end
+
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
+end
+
+function SearchCurrentRecipe()
+  if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 or #current_recipe.ingredients == 0 then
+    Note("No recipe is currently being tracked. Use 'cooking search' after viewing a recipe card.")
+    return
+  end
+
   search_count = 0
   search_found = { }
-  Note("Searching for ingredients, please wait...")
+  if not cooking then
+    Note("Searching for ingredients to cook " .. current_recipe.name .. ", please wait...")
+  end
 
   EnableTriggerGroup("search_recipe", true)
-  for _, i in ipairs(current_recipe) do
+  for _, i in ipairs(current_recipe.ingredients) do
     SendNoEcho("inventory search \"" .. i .. "\"")
   end
 end
 
-function getAll(container)
-  for _, i in ipairs(current_recipe) do
-    SendNoEcho("get \"" .. i .. "\" " .. container)
+function GetAll(container)
+  if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 or #current_recipe.ingredients == 0 then
+    Note("No recipe is currently being tracked. Use 'cooking getall' after viewing a recipe card.")
+    return
   end
 
-  if recipe_name ~= nil and #recipe_name > 0 then
-    Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
-    Note("")
+  if container == nil or container == "" then
+    container = Trim(config.storage_container)
+  end
+
+  if not cooking then
+    Note("Getting all ingredients for " .. current_recipe.name .. " from " .. container .. "...")
+  end
+
+  local wait_time = .5
+  for _, i in ipairs(current_recipe.ingredients) do
+    DoAfterSpecial(wait_time, "getIngredient(\"" .. i .. "\", \"" .. container .. "\")", sendto.script)
+    wait_time = wait_time + .5
+  end
+
+  if cooking then
+    DoAfterSpecial(wait_time, "doFinalCook()", sendto.script)
   end
 end
 
-function found(ingredient, location)
-  if search_found ~= nil and #search_found > 0 then
-    for _, i in ipairs(search_found) do
-      if ingredient == i then
-        return
+function getIngredient(ingredient, container)
+  SendNoEcho("get \"" .. ingredient .. "\" " .. container)
+end
+
+function doFinalCook()
+  if cooking then
+    SendNoEcho("cook " .. current_recipe.name)
+    cooking_amount = cooking_amount - 1
+    if cooking_amount ~= 0 then
+      GetAll()
+    else
+      if cooking_infinite then
+        SearchCurrentRecipe()
+      else
+        cooking = false
       end
     end
   end
-
-  containers[location] = true
-  table.insert(search_found, ingredient)
-  search_count = search_count + 1  
-  checkIfDone()
 end
 
-function notFound()
+function FindIngredient(ingredient)
+  if ingredient == nil or Trim(ingredient) == "" then
+    Note("You must specify an ingredient to search for.")
+    return
+  end
+
+  if db ~= nil then
+    pcall(function() db:close() end)
+    db = nil
+  end
+  db = assert(sqlite3.open(GetInfo(66) .. "recipes.db"))
+
+  Note("Searching DB for '" .. ingredient .. "'")
+  local found_ingredients = {}
+  for row in db:nrows(string.format("SELECT area, details, notes FROM ingredients WHERE name = '" .. Trim(ingredient) .. "'")) do
+    found_ingredients[#found_ingredients + 1] = row
+  end
+
+  if #found_ingredients == 0 then
+    Note("No results found for '" .. ingredient .. "'.")
+  else
+    Note("Found " .. #found_ingredients .. " result(s) for '" .. ingredient .. "':")
+    for _, row in ipairs(found_ingredients) do
+      displayIngredient(row)
+    end
+  end
+end
+
+function displayIngredient(row)
+  ColourTell("cyan", "black", " * ")
+  if row.area ~= nil and #row.area > 0 then
+    ColourTell("white", "black", row.area)
+  else
+    ColourTell("red", "black", "UNKNOWN")
+  end 
+    
+  ColourTell("silver", "black", " - ")
+
+  if row.details ~= nil and #row.details > 0 then
+    ColourTell("white", "black", row.details)
+    if row.notes ~= nil and #row.notes > 0 then
+      ColourTell("white", "black", "(" .. row.notes .. ")")
+    end
+  elseif row.notes ~= nil and #row.notes > 0 then
+    ColourTell("white", "black", row.notes)
+  end
+
+  Note("")
+end
+
+function TrackPouchIngredient(ingredient)
+  if ingredient and Trim(ingredient) ~= "" then
+    ingredient = Trim(ingredient:lower())
+    config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
+    if config.tracked_ingredients[ingredient] then
+      Note("Tracking " .. ingredient .. " in pouch of plenitude.")
+    else
+      Note("Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+    end
+    SetVariable(character_name .. "_cooking_config", Serialize(config))
+    SaveState()
+  else
+    local t_count = 0
+    for ing, t in pairs(config.tracked_ingredients) do
+        if t_count == 0 then
+          Note("Tracked ingredients in pouch of plenitude:")
+        end
+        if t then
+          ColourTell("silver", "black", " * ")
+          ColourNote("white", "black", ing)
+          t_count = t_count + 1
+        end
+    end
+    if t_count == 0 then
+      Note("No ingredients are currently being tracked in the pouch of plenitude.")
+    else
+      Note("A total of " .. t_count .. " ingredients are being tracked.")
+    end
+    Note("You can toggle tracking of an ingredient with 'cooking pouch track <ingredient>'")
+  end
+end
+
+function CookRecipe(times)
+  if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 then
+    Note("No recipe is currently being tracked. Try again after viewing a recipe card.")
+    return
+  end
+
+  cooking_amount = tonumber(times) or 1
+
+  if cooking_amount <= 0 then 
+    cooking_infinite = true 
+    cooking_amount = 10
+  else
+    cooking_infinite = false
+  end
+
+  cooking = true
+  Tell("Cooking " .. current_recipe.name .. " ")
+  if not cooking_infinite and cooking_amount > 0 then
+    Note(cooking_amount .. " time(s). Please wait...")
+  else
+    Note("as many times as possible. Please wait...")
+  end
+  SearchCurrentRecipe()
+end
+
+--------------
+-- triggers --
+--------------
+
+function AddNpcTracking(npc, recipe)
+  if npc_names[Trim(npc:lower())] then
+    TrackRecipe(recipe .. " c:" .. npc)
+    last_npc_food = Trim(recipe:lower())
+  end
+end
+
+function RemoveLastNpc(npc)
+  for _, recipe in pairs(tracked_recipes) do
+    if string.find(recipe.name:upper(), last_npc_food:upper()) ~= nil then
+      local eaten = tracked_recipes[last_npc_food:upper()].eaten
+      if eaten[Trim(npc:upper())] then
+        eaten[Trim(npc:upper())] = false
+        Note("Consumer '" .. npc .. "' has been removed from the '" .. last_npc_food .. "' list of consumers.")
+      end
+      break
+    end
+  end
+end
+
+function StartRecipeCapture(recipe_name)
+  if recipe_name == nil or recipe_name == "" then
+    return
+  end
+
+  search_containers = {}
+  search_found = {}
+  search_count = 0
+  current_recipe = { name = recipe_name, ingredients = { } }
+  EnableTriggerGroup("get_recipe", true)
+end
+
+function AddIngredientToRecipe(ingredient)
+  if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 then
+    return
+  end
+
+  table.insert(current_recipe.ingredients, ingredient)
+end
+
+function EndRecipeCapture()
+  EnableTriggerGroup("get_recipe", false)
+  
+  Note("")
+  Hyperlink("cooking search", "[Search]", "", "silver", "black", false)
+  Tell(" - ")
+  if current_recipe.name ~= nil and #current_recipe.name > 0 then
+    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(1)", "[Cook 1]", "Cook " .. Trim(current_recipe.name), "silver", "black", false)
+    Tell(" ")
+    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(2)", "[Cook 2]", "Cook " .. Trim(current_recipe.name) .. " twice!", "silver", "black", false)
+    Tell(" ")
+    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(0)", "[Cook All]", "Cook " .. Trim(current_recipe.name) .. " as many times as you can!", "silver", "black", false)
+    Tell(" - ")
+  end
+  ColourTell("silver", "black", "Get All:")
+  if config.storage_container ~= nil and #config.storage_container > 0 then
+    Tell(" ")
+    Hyperlink("cooking getall " .. config.storage_container, "[" .. config.storage_container .. "]", "", "silver", "black", false)
+  end
+  Tell(" - ")
+  ColourTell("silver", "black", "Pouch: ")
+  Hyperlink("!!" .. GetPluginID() .. ":AddRecipeToPouch()", "[Track All]", "", "silver", "black", false)
+  Tell(" - ")
+  Hyperlink("!!" .. GetPluginID() .. ":ClearPouch()", "[Clear]", "", "silver", "black", false)
+  Note("")
+end
+
+function SearchFoundIngredient(ingredient, location)
+  if search_found[ingredient] == nil then 
+    search_found[ingredient] = 1
+    search_count = search_count + 1 
+    checkIfDone()
+  else
+    search_found[ingredient] = search_found[ingredient] + 1
+  end
+
+  search_containers[location] = true
+end
+
+function SearchNotFoundIngredient()
   search_count = search_count + 1
   checkIfDone()
 end
 
 function checkIfDone()
-  if search_count == #current_recipe then
+  if search_count == #current_recipe.ingredients then
     DoAfterSpecial(1, "finishSearch()", sendto.script)
   end
 end
 
 function finishSearch()
   EnableTriggerGroup("search_recipe", false)
+
+  local not_found = {}
+  for _, ingredient in ipairs(current_recipe.ingredients) do
+    if not search_found[ingredient] then
+      table.insert(not_found, ingredient)
+    else
+      if search_found[ingredient] < cooking_amount then
+        cooking_amount = search_found[ingredient]
+      end
+    end
+  end
   
-  if #search_found ~= #current_recipe then
-    ing_set = {}
-    for _, ingredient in ipairs(search_found) do
-      ing_set[ingredient] = true
+  if #not_found > 0 then
+    if cooking then
+      cooking_infinite = false
+      cooking = false
+      cooking_amount = 0
+      Note("Not enough ingredients to cook " .. current_recipe.name .. ".")
     end
 
     ColourTell("silver", "black", "You need: ")
-    for idx, i in ipairs(current_recipe) do
-      if not ing_set[i] then
-        Hyperlink("cooking find " .. i, "[" .. i .. "]", "Find", "white", "black", false)
-        if idx == #current_recipe then
-          ColourTell("silver", "black", ".")
-        else
-          ColourTell("silver", "black", ", ")
-        end
+    for idx, i in ipairs(not_found) do
+      Hyperlink("cooking find " .. i, "[" .. i .. "]", "Find", "white", "black", false)
+      if idx == #not_found then
+        ColourTell("silver", "black", ".")
+      else
+        ColourTell("silver", "black", ", ")
       end
     end
     Note("")
   else
+    if cooking then
+      GetAll()
+      return
+    end
+
     ColourNote("white", "black", "You have all the ingredients required!")
     Tell("You can find them: ")
-    for k, v in pairs(containers) do
+    for k, v in pairs(search_containers) do
       ColourTell("cyan", "black", " * ")
       ColourNote("silver", "black", "in" .. k)      
     end
 
-    if recipe_name ~= nil and #recipe_name > 0 then
-      Hyperlink("cook " .. Trim(recipe_name), "[Cook]", "", "silver", "black", false)
+    if current_recipe.name ~= nil and #current_recipe.name > 0 then
+      Hyperlink("cook " .. Trim(current_recipe.name), "[Cook]", "", "silver", "black", false)
       Tell(" - ")
     end
     ColourTell("silver", "black", "Get from: ")
   
-    for _, container in ipairs(set_containers) do
-      Hyperlink("cooking getall " .. container, "[" .. container .. "]", "", "silver", "black", false)
-      Tell(" ")
-    end
+    Hyperlink("cooking getall " .. config.storage_container, "[" .. config.storage_container .. "]", "", "silver", "black", false)
   end
 end
 
-function findIngredient(ingredient)
-  if db == nil then EnsureDb() end
-
-  Note("Searching DB for '" .. ingredient .. "'")
-
-  for row in db:nrows(string.format("SELECT area, details, notes FROM ingredients WHERE name = '" .. ingredient .. "'")) do
-      ColourTell("cyan", "black", " * ")
-      if row.area ~= nil and #row.area > 0 then
-        ColourTell("white", "black", row.area)
-      else
-        ColourTell("red", "black", "UNKNOWN")
-      end 
-      
-      ColourTell("silver", "black", " - ")
-
-      if row.details ~= nil and #row.details > 0 then
-        ColourTell("white", "black", row.details)
-        if row.notes ~= nil and #row.notes > 0 then
-          ColourTell("white", "black", "(" .. row.notes .. ")")
-        end
-      elseif row.notes ~= nil and #row.notes > 0 then
-        ColourTell("white", "black", row.notes)
-      end
-
-      Note("")
-    end
-end
-
----------------------
--- serialization
----------------------
-
-function Serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return Serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
+function DisplayPouchStatus(trigger_style_runs, line)
+  if not config then return end
+  local fgcol = "lightgray"
+  local bgcol = "black"
+  local status = "disabled"
+  if config.automate_pouch then
+    status = "enabled"
+  end  
+  for i = 1, #trigger_style_runs do
+    fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
+    bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
+    local style_text = trigger_style_runs[i].text
+    if string.find(style_text, "pouch of plenitude") then
+      local pouch_commands = "examine 'a pouch of plenitude'|look in 'a pouch of plenitude'|wear 'a pouch of plenitude'|drop 'a pouch of plenitude'|open 'a pouch of plenitude'|close 'a pouch of plenitude'|eat 'a pouch of plenitude'|drink 'a pouch of plenitude'|empty 'a pouch of plenitude'|light 'a pouch of plenitude'|extinguish 'a pouch of plenitude'|use 'a pouch of plenitude'"
+      local pouch_tooltips = "Right mouse click to act on this item|Examine a pouch of plenitude (new)|Look inside a pouch of plenitude (new)|Wear/Hold a pouch of plenitude (new)|Drop a pouch of plenitude (new)|Open a pouch of plenitude (new)|Close a pouch of plenitude (new)|Eat a pouch of plenitude (new)|Drink a pouch of plenitude (new)|Empty a pouch of plenitude (new)|Light a pouch of plenitude (new)|Extinguish a pouch of plenitude (new)|Use a pouch of plenitude (new)"
+      Hyperlink(pouch_commands, style_text, pouch_tooltips, fgcol, bgcol, false)
     else
-      return tostring(value)
+      ColourTell(fgcol, bgcol, trigger_style_runs[i].text)
     end
   end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
+  ColourTell(fgcol, bgcol, " [")
+  ColourTell("white", "black", status)
+  ColourNote(fgcol, bgcol, "]")
 end
 
-function Deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
+function LootPouch()
+  if config.automate_pouch then
+    SendNoEcho("open plenitude")
+    SendNoEcho("get all plenitude")
+    SendNoEcho("close plenitude")
+  end
+end
+
+function HandlePouchIngredient(ingredient)
+  if not config.automate_pouch or not ingredient or ingredient == "" then
+    return
+  end
+
+  ingredient = Trim(ingredient:lower())
+  
+  if config.tracked_ingredients[ingredient] then
+    SendNoEcho("put all.\"" .. ingredient .. "\" " .. config.storage_container)
+  elseif non_food_items[ingredient] then
+    SendNoEcho("drop all.\"" .. ingredient .. "\"")
   else
-    return nil, "Failed to load string"
+    pulled_food = true
+  end  
+end
+
+function AddRecipeToPouch()
+  if current_recipe.ingredients == nil or #current_recipe.ingredients == 0 then
+    Note("You have no recipe to add to the pouch.")
+    return
+  end
+
+  for _, ingredient in ipairs(current_recipe.ingredients) do
+    if not config.tracked_ingredients[ingredient] then
+      config.tracked_ingredients[ingredient] = true
+      ColourNote("green", "black", "Added " .. ingredient .. " to pouch tracking.")
+    else
+      ColourNote("yellow", "black", ingredient .. " is already being tracked in the pouch.")
+    end
+  end
+
+  SetVariable(character_name .. "_cooking_config", Serialize(config))
+  SaveState()
+end
+
+function ClearPouch()
+  if #config.tracked_ingredients == 0 then
+    Note("You have no tracked ingredients to clear.")
+    return
+  end
+
+  config.tracked_ingredients = {}
+  SetVariable(character_name .. "_cooking_config", Serialize(config))
+  SaveState()
+  Note("Cleared all ingredients from pouch tracking.")
+end
+
+function EndCooking()
+  if cooking then
+    cooking = false
+    Note("An ingredient you need to cook " .. current_recipe.name .. " was not found in " .. config.storage_container .. ".")
+  end
+end
+
+function HandleMealCooked(meal)
+  if cooking then
+    Send("put \"" .. Trim(meal) .. "\" " .. config.storage_container)
+  end
+end
+
+function StartPouchAutomation()
+  EnableTriggerGroup("cooking_open_pouch", true)
+end
+
+function StopPouchAutomation()
+  EnableTriggerGroup("cooking_open_pouch", false)
+  if pulled_food then
+    SendNoEcho("drop all.food")
+    pulled_food = false
   end
 end
 

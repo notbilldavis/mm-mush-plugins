@@ -1,237 +1,220 @@
 local https = require("ssl.https")
 local ltn12 = require("ltn12")
+local http = require("socket.http")
+
+local getQuestInfo, removeQuestFromDb, locateCrystal
+local prepareAndExecute, stripHtml, findQuestLink, fetchHtml, parseHtmlForPhases, 
+  initDb, addQuestToDb, getQuestFromDb, splitByNewLine
 
 local db
 
-function finalize(stmt)
-    if stmt then stmt:finalize() end
+getQuestInfo = function(quest_num, quest_name)
+  initDb()
+  local quest = getQuestFromDb(quest_num)
+
+  if quest == nil then
+    local link, annwn_id = findQuestLink(quest_num, quest_name)
+    if not link then
+      return nil, nil
+    end
+
+    local html = fetchHtml(link)
+    if not html then
+      return nil, nil
+    end
+
+    local phases = parseHtmlForPhases(html)
+    addQuestToDb(quest_num, quest_name, phases, annwn_id)
+    quest = { phases = phases, annwn_id = annwn_id }
+  end
+
+  return quest.phases, quest.annwn_id
 end
 
-function exec_prepared(db, sql, ...)
-    local stmt = db:prepare(sql)
-    if stmt then
-        stmt:bind_values(...)
-        stmt:step()
-        finalize(stmt)
-    end
+removeQuestFromDb = function(quest_id)
+  initDb()
+  db:exec("BEGIN")
+  prepareAndExecute(db, "DELETE FROM quests WHERE id = ?", quest_id)
+  db:exec("COMMIT")
+  db:close()
+  return true
 end
 
--- Utility: Fetch all rows
-function fetch_all(stmt)
-    local results = {}
-    local result = stmt:step()
-    while result == sqlite3.ROW do
-        table.insert(results, stmt:get_named_values())
-        result = stmt:step()
+findQuestLink = function(quest_number, quest_name)
+  local encoded_name = quest_name:gsub(" ", "+")
+  local url = "https://annwn.info/quest/search/?search=quest&keyword=" .. encoded_name
+  local response = {}
+
+  local _, status = https.request{
+    url = url,
+    sink = ltn12.sink.table(response)
+  }
+
+  if status ~= 200 then
+    Note("Failed to fetch quest page: status " .. tostring(status))
+    return nil, nil
+  end
+
+  local html = table.concat(response)
+  local pattern = '<a href="/quest/(%d+)">([^<]+)'
+  local fallback_id = nil
+
+  for quest_id, link_text in html:gmatch(pattern) do
+    local clean_text = Trim(link_text:gsub("%s+", " "):gsub("%s%[.*%]", ""):lower())
+    local expected = Trim(quest_name:lower())
+    local bracket_num = link_text:match("%[(%d+)%]")
+
+    if clean_text == expected then
+      if bracket_num and tonumber(bracket_num) == tonumber(quest_number) then
+        return "/quest/" .. quest_id, quest_id
+      elseif not bracket_num and not fallback_id then
+        fallback_id = "/quest/" .. quest_id
+      end
     end
-    finalize(stmt)
-    return results
+  end
+
+  if fallback_id == nil then
+    return nil, nil
+  end
+
+  return "/quest/" .. fallback_id, fallback_id
 end
 
--- HTML decoder
-function strip_html(html)
-    return html
-        :gsub("<br ?/?>", "\n")
-        :gsub("<[^>]->", "")
-        :gsub("&mdash;", "—")
-        :gsub("&nbsp;", " ")
-        :gsub("&amp;", "&")
-        :gsub("&lt;", "<")
-        :gsub("&gt;", ">")
-        :gsub("&quot;", '"')
-        :gsub("&#(%d+);", function(n)
-            return utf8.char(tonumber(n))
-        end)
-        :gsub("%s+", " ")
-        :match("^%s*(.-)%s*$")
+fetchHtml = function(path)
+  local url = "https://annwn.info" .. path
+  local response = {}
+  local _, status = https.request{
+    url = url,
+    sink = ltn12.sink.table(response),
+    protocol = "tlsv1_2"
+  }
+
+  if status ~= 200 then
+    Note("Failed to fetch quest page (status: " .. tostring(status) .. ")")
+    return nil
+  end
+
+  return table.concat(response)
 end
 
--- Find quest link on annwn.info
-function find_quest_link(quest_number, quest_name)
-    local encoded_name = quest_name:gsub(" ", "+")
-    local url = "https://annwn.info/quest/search/?search=quest&keyword=" .. encoded_name
-    local response = {}
+parseHtmlForPhases = function(html)
+  local phases, html_phases = {}, {}
 
-    local _, status = https.request{
-        url = url,
-        sink = ltn12.sink.table(response)
-    }
+  local phases_start = html:find('<div[^>]-class="phase"[^>]*>')
+  local phases_end = html:find('<div[^>]*class="quest%-toggle"[^>]*>')
+  local phases_only = html:sub(phases_start, phases_end - 1)
+  
+  local phase_start, phase_end = phases_only:find('<div[^>]-class="phase"[^>]*>')
+  local next_phase_start, next_phase_end = phases_only:find('<div[^>]-class="phase"[^>]*>', phase_end and (phase_end + 1) or 1)
 
-    if status ~= 200 then
-        return nil, "Failed to fetch page: status " .. tostring(status)
+  while (next_phase_start ~= nil)
+  do
+    local phase_text = phases_only:sub(phase_start, next_phase_start - 1)
+    table.insert(html_phases, phase_text)
+    phase_start = next_phase_start
+    phase_end = next_phase_end
+
+    next_phase_start, next_phase_end = phases_only:find('<div[^>]-class="phase"[^>]*>', phase_end and (phase_end + 1) or 1)
+  end
+
+  local final_phase_text = phases_only:sub(phase_start, #phases_only)
+  table.insert(html_phases, final_phase_text)
+
+  for _, phase_block in ipairs(html_phases) do
+    local phase = { text = nil, mobs = {}, items = {}, rooms = {}, hints = {} }
+    local main_line = phase_block:match('<a class=".-hints"[^>]*>.-</a>:%s*(.-)%s*<div')
+    if main_line then phase.text = stripHtml(main_line) end
+
+    for mob_html in phase_block:gmatch('<div class="phaseinfomob">(.-)</div>') do
+      local mob = stripHtml(mob_html)
+      if mob ~= "" then table.insert(phase.mobs, mob) end
     end
 
-    local html = table.concat(response)
-    local pattern = '<a href="/quest/(%d+)">([^<]+)'
-    local fallback_id = nil
-
-    for quest_id, link_text in html:gmatch(pattern) do
-        local clean_text = Trim(link_text:gsub("%s+", " "):gsub("%s%[.*%]", ""):lower())
-        local expected = Trim(quest_name:lower())
-        local bracket_num = link_text:match("%[(%d+)%]")
-
-        if clean_text == expected then
-            if bracket_num and tonumber(bracket_num) == tonumber(quest_number) then
-                return "/quest/" .. quest_id, quest_id
-            elseif not bracket_num and not fallback_id then
-                fallback_id = "/quest/" .. quest_id
-            end
-        end
+    for item_html in phase_block:gmatch('<div class="phaseinfoitem">(.-)</div>') do
+      local item = stripHtml(item_html)
+      if item ~= "" then table.insert(phase.items, item) end
     end
 
-    return "/quest/" .. fallback_id, fallback_id
+    for room_html in phase_block:gmatch('<div class="phaseinforoom">(.-)</div>') do
+      local room = stripHtml(room_html)
+      if room ~= "" then table.insert(phase.rooms, room) end
+    end
+
+    for hint_html in phase_block:gmatch('<div class="phasehint">(.-)</div>') do
+      local hint = stripHtml(hint_html)
+      if hint ~= "" then table.insert(phase.hints, hint) end
+    end
+
+    table.insert(phases, phase)
+  end
+
+  return phases
 end
 
--- Fetch HTML from full URL path
-function fetch_html(path)
-    local url = "https://annwn.info" .. path
-    local response = {}
-    local _, status = https.request{
-        url = url,
-        sink = ltn12.sink.table(response),
-        protocol = "tlsv1_2"
-    }
+initDb = function()
+  if db ~= nil then
+    pcall(function() db:close() end)
+    db = nil
+  end
 
-    if status ~= 200 then
-        return nil, "Failed to fetch quest page (status: " .. tostring(status) .. ")"
+  db = assert(sqlite3.open(GetInfo(66) .. "annwn_quests.db"))
+  db:exec("PRAGMA foreign_keys = ON")
+
+  local columnExists = false
+  for row in db:nrows("PRAGMA table_info(quests)") do
+    if row.name == "annwn_id" then
+      columnExists = true
+      break
     end
+  end
 
-    return table.concat(response)
+  if not columnExists then
+    db:exec("DROP TABLE IF EXISTS quests")
+  end
+
+  local schema = [[
+    CREATE TABLE IF NOT EXISTS quests (id INTEGER PRIMARY KEY, name TEXT, annwn_id TEXT);
+    CREATE TABLE IF NOT EXISTS phases (
+        id INTEGER PRIMARY KEY, quest_id INTEGER, phase_number INTEGER,
+        description TEXT, UNIQUE(quest_id, phase_number),
+        FOREIGN KEY(quest_id) REFERENCES quests(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS mobs (
+        id INTEGER PRIMARY KEY, phase_id INTEGER, mob_name TEXT,
+        UNIQUE(phase_id, mob_name),
+        FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS items (
+        id INTEGER PRIMARY KEY, phase_id INTEGER, item_name TEXT,
+        UNIQUE(phase_id, item_name),
+        FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS rooms (
+        id INTEGER PRIMARY KEY, phase_id INTEGER, room_name TEXT,
+        UNIQUE(phase_id, room_name),
+        FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS hints (
+        id INTEGER PRIMARY KEY, phase_id INTEGER, hint_text TEXT,
+        UNIQUE(phase_id, hint_text),
+        FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
+    );
+  ]]
+  
+  db:exec(schema)
 end
 
--- Parse phases from HTML
-function parse_phases(html)
-    local phases = {}
-    
-    -- This pattern captures each entire phase block
-    for phase_block in html:gmatch('<div[^>]-class="phase"[^>]*>(.-)</div>%s*</div>') do
-        local phase = {
-            text = nil,
-            mobs = {},
-            items = {},
-            rooms = {},
-            hints = {}
-        }
-
-        -- Extract main phase text (usually before <div class="phaseinfo...">)
-        local main_line = phase_block:match('<a class=".-hints"[^>]*>.-</a>:%s*(.-)%s*<div')
-        if main_line then
-            phase.text = strip_html(main_line)
-        end
-
-        -- Extract all mobs
-        for mob_html in phase_block:gmatch('<div class="phaseinfomob">(.-)</div>') do
-            local mob = strip_html(mob_html)
-            if mob ~= "" then
-                table.insert(phase.mobs, mob)
-            end
-        end
-
-        -- Extract all items
-        for item_html in phase_block:gmatch('<div class="phaseinfoitem">(.-)</div>') do
-            local item = strip_html(item_html)
-            if item ~= "" then
-                table.insert(phase.items, item)
-            end
-        end
-
-        -- Extract all rooms
-        for room_html in phase_block:gmatch('<div class="phaseinforoom">(.-)</div>') do
-            local room = strip_html(room_html)
-            if room ~= "" then
-                table.insert(phase.rooms, room)
-            end
-        end
-
-        -- Extract all hints
-        for hint_html in phase_block:gmatch('<div class="phasehint">(.-)</div>') do
-            local hint = strip_html(hint_html)
-            if hint ~= "" then
-                table.insert(phase.hints, hint)
-            end
-        end
-
-        table.insert(phases, phase)
-    end
-
-    return phases
-end
-
-
--- DB Initialization
-function initDb()
-    if db ~= nil then
-        pcall(function()
-            db:close()
-        end)
-        db = nil
-    end
-
-    db = assert(sqlite3.open(GetInfo(66) .. "annwn_quests.db"))
-    db:exec("PRAGMA foreign_keys = ON")
-
-    local columnExists = false
-    for row in db:nrows("PRAGMA table_info(quests)") do
-        if row.name == "annwn_id" then
-            columnExists = true
-            break
-        end
-    end
-
-    if not columnExists then
-        db:exec("DROP TABLE IF EXISTS quests")
-    end
-
-    local schema = [[
-        CREATE TABLE IF NOT EXISTS quests (id INTEGER PRIMARY KEY, name TEXT, annwn_id TEXT);
-        CREATE TABLE IF NOT EXISTS phases (
-            id INTEGER PRIMARY KEY, quest_id INTEGER, phase_number INTEGER,
-            description TEXT, UNIQUE(quest_id, phase_number),
-            FOREIGN KEY(quest_id) REFERENCES quests(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS mobs (
-            id INTEGER PRIMARY KEY, phase_id INTEGER, mob_name TEXT,
-            UNIQUE(phase_id, mob_name),
-            FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY, phase_id INTEGER, item_name TEXT,
-            UNIQUE(phase_id, item_name),
-            FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS rooms (
-            id INTEGER PRIMARY KEY, phase_id INTEGER, room_name TEXT,
-            UNIQUE(phase_id, room_name),
-            FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS hints (
-            id INTEGER PRIMARY KEY, phase_id INTEGER, hint_text TEXT,
-            UNIQUE(phase_id, hint_text),
-            FOREIGN KEY(phase_id) REFERENCES phases(id) ON DELETE CASCADE
-        );
-    ]]
-    db:exec(schema)
-end
-
--- Insert entities
-function insert_entities(table_name, column_name, phase_id, values)
-    for _, val in ipairs(values) do
-        exec_prepared(db, string.format("INSERT INTO %s (phase_id, %s) VALUES (?, ?)", table_name, column_name), phase_id, val)
-    end
-end
-
--- Add quest to database
-function addQuestToDb(questId, questName, phases, annwn_id)
+addQuestToDb = function(quest_id, quest_name, phases, annwn_id)
   initDb()
 
   local questStmt = db:prepare("INSERT INTO quests (id, name, annwn_id) VALUES (?, ?, ?)")
-  questStmt:bind_values(questId, questName, annwn_id)
+  questStmt:bind_values(quest_id, quest_name, annwn_id)
   questStmt:step()
   questStmt:finalize()
 
   for phaseNumber, phase in ipairs(phases) do
     local phaseStmt = db:prepare("INSERT INTO phases (quest_id, phase_number, description) VALUES (?, ?, ?)")
-    phaseStmt:bind_values(questId, phaseNumber, phase.text)
+    phaseStmt:bind_values(quest_id, phaseNumber, phase.text)
     phaseStmt:step()
     local phaseId = db:last_insert_rowid()
     phaseStmt:finalize()
@@ -269,7 +252,7 @@ function addQuestToDb(questId, questName, phases, annwn_id)
 end
 
 
-function getQuestFromDb(questId)
+getQuestFromDb = function(questId)
   initDb()
 
   local quest = {}
@@ -328,38 +311,68 @@ function getQuestFromDb(questId)
   end
 end
 
-
--- Remove quest
-function removeQuestFromDb(quest_id)
-    initDb()
-    db:exec("BEGIN")
-    exec_prepared(db, "DELETE FROM quests WHERE id = ?", quest_id)
-    db:exec("COMMIT")
-    db:close()
-    return true
+prepareAndExecute = function(db, sql, ...)
+  local stmt = db:prepare(sql)
+  if stmt then
+    stmt:bind_values(...)
+    stmt:step()
+    stmt:finalize() 
+  end
 end
 
--- Main interface
-function getQuestInfo(quest_num, quest_name)
-    initDb()
-    local quest = getQuestFromDb(quest_num)
+stripHtml = function(html)
+  return html
+    :gsub("<br ?/?>", "\n")
+    :gsub("<[^>]->", "")
+    :gsub("&mdash;", "—")
+    :gsub("&nbsp;", " ")
+    :gsub("&amp;", "&")
+    :gsub("&lt;", "<")
+    :gsub("&gt;", ">")
+    :gsub("&quot;", '"')
+    :gsub("&#(%d+);", function(n) return utf8.char(tonumber(n)) end)
+    :gsub("%s+", " ")
+    :match("^%s*(.-)%s*$")
+end
 
-    if quest == nil then
-        local link, annwn_id = find_quest_link(quest_num, quest_name)
-        if not link then
-            return nil
-        end
+locateCrystal = function(location)
+  if location == nil or #location == 0 then
+    return
+  end
 
-        local html, fetch_err = fetch_html(link)
-        if not html then
-            Note(fetch_err)
-            return nil
-        end
+  local page, retcode = http.request("http://mmatlas.dune.net/find-crystal-guild-vi.pl","map=".. location)
+  
+  if (retcode == 200) then
+    local coords_start = string.find(page, "(", 0, true)
 
-        local phases = parse_phases(html)
-        addQuestToDb(quest_num, quest_name, phases, annwn_id)
-        quest = { phases = phases, annwn_id = annwn_id }
+    if (coords_start ~= nil) then
+      local coords_end = string.find(page, ")", 0, true)
+      return string.sub(page, coords_start + 1, coords_end - 1)     
+    else
+      local map_tab = splitByNewLine(location)
+      if #map_tab < 2 then
+        Note("Ran out attempts: " .. page)
+      else
+        local map_next = table.concat(map_tab, "\r\n", 2, #map_tab - 1)
+        locateCrystal(map_next)
+      end
     end
 
-    return quest.phases, quest.annwn_id
+  else
+    Note("error accessing MagicMap - code: " .. retcode)
+  end
 end
+
+splitByNewLine = function(str)
+  local result = {}
+  for line in string.gmatch(str, "[^\r\n]+") do
+    table.insert(result, line)
+  end
+  return result
+end
+
+return {
+    GetQuestInfo = getQuestInfo,
+    RemoveQuestFromDb = removeQuestFromDb,
+    LocateCrystal = locateCrystal
+}

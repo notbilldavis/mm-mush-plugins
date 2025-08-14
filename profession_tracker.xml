@@ -114,7 +114,7 @@ Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
 require "gmcphelper"
 
 needed_manuals = {
-  "enhanced strength", "refresh",
+  "enhanced strength", "refresh", "remove curse",
   "acid blast", "bless", "blindness", "spark", "call lightning", "calm", "cause critical",
   "cause light", "change sex", "chill touch", "color spray", "light", "cure blindness", 
   "cure critical", "cure disease", "cure light", "cure poison", "curse", "cure serious", 

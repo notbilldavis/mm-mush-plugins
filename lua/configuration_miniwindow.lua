@@ -1,98 +1,101 @@
-local M_configuration_miniwindow = {}
+local const_installed, consts = pcall(require, "consthelper")
 
 local WIN = "configuration_" .. GetPluginID()
 local FONT = WIN .. "_font"
 local FONT_UNDERLINE = FONT .. "_underline"
 
-local WINDOW_WIDTH = 225
-local WINDOW_HEIGHT = 25
-local WINDOW_X = nil
-local WINDOW_Y = nil
-local LINE_HEIGHT = nil
-local LABEL_WIDTH = 100
-local VALUE_WIDTH = 100
-local BORDER_WIDTH = 3
-local WINDOW_INFO = ""
-local SECTION_STATUS = { }
-local CONFIG = { }
-local SAVE_CALLBACK
-local INIT = false
+local POSITION = nil
+local SIZES = nil
 
-function M_configuration_miniwindow.Show(config, saveCallback)
-  --if not INIT then
+local CONFIG = nil
+local SAVE_CALLBACK = nil
+local SECTION_STATUS = { }
+
+local show, hide, createFontOption, createNumberOption, createTextOption, createBoolOption, createColorOption, createListOption
+local initialize, calculate, draw, drawWindow, drawHeader, drawSection, drawOptions, drawOption,
+ changeNumber, changeText, changeColor, changeBool, changeFont, changeList, validateNumber, measureSection,
+ measureOption
+
+show = function (config, saveCallback)
+  if not CONFIG then
     CONFIG = config
     SAVE_CALLBACK = saveCallback
-    configuration_miniwindow_initialize()
-  --end
+    initialize()
+  end
 
-  configuration_miniwindow_show()
+  draw()
 end
 
-function configuration_miniwindow_initialize()
+initialize = function()
   WindowCreate(WIN, 0, 0, 50, 50, miniwin.pos_center_all, 0, 0)
+  WindowSetZOrder(WIN, 9999)
   WindowFont(WIN, FONT, "Lucida Console", 9)
   WindowFont(WIN, FONT_UNDERLINE, "Lucida Console", 9, false, false, true)
 
-  BORDER_WIDTH = GetInfo(277)
-  LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 2 
-  INIT = true
+  POSITION = {}
+  SIZES = {}
+
+  SIZES.LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 2 
+  SIZES.LABEL_WIDTH = 100
+  SIZES.VALUE_WIDTH = 100
 end
 
-function configuration_miniwindow_show()
-  configuration_miniwindow_drawWindow()  
-  configuration_miniwindow_drawHeader()
-  configuration_miniwindow_drawOptions()  
+draw = function()
+  WindowShow(WIN, false)
 
-  WindowSetZOrder(WIN, 9999)
+  calculate()
+  drawWindow()  
+  drawHeader()
+  drawOptions()  
+
   WindowShow(WIN, true)
 end
 
-function configuration_miniwindow_drawWindow()
-  configuration_miniwindow_calculateSizeAndPosition()  
-  WindowPosition(WIN, WINDOW_X, WINDOW_Y , 4, 2)
-  WindowResize(WIN, WINDOW_WIDTH, WINDOW_HEIGHT, ColourNameToRGB("black"))
-  WindowRectOp(WIN, miniwin.rect_fill, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, ColourNameToRGB("black"))
-  for i = 1, BORDER_WIDTH + 1 do
-    WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, WINDOW_WIDTH - i, WINDOW_HEIGHT - i, ColourNameToRGB("silver"))
+drawWindow = function()
+  WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP , 4, 2)
+  WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
+  WindowRectOp(WIN, miniwin.rect_fill, 0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
+  for i = 1, consts.border_width + 1 do
+    WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, POSITION.WINDOW_WIDTH - i, POSITION.WINDOW_HEIGHT - i, consts.silver)
   end
 end
 
-function configuration_miniwindow_drawHeader()
-  WindowText(WIN, FONT, "Configuration", 4 + BORDER_WIDTH, 4 + BORDER_WIDTH, 0, 0, ColourNameToRGB("white"), true)
-  WindowLine(WIN, WINDOW_WIDTH - LINE_HEIGHT - 2 - BORDER_WIDTH, 2 + BORDER_WIDTH, WINDOW_WIDTH - 2 - BORDER_WIDTH, LINE_HEIGHT + 2 + BORDER_WIDTH, ColourNameToRGB("white"), miniwin.pen_solid, 2)
-  WindowLine(WIN, WINDOW_WIDTH - LINE_HEIGHT - 2 - BORDER_WIDTH, LINE_HEIGHT + 2 + BORDER_WIDTH, WINDOW_WIDTH - 2 - BORDER_WIDTH, 2 + BORDER_WIDTH, ColourNameToRGB("white"), miniwin.pen_solid, 2)
-  WindowAddHotspot(WIN, "close_hotspot", WINDOW_WIDTH - LINE_HEIGHT - 2 - BORDER_WIDTH, 2 + BORDER_WIDTH, WINDOW_WIDTH - 2 - BORDER_WIDTH, LINE_HEIGHT + 2 + BORDER_WIDTH, "", "", "", "", "configuration_miniwindow_onConfigureCloseClick", "Close", miniwin.cursor_hand, 0)
+drawHeader = function()
+  WindowText(WIN, FONT, "Configuration", 4 + consts.border_width, 4 + consts.border_width, 0, 0, consts.white, true)
+  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, consts.white, miniwin.pen_solid, 2)
+  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, 2 + consts.border_width, consts.white, miniwin.pen_solid, 2)
+  WindowAddHotspot(WIN, "close_hotspot", POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, "", "", "", "", "configuration_onClose", "Close", miniwin.cursor_hand, 0)
 
   local single, space = WindowTextWidth(WIN, FONT, "[+]"), WindowTextWidth(WIN, FONT, " ")
-  local start_x = 4 + BORDER_WIDTH + WindowTextWidth(WIN, FONT, "Configuration") + space
-  local collapse_color, expand_color = ColourNameToRGB("dimgray"), ColourNameToRGB("dimgray")
+  local start_x = 4 + consts.border_width + WindowTextWidth(WIN, FONT, "Configuration") + space
+  local collapse_color, expand_color = consts.dimgray, consts.dimgray
 
   for k, _ in pairs(CONFIG) do
     if SECTION_STATUS[k] then
-      collapse_color = ColourNameToRGB("white")
+      collapse_color = consts.white
     else
-      expand_color = ColourNameToRGB("white")
+      expand_color = consts.white
     end
   end
 
   WindowText(WIN, FONT, "[+] ", start_x, 6, 0, 0, expand_color)
   WindowText(WIN, FONT, "[-]", start_x + single + space, 6, 0, 0, collapse_color)
-  if expand_color == ColourNameToRGB("white") then
-    WindowAddHotspot(WIN, "expand_all", start_x, 6, start_x + single, 6 + LINE_HEIGHT, "", "", "", "", "configuration_miniwindow_onConfigureExpandCollapseClick", "", miniwin.cursor_hand, 0)
+  if expand_color == consts.white then
+    WindowAddHotspot(WIN, "expand_all", start_x, 6, start_x + single, 6 + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
   end
-  if collapse_color == ColourNameToRGB("white") then
-    WindowAddHotspot(WIN, "collapse_all", start_x + single + space, 6, start_x + space + single * 2, 6 + LINE_HEIGHT, "", "", "", "", "configuration_miniwindow_onConfigureExpandCollapseClick", "", miniwin.cursor_hand, 0)
-  end
-end
-
-function configuration_miniwindow_drawOptions()
-  local y = LINE_HEIGHT + (BORDER_WIDTH * 2)
-  for key, group in configuration_miniwindow_pairsByKeys(CONFIG) do
-    y = configuration_miniwindow_drawSection(0, y, key, group)
+  if collapse_color == consts.white then
+    WindowAddHotspot(WIN, "collapse_all", start_x + single + space, 6, start_x + space + single * 2, 6 + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
   end
 end
 
-function configuration_miniwindow_drawSection(indents, y, key, group)
+drawOptions = function()
+  local y = SIZES.LINE_HEIGHT + (consts.border_width * 2)
+  for key, group in consts.pairsByKeys(CONFIG) do
+    y = drawSection(0, y, key, group)
+  end
+end
+
+drawSection = function(indents, y, key, group)
   local marker = " - "
   if not SECTION_STATUS[key] then marker = " + " end
   for i = 1, indents do marker = " " .. marker end
@@ -101,18 +104,30 @@ function configuration_miniwindow_drawSection(indents, y, key, group)
   title = title:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
 
   local title_width = WindowTextWidth(WIN, FONT, title)
-  WindowText(WIN, FONT, marker .. title, 4 + BORDER_WIDTH, y, 0, 0, ColourNameToRGB("white"), true)
-  WindowAddHotspot(WIN, key, BORDER_WIDTH, y, title_width + BORDER_WIDTH + 2, y + LINE_HEIGHT, "", "", "", "", "configuration_miniwindow_onConfigureExpandCollapseClick", "", miniwin.cursor_hand, 0)
-  y = y + LINE_HEIGHT
+  WindowText(WIN, FONT, marker .. title, 4 + consts.border_width, y, 0, 0, consts.white, true)
+  WindowAddHotspot(WIN, key, consts.border_width, y, title_width + consts.border_width + 2, y + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
+  y = y + SIZES.LINE_HEIGHT
+
+  local sortFunc = function(a, b)
+    local sort_a = a.value.sort 
+    local sort_b = b.value.sort
+
+    if sort_a == nil or sort_b == nil then
+      sort_a = a.value.label or a.key or ""
+      sort_b = b.value.label or b.key or ""
+    end
+
+    return sort_a < sort_b
+  end
 
   if SECTION_STATUS[key] then
-    for k, v in configuration_miniwindow_pairsByKeys(group) do
+    for k, v in consts.pairsByKeys(group, sortFunc) do
       if v == nil then
         -- do nothin
       elseif v.type == nil then
-        y = configuration_miniwindow_drawSection(indents + 1, y, key .. "^" .. k, v)
+        y = drawSection(indents + 1, y, key .. "^" .. k, v)
       else
-        y = configuration_miniwindow_drawOption(indents, y, key, k, v)
+        y = drawOption(indents, y, key, k, v)
       end
     end
   end
@@ -120,7 +135,7 @@ function configuration_miniwindow_drawSection(indents, y, key, group)
   return y
 end
 
-function configuration_miniwindow_drawOption(indents, y, parent_key, key, option)
+drawOption = function(indents, y, parent_key, key, option)
   if option == nil then
     return y
   end
@@ -130,47 +145,46 @@ function configuration_miniwindow_drawOption(indents, y, parent_key, key, option
   local marker = "  * "
   for i = 1, indents do marker = " " .. marker end
 
-  WindowText(WIN, FONT, marker .. option.label, 2 + BORDER_WIDTH, y, 0, 0, ColourNameToRGB("white"), true)
+  WindowText(WIN, FONT, marker .. option.label, 2 + consts.border_width, y, 0, 0, consts.white, true)
   if option.type == "color" then
-    WindowRectOp(WIN, miniwin.rect_fill, LABEL_WIDTH + 20 + BORDER_WIDTH, y + 1, WINDOW_WIDTH - 5 - BORDER_WIDTH, y + LINE_HEIGHT - 1, option.raw_value)
-    WindowRectOp(WIN, miniwin.rect_frame, LABEL_WIDTH + 20 + BORDER_WIDTH, y + 1, WINDOW_WIDTH - 5 - BORDER_WIDTH, y + LINE_HEIGHT - 1, ColourNameToRGB("white"))
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, LABEL_WIDTH + 20 + BORDER_WIDTH, y + 1, WINDOW_WIDTH - 5 - BORDER_WIDTH, y + LINE_HEIGHT - 1, "", "", "", "", "configuration_miniwindow_onConfigureChangeClick", "click to change", miniwin.cursor_hand, 0)
+    WindowRectOp(WIN, miniwin.rect_fill, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, option.raw_value)
+    WindowRectOp(WIN, miniwin.rect_frame, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, consts.white)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
   elseif option.type == "number" then
     if option.value == nil then option.value = tostring(option.raw_value) end
     local b_width = WindowTextWidth(WIN, FONT, "-")
     local v_width = WindowTextWidth(WIN, FONT, option.value)
-    local minus_color = ColourNameToRGB("white")
-    local add_color = ColourNameToRGB("white")
-    if option.raw_value == nil then tonumber(option.value or 0) end
-    if option.min ~= nil and option.raw_value <= option.min then minus_color = ColourNameToRGB("dimgray") end
-    if option.max ~= nil and option.raw_value >= option.max then add_color = ColourNameToRGB("dimgray") end
-    WindowText(WIN, FONT, "-", LABEL_WIDTH + 20 + BORDER_WIDTH, y, 0, 0, minus_color, true)
-    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), LABEL_WIDTH + 20 + BORDER_WIDTH + b_width * 2, y, 0, 0, ColourNameToRGB("white"), true)
-    WindowText(WIN, FONT, "+", LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 3, y, 0, 0, ColourNameToRGB("white"), true)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", LABEL_WIDTH + 20 + BORDER_WIDTH, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + b_width, y + LINE_HEIGHT - 1, "", "", "", "", "configuration_miniwindow_onConfigureChangeClick", "click to decrease (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, LABEL_WIDTH + 20 + BORDER_WIDTH + b_width * 2, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 2, y + LINE_HEIGHT - 1, "", "", "", "", "configuration_miniwindow_onConfigureChangeClick", "click to change", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 3, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width + b_width * 4, y + LINE_HEIGHT - 1, "", "", "", "", "configuration_miniwindow_onConfigureChangeClick", "click to increase (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
+    local minus_color = consts.white
+    local add_color = consts.white
+    if option.raw_value == nil then option.raw_value = tonumber(option.value or 0) end
+    if option.min ~= nil and option.raw_value <= option.min then minus_color = consts.dimgray end
+    if option.max ~= nil and option.raw_value >= option.max then add_color = consts.dimgray end
+    WindowText(WIN, FONT, "-", SIZES.LABEL_WIDTH + 20 + consts.border_width, y, 0, 0, minus_color, true)
+    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width * 2, y, 0, 0, consts.white, true)
+    WindowText(WIN, FONT, "+", SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 3, y, 0, 0, consts.white, true)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", SIZES.LABEL_WIDTH + 20 + consts.border_width, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to decrease (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width * 2, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 2, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 3, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 4, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to increase (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
   else
     if option.value == nil then option.value = tostring(option.raw_value) end
     local v_width = WindowTextWidth(WIN, FONT, option.value)
-    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), LABEL_WIDTH + 20 + BORDER_WIDTH, y, 0, 0, ColourNameToRGB("white"), true)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, LABEL_WIDTH + 20 + BORDER_WIDTH, y+1, LABEL_WIDTH + 20 + BORDER_WIDTH + v_width, y + LINE_HEIGHT - 1, "", "", "", "", "configuration_miniwindow_onConfigureChangeClick", "click to change", miniwin.cursor_hand, 0)
+    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.border_width, y, 0, 0, consts.white, true)
+    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
   end
 
-  return y + LINE_HEIGHT
+  return y + SIZES.LINE_HEIGHT
 end
 
-function M_configuration_miniwindow.Hide()
-  INIT = false
+hide = function()
+  CONFIG = nil
   WindowShow(WIN, false)
 end
 
-function configuration_miniwindow_onConfigureCloseClick(flags, hotspot_id)
-  INIT = false
-  WindowShow(WIN, false)
+function configuration_onClose(flags, hotspot_id)
+  hide()
 end
 
-function configuration_miniwindow_onConfigureChangeClick(flags, hotspot_id)
+function configuration_onChangeOption(flags, hotspot_id)
   local ids = utils.split(hotspot_id, "|")
   local group_id, option_id = ids[1], ids[2]
   local opt_mode = ids[3]
@@ -193,18 +207,18 @@ function configuration_miniwindow_onConfigureChangeClick(flags, hotspot_id)
   end
 
   local option = group[option_id]
-  if option.type == "number" then configuration_miniwindow_changeNumber(option, opt_mode, num)
-  elseif option.type == "text" then configuration_miniwindow_changeText(option)
-  elseif option.type == "color" then configuration_miniwindow_changeColor(option)
-  elseif option.type == "font" then configuration_miniwindow_changeFont(option)
-  elseif option.type == "bool" then configuration_miniwindow_changeBool(option)
-  elseif option.type == "list" then configuration_miniwindow_changeList(option)
+  if option.type == "number" then changeNumber(option, opt_mode, num)
+  elseif option.type == "text" then changeText(option)
+  elseif option.type == "color" then changeColor(option)
+  elseif option.type == "font" then changeFont(option)
+  elseif option.type == "bool" then changeBool(option)
+  elseif option.type == "list" then changeList(option)
   end
 
   SAVE_CALLBACK(group_id, option_id, option)
 end
 
-function configuration_miniwindow_onConfigureExpandCollapseClick(flags, hotspot_id)
+function configuration_onExpandCollapse(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
     if hotspot_id == "expand_all" then
       for sec, _ in pairs(SECTION_STATUS) do
@@ -217,11 +231,11 @@ function configuration_miniwindow_onConfigureExpandCollapseClick(flags, hotspot_
     else
       SECTION_STATUS[hotspot_id] = not SECTION_STATUS[hotspot_id]
     end
-    configuration_miniwindow_show()
+    show()
   end
 end
 
-function configuration_miniwindow_changeNumber(option, opt_mode, num)
+changeNumber = function(option, opt_mode, num)
   if opt_mode ~= nil then
     local current = option.raw_value
     if opt_mode == "minus" then    
@@ -230,7 +244,7 @@ function configuration_miniwindow_changeNumber(option, opt_mode, num)
       option.raw_value = current + 1
     end
     if option.min ~= nil and option.max ~= nil then
-      option.raw_value = math.max(option.min, math.min(option.raw_value, max))
+      option.raw_value = math.max(option.min, math.min(option.raw_value, option.max))
     end
     option.value = tostring(option.raw_value)
   else
@@ -244,7 +258,7 @@ function configuration_miniwindow_changeNumber(option, opt_mode, num)
       option.label, 
       option.raw_value, nil, nil,
       { 
-        validate = configuration_miniwindow_validateNumber(min, max),
+        validate = validateNumber(min, max),
         prompt_height = 14,
         box_height = 130,
         box_width = 300,
@@ -257,10 +271,10 @@ function configuration_miniwindow_changeNumber(option, opt_mode, num)
       option.raw_value = user_input
     end
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_changeText(option)
+changeText = function(option)
   local message = "Choose a new value"
   local user_input = utils.inputbox(
     message, 
@@ -277,39 +291,39 @@ function configuration_miniwindow_changeText(option)
     option.value = user_input
     option.raw_value = user_input
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_changeColor(option)
+changeColor = function(option)
   local new_color = PickColour(option.raw_value)
   if new_color >= 0 then
     option.value = new_color
     option.raw_value = new_color
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_changeFont(option)
+changeFont = function(option)
   local new_font = utils.fontpicker(option.raw_value.name, option.raw_value.size, option.raw_value.colour)
 
   if new_font ~= nil then
     option.value = new_font.name
     option.raw_value = new_font
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_changeBool(option)
+changeBool = function(option)
   option.raw_value = not option.raw_value
   if option.raw_value then
     option.value = "true"
   else
     option.value = "false"
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_changeList(option)
+changeList = function(option)
   local message = "Choose a new value"
   local user_input = utils.choose(
     message, 
@@ -320,10 +334,10 @@ function configuration_miniwindow_changeList(option)
     option.value = tostring(user_input)
     option.raw_value = user_input
   end
-  configuration_miniwindow_show()
+  show()
 end
 
-function configuration_miniwindow_validateNumber(min, max)
+validateNumber = function(min, max)
   return function(s)
     if min == nil or max == nil then return true end
     local n = tonumber(s)
@@ -339,57 +353,25 @@ function configuration_miniwindow_validateNumber(min, max)
   end
 end
 
-function configuration_miniwindow_pairsByKeys(t)
-  local a = {}
-  for key, value in pairs(t) do
-    table.insert(a, {key = key, value = value})
-  end  
-
-  table.sort(a, function(a, b)
-    local sort_a = a.value.sort 
-    local sort_b = b.value.sort
-
-    if sort_a == nil or sort_b == nil then
-      sort_a = a.value.label or a.key or ""
-      sort_b = b.value.label or b.key or ""
-    end
-
-    return sort_a < sort_b
-  end)
-
-  local i = 0
-  local iter = function()
-    i = i + 1
-    if a[i] == nil then return nil
-    else return a[i].key, a[i].value
-    end
-  end
-
-  return iter
-end
-
-function configuration_miniwindow_calculateSizeAndPosition()
-  local height = 4 + BORDER_WIDTH + LINE_HEIGHT
+calculate = function()
+  local height = 4 + consts.border_width + SIZES.LINE_HEIGHT
   local l_width, v_width = 0, 0
-  for key, group in configuration_miniwindow_pairsByKeys(CONFIG) do
-    height, l_width, v_width = configuration_miniwindow_measureSection(0, height, key, group, l_width, v_width)
+  for key, group in consts.pairsByKeys(CONFIG) do
+    height, l_width, v_width = measureSection(0, height, key, group, l_width, v_width)
   end
-
-  local output_width = GetInfo(292) - GetInfo(290)
-  local output_height = GetInfo(293) - GetInfo(291)
     
-  LABEL_WIDTH = math.max(LABEL_WIDTH, l_width)
-  VALUE_WIDTH = math.max(VALUE_WIDTH, v_width + WindowTextWidth(WIN, FONT, "- + "))
-  WINDOW_HEIGHT = math.min(height + BORDER_WIDTH, output_height - 50)
-  WINDOW_WIDTH = math.min(LABEL_WIDTH + 25 + VALUE_WIDTH + (BORDER_WIDTH * 2), output_width - 50)
-  WINDOW_X = ((output_width) / 2 + GetInfo(290)) - WINDOW_WIDTH / 2
-  WINDOW_Y = ((output_height) / 2 + GetInfo(291)) - WINDOW_HEIGHT / 2
+  SIZES.LABEL_WIDTH = math.max(SIZES.LABEL_WIDTH, l_width)
+  SIZES.VALUE_WIDTH = math.max(SIZES.VALUE_WIDTH, v_width + WindowTextWidth(WIN, FONT, "- + "))
+  POSITION.WINDOW_HEIGHT = math.min(height + consts.border_width, consts.output_height - 50)
+  POSITION.WINDOW_WIDTH = math.min(SIZES.LABEL_WIDTH + 25 + SIZES.VALUE_WIDTH + (consts.border_width * 2), consts.output_width - 50)
+  POSITION.WINDOW_LEFT = ((consts.output_width) / 2 + consts.output_left_inside) - POSITION.WINDOW_WIDTH / 2
+  POSITION.WINDOW_TOP = ((consts.output_height) / 2 + consts.output_top_inside) - POSITION.WINDOW_HEIGHT / 2
 end
 
-function configuration_miniwindow_measureSection(indents, height, key, group, l_width, v_width)
-  height = height + LINE_HEIGHT
-  if height > GetInfo(293) - GetInfo(291) then
-    Note("TOO M_configuration_miniwindowANY!")
+measureSection = function(indents, height, key, group, l_width, v_width)
+  height = height + SIZES.LINE_HEIGHT
+  if height > consts.output_height then
+    Note("Config screen is too big, collapse some sections.")
     return height, l_width, v_width
   end
   if SECTION_STATUS[key] == nil then
@@ -400,20 +382,20 @@ function configuration_miniwindow_measureSection(indents, height, key, group, l_
     end
   end
   if SECTION_STATUS[key] then
-    for k, v in configuration_miniwindow_pairsByKeys(group) do
+    for k, v in consts.pairsByKeys(group) do
       if v == nil then
         -- do nothin
       elseif v.type == nil then
-        height, l_width, v_width = configuration_miniwindow_measureSection(indents + 1, height, key .. "^" .. k, v, l_width, v_width)
+        height, l_width, v_width = measureSection(indents + 1, height, key .. "^" .. k, v, l_width, v_width)
       else
-        height, l_width, v_width = configuration_miniwindow_measureOption(indents, height, key, k, v, l_width, v_width)
+        height, l_width, v_width = measureOption(indents, height, key, k, v, l_width, v_width)
       end
     end
   end
   return height, l_width, v_width
 end
 
-function configuration_miniwindow_measureOption(indents, height, parent_key, key, option, l_width, v_width)
+measureOption = function(indents, height, parent_key, key, option, l_width, v_width)
   if option == nil then return height, l_width, v_width end
   if option.label == nil then option.label = key:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end) end
   if option.value == nil then option.value = tostring(option.raw_value) end
@@ -423,7 +405,98 @@ function configuration_miniwindow_measureOption(indents, height, parent_key, key
   local value_width = WindowTextWidth(WIN, FONT, option.value)
   if label_width > l_width then l_width = label_width end
   if option.type ~= "color" and value_width > v_width then v_width = value_width end
-  return height + LINE_HEIGHT, l_width, v_width
+  return height + SIZES.LINE_HEIGHT, l_width, v_width
 end
 
-return M_configuration_miniwindow
+createFontOption = function(sort, label, font, hint, enabled)
+  return {
+    sort = sort,
+    label = label,
+    type = "font",
+    value = font.name .. " (" .. font.size .. ")",
+    raw_value = font,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+createNumberOption = function(sort, label, number, min, max, hint, enabled)
+  return {
+    sort = sort,
+    label = label,
+    type = "number",
+    value = tostring(number),
+    raw_value = number or 0,
+    min = min,
+    max = max,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+createTextOption = function(sort, label, text, hint, enabled)
+  return {
+    sort = sort,
+    label = label,
+    type = "text",
+    value = text,
+    raw_value = text,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+createBoolOption = function(sort, label, bool, hint, enabled)
+  return {
+    sort = sort,
+    label = label,
+    type = "bool",
+    value = tostring(bool),
+    raw_value = bool,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+createColorOption = function(sort, label, color, hint, enabled)
+  return {
+    sort = sort,
+    label = label,
+    type = "color",
+    value = color or consts.black,
+    raw_value = color,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+createListOption = function(sort, label, selection, list, hint, enabled)
+  local raw = 0
+  for i, opt in ipairs(list) do
+    if Trim(opt:lower()) == Trim(selection:lower()) then
+      raw = i
+      break
+    end
+  end
+  return {
+    sort = sort,
+    label = label,
+    type = "list",
+    value = selection,
+    raw_value = idx,
+    list = list,
+    hint = hint or "",
+    enabled = enabled or true
+  }
+end
+
+return {
+  Show = show, 
+  Hide = hide, 
+  CreateFontOption = createFontOption, 
+  CreateNumberOption = createNumberOption, 
+  CreateTextOption = createTextOption,
+  CreateBoolOption = createBoolOption, 
+  CreateColorOption = createColorOption, 
+  CreateListOption = createListOption
+}

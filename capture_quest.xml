@@ -19,6 +19,18 @@
 
 <![CDATA[
 
+  Track and complete quests, orc pursuer, and crystal targets easily.
+
+  Commands:
+
+   * quest hint <phase> - check for hints from annwn.info that were submitted by players
+   * quest time - see how long until you can do another quest, pursuer, or crystal map
+   * quest clear <quest, pursuer, crystal> - clears the quest window of what you specify
+   * quest remove <quest number> - removes the quest from the database
+   * quest config - open the configuration window
+
+   Note: q can be used instead of quest.
+
 ]]>
 
 </description>
@@ -27,95 +39,78 @@
 
 <aliases>
 
-  <alias enabled="y" match="^capture quest remove (.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>removeQuest("%1")</send>
+  <alias enabled="y" match="^q(?:|uest) hint (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>ShowHint("%1")</send>
   </alias>
 
-  <alias enabled="y" match="^q(|uest) hint (.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>showHint("%2")</send>
-  </alias>
-
-  <alias enabled="y" match="^quest aban(|don) (.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>
-      Send("quest abandon %2")
-      clearWindow()
-    </send>
-  </alias>
-
-  <alias enabled="y" match="^q(|uest) time((r)?s)?$" regexp="y" send_to="12" sequence="100">
+  <alias enabled="y" match="^q(?:|uest) time((r)?s)?$" regexp="y" send_to="12" sequence="100">
     <send>ShowTimes()</send>
   </alias>
 
-  <alias enabled="y" match="^capture quest clear$" regexp="y" send_to="12" sequence="100">
-    <send>clearWindow()</send>
+  <alias enabled="y" match="^q(?:|uest) clear(.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>Clear("%1")</send>
   </alias>
 
-  <alias enabled="y" match="^capture pursuer clear$" regexp="y" send_to="12" sequence="100">
-    <send>SetPursuerTarget()</send>
+  <alias enabled="y" match="^q(?:|uest) remove (.*?)$" regexp="y" send_to="12" sequence="100">
+    <send>RemoveQuest("%1")</send>
   </alias>
 
-  <alias enabled="y" match="^capture crystal clear$" regexp="y" send_to="12" sequence="100">
-    <send>SetCrystalTarget()</send>
-  </alias>
-
-  <alias enabled="y" match="^capture quest debug$" regexp="y" send_to="12" sequence="100">
-    <send>debug()</send>
+  <alias match="^q(?:|uest)[ ]+(?:config|configure)\b(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure("%1")</send>
   </alias>
 
 </aliases>
 
 <triggers>
 
+  <trigger match="^(|[^ ]+(.*?))(\<(.+)hp (.+)sp (.+)st\>|\(.+\)) $" enabled="y" name="first_prompt" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>OnFirstPrompt()</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" name="capture_name" match="^This quest \[(.*?)\] is called \'(.*?)\'\,$" regexp="y" send_to="14" sequence="100">
-    <send>captureStart("%1", "%2")</send>
+    <send>StartCapturingQuest("%1", "%2")</send>
   </trigger>
 
   <trigger enabled="n" keep_evaluating="y" name="capture_name_refresh" match="^This quest \[(.*?)\] is called \'(.*?)\'\,$" regexp="y" omit_from_output="y" sequence="100">
   </trigger>
 
   <trigger match="*" keep_evaluating="y" name="capture_line" send_to="14" sequence="100">
-    <send>captureLine("%0")</send>
+    <send>CaptureLine("%0")</send>
   </trigger>
 
   <trigger enabled="n" keep_evaluating="y" name="capture_line_refresh" match="*" omit_from_output="y" sequence="100">
   </trigger>
 
   <trigger match="^$" keep_evaluating="y" name="capture_end" regexp="y" send_to="14" sequence="100">
-    <send>captureEnd()</send>
+    <send>StopCapturingQuest()</send>
   </trigger>  
 
   <trigger enabled="y" keep_evaluating="y" expand_variables="y" match="^(.*?) tells you\, \'Congratulations on the completion of thy quest\, (.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>
-      clearWindow()
-      SetQuestTime()
-    </send>
+    <send>FinishQuest()</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You have run out of time for your quest\, (.*?)\.$" regexp="y" send_to="12" sequence="100">
-    <send>clearWindow() </send>
+    <send>FinishQuest() </send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You have abandoned quest (.*?)\.$" regexp="y" send_to="12" sequence="100">
-    <send>clearWindow() </send>
+    <send>FinishQuest() </send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You have completed a part of quest \#(.*?)\, \'(.*?)\'\!$" regexp="y" send_to="12" sequence="100">
-    <send>refreshQuest("%1") </send>
+    <send>RefreshQuest("%1") </send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^All parts of your quest (.*?) are complete\." regexp="y" send_to="12" sequence="100">
-    <send>refreshQuest("%1") </send>
+  <trigger enabled="y" keep_evaluating="y" match="^All parts of your quest \'(.*?)\' are complete\." regexp="y" send_to="12" sequence="100">
+    <send>RefreshQuest("%1") </send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" omit_from_output="y" match="^  Spell Points\:(.*?)Quest Points\:(.*?)$" regexp="y" send_to="14" sequence="100">
-    <send>replaceQuestTime(TriggerStyleRuns, "%0")</send>
+    <send>ReplaceQuestTime(TriggerStyleRuns, "%0")</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^\'Thank you\, (.+)\!\' Tadamir the guildsman exclaims to you\. \'Here is your reward\, as promised\.\'$" regexp="y" send_to="12" sequence="100">
-    <send>
-      SetCrystalTarget()
-      SetCrystalTime()
-    </send>
+    <send>FinishCrystal()</send>
   </trigger>
 
   <trigger enabled="y" match="^\'Ekai Nosrat Sulla Garha \&quot;(.+?)\&quot;\, Setama Sulla \&quot;(.+?)\&quot;\, Ekass Armas Thran Bel Dinas\.\' the orc pursuer says(| to you)\. \'Nohsa Sulla Amata\.\'$" regexp="y" send_to="12" sequence="100">
@@ -123,17 +118,11 @@
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^The orc pursuer gives you (.+)\.$" regexp="y" send_to="12" sequence="100">
-    <send>
-      SetPursuerTarget()
-      SetPursuerTime()
-    </send>
+    <send>FinishPursuer()</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You give the carcass of a captive dodo to an orc woman\.$" regexp="y" send_to="12" sequence="100">
-    <send>
-      SetPursuerTarget()
-      SetPursuerTime()
-    </send>
+    <send>FinishPursuer()</send>
   </trigger>
 
   <trigger match="^The severed (.*?) of (.*?) falls to the ground\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
@@ -141,12 +130,12 @@
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) savage\-looking orc stands here\, his every limb chained to the wall\.$">
-    <send>ShowOrcPursuerOptions()</send>
+    <send>ShowPursuerOptions()</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" multi_line="y" lines_to_match="23" regexp="y" send_to="12" sequence="100"
     match="It looks like this map depicts(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n">
-    <send>locateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
+    <send>LocateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You take a (blood|small) crystal\.$" sequence="100" send_to="10">
@@ -154,15 +143,11 @@
   </trigger>
 
   <trigger enabled="y" match="^\* You may ask Tadamir for another map at\: (.*?)$" omit_from_output="y" regexp="y" send_to="14" sequence="100">
-    <send>replaceCrystalTime(TriggerStyleRuns, "%0", "%1")</send>
+    <send>ReplaceCrystalTime(TriggerStyleRuns, "%0", "%1")</send>
   </trigger>
 
   <trigger enabled="y" name="capture_time_offset" match="^The current system time is\: (.*?)\.$" regexp="y" send_to="12" sequence="100">
-    <send>setOffset("%1")</send>
-  </trigger>
-
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
-    <send>onFirstPrompt()</send>
+    <send>SetOffset("%1")</send>
   </trigger>
 
 </triggers>
@@ -171,99 +156,83 @@
 
 <![CDATA[
 
-function ensureRequired(required_name, required_remote_url, should_return)
-  local existing_file = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "r")
-  if not existing_file then
-    local https = require("ssl.https")
-    local ltn12 = require("ltn12")
-    local response = {}
-    local _, dl_res = https.request {
-        url = required_remote_url,
-        sink = ltn12.sink.table(response)
-    }
-    if (dl_res == 200) then
-      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
-      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
-      new_file:write(required_ref_file)
-      new_file:flush()
-      new_file:close()
-    end
-  end
+local can_update, update_helper = pcall(require, "updatehelper")
+local const_installed, consts = pcall(require, "consthelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local quest_installed, quest_window = pcall(require, "quest_miniwindow")
+local searcher_installed, searcher = pcall(require, "questsearcher")
 
-  if should_return then 
-    return pcall(require, required_name)
-  end
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
 end
 
-ensureRequired("quest_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/quest_miniwindow.lua", false)
-ensureRequired("questsearcher", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/questsearcher.lua", false)
+if can_update then
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  if not quest_installed then quest_installed, quest_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/quest_miniwindow.lua") end
+  if not quest_installed then searcher_installed, searcher = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/questsearcher.lua") end
+end
 
-require "quest_miniwindow"
-require "questsearcher"
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
 
-local quest_num
-local quest_name
-local quest_phases
-local quest_annwn_id
+local quest = {}
 local captured_lines = {}
 local refreshing = false
-local hour_offset = 1
 
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  InitializeMiniWindow()
+function pluginStart()
+  if not const_installed or not serializer_installed or not config_installed or not quest_installed or not searcher_installed then 
+    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  end
+  
+  quest_window.Initialize()
 end
 
-function OnPluginEnable()
-  clearMiniWindow()
+function pluginStop()
+  if can_update and quest_window.IsAutoUpdateEnabled() then
+    CheckForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end  
+
+  quest_window.Close()
+  config_window.Hide()
 end
 
-function onFirstPrompt()
+function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
+
   DoAfterSpecial(1, "tryGetOffset()", sendto.script)
 end
 
 function tryGetOffset()
-  hour_offset = GetVariable("hour_offset")
-  if hour_offset == nil then
+  if consts.getHourOffset() == nil then
     EnableTrigger("capture_time_offset", true)
     Note("Sending time to get hour offset from server...")
     Send("time")
   else
     EnableTrigger("capture_time_offset", false)
-  end
-  
+  end    
 end
 
-function OnPluginClose()
-  SaveState()
-  hideWindow()
-end
+function StartCapturingQuest(num, name)
+  quest_window.Clear("quest")
+  captured_lines = {}
+  quest = {}
 
-function OnPluginDisable()
-  SaveState()
-  hideWindow()
-end
-
-function OnPluginDisconnect()
-  checkForUpdates()
-end
-
-function OnPluginSaveState()
-  if INIT then
-    movewindow.save_state(GetPluginID())
-  end
-end
-
-function captureStart(num, name)
   if string.find(string.lower(name), "daily quest", 1, true) ~= nil or
      string.find(string.lower(name), "weekly quest", 1, true) ~= nil or
      string.find(string.lower(name), "archon meta", 1, true) ~= nil then
-    clearMiniWindow()
     return
-  end
-
-  captured_lines = {}
+  end  
 
   EnableTrigger("capture_line", true)
   EnableTrigger("capture_end", true)
@@ -271,8 +240,6 @@ function captureStart(num, name)
   if refreshing then
     EnableTrigger("capture_line_refresh", true)
   end
-
-  clearMiniWindow()
   
   addToLine("Quest ", "springgreen", "black", "quest" .. num, true)
   addToLine("[", "blue", "black", "quest" .. num, true)
@@ -281,14 +248,14 @@ function captureStart(num, name)
   addToLine(name, "springgreen", "black", "quest" .. num, true)
   addNewLine("quest" .. num, true)
 
-  if quest_num ~= num then
-    quest_num = num
-    quest_name = name
-    quest_phases, quest_annwn_id = getQuestInfo(num, name)
+  if quest.num ~= num then
+    quest.num = num
+    quest.name = name
+    quest.phases, quest.annwn_id = searcher.GetQuestInfo(num, name)
   end
 end
 
-function captureLine(line)
+function CaptureLine(line)
   if (string.find(string.lower(line), string.lower("phase"), 1, true) ~= nil and string.find(string.lower(line), string.lower("metaquest"), 1, true) == nil) then
     local split = utils.split(line, ":")
     local section = split[1]
@@ -313,8 +280,8 @@ function captureLine(line)
 
     addToLine(phase_text, color, "black", section, true)
     addNewLine(section, true)
-    if color ~= "dimgray" and quest_phases ~= nil then
-      for i, phase in ipairs(quest_phases) do
+    if color ~= "dimgray" and quest.phases ~= nil then
+      for i, phase in ipairs(quest.phases) do
         local check = Trim(phase.text:lower():gsub(" and keep", ""))
         local one = Trim(phase_text:lower():gsub(" and keep", ""))
         local two = Trim(string.sub(check, 1, #check - 1))
@@ -346,7 +313,7 @@ function displayMultiParts(line, section)
   end
 end
 
-function captureEnd()
+function StopCapturingQuest()
   refreshing = false
 
   EnableTrigger("capture_line", false)
@@ -358,42 +325,66 @@ function captureEnd()
   doFinalDisplay()
 end
 
-function clearWindow()
-  clearMiniWindow()
+function Clear(arg)
+  quest_window.Clear(Trim(arg:lower()))
 end
 
-function removeQuest(quest_id)
-  local removed = removeQuestFromDb(tonumber(quest_id))
+function SetPursuerTarget(target)
+  quest_window.SetPursuerTarget(target)
+end
+
+function FinishQuest()
+  quest_window.Clear("quest")
+  quest_window.SetQuestTime()
+end
+
+function FinishCrystal()
+  quest_window.Clear("crystal")
+  quest_window.SetCrystalTime()
+end
+
+function FinishPursuer()
+  quest_window.Clear("pursuer")
+  quest_window.SetPursuerTime()
+end
+
+function CheckBodyPartDrop(part, victim)
+  quest_window.CheckBodyPartDrop(part, victim)
+end
+
+function RemoveQuest(quest_id)
+  local removed = searcher.RemoveQuestFromDb(tonumber(quest_id))
   if removed then
-    clearWindow()
+    quest_window.Clear("quest")
     Note("Quest has been removed from the database, check quest status to retrieve it again.")
   else
     Note("Unable to remove from db.")
   end
 end
 
-function refreshQuest(quest_id)
-  if quest_id == quest_name then
-    quest_id = quest_num
-  elseif quest_id ~= quest_num then
+function RefreshQuest(quest_id)
+  if quest_id == quest.name then
+    quest_id = quest.num
+  elseif quest_id ~= quest.num then
     return
   end
 
-  if string.find(quest_name, "Daily Quest") ~= nil then return end
-  if string.find(quest_name, "Weekly Quest") ~= nil then return end
-  if string.find(quest_name, "Archon Meta") ~= nil then return end
+  if string.find(quest.name, "Daily Quest") ~= nil then return end
+  if string.find(quest.name, "Weekly Quest") ~= nil then return end
+  if string.find(quest.name, "Archon Meta") ~= nil then return end
   
-  if isSilentRefreshEnabled() then
+  if quest_window.IsSilentRefreshEnabled() then
     refreshing = true
     EnableTrigger("capture_name_refresh", true)
-    if quest_id == nil then quest_id = quest_num end
+    if quest_id == nil then quest_id = quest.num end
     SendNoEcho("quest status " .. quest_id)
   end
 end
 
-function showHint(phase_num)
+function ShowHint(phase_num)
+  if quest == nil or quest.phases == nil then return end
   local shown = false
-  local phase = quest_phases[tonumber(phase_num)]
+  local phase = quest.phases[tonumber(phase_num)]
   if phase ~= nil and phase.hints ~= nil then
     for _, hint in ipairs(phase.hints) do
       if hint ~= nil and hint ~= "" then
@@ -406,6 +397,10 @@ function showHint(phase_num)
   if not shown then
     Note("No hints available for this phase.")
   end
+end
+
+function ShowTimes()
+  quest_window.ShowTimes()
 end
 
 function addToLine(txt, text_color, back_color, section, is_header)
@@ -431,55 +426,41 @@ function addNewLine(section, is_header)
 end
 
 function doFinalDisplay()
-  SetQuestInfo(quest_num, quest_name, quest_annwn_id)
+  quest_window.SetQuestInfo(quest.num, quest.name, quest.annwn_id)
   for idx, line in ipairs(captured_lines) do
-    AddLine(line.styles, line.section, line.is_header)
+    quest_window.AddLine(line.styles, line.section, line.is_header)
   end
 end
 
-function locateCrystal(location)
-  doCrystalLoop(location)
+function Configure(args)
+  local option, value = args:match("%s-(%a-)%s-(%a-)")
+  if config_installed then   
+    config_window.Show(quest_window.GetConfiguration(), quest_window.OnConfigureDone)
+  else
+    
+  end  
+end
+
+function ShowPursuerOptions()
+  quest_window.ShowPursuerOptions()
+end
+
+function LocateCrystal(location)
+  local crystal = searcher.LocateCrystal(location)
+  if crystal == nil then
+    Note("The crystal could not be found!")
+  else
+    Note("The crystal is located at ".. crystal)
+    quest_window.SetCrystalTarget(crystal) 
+    BroadcastPlugin(1, crystal)
+  end
   EnableTrigger("findcrystal", false)
 end
 
-function doCrystalLoop(location)
-  if location == nil or #location == 0 then
-    return
-  end
-
-  local http = require "socket.http"
-
-  page, retcode, header = http.request("http://mmatlas.dune.net/find-crystal-guild-vi.pl","map=".. location)
-  
-  if (retcode == 200) then
-    coords_start = string.find(page, "(", 0, true)
-
-    if (coords_start ~= nil) then
-      coords_end = string.find(page, ")", 0, true)
-      crystal = string.sub(page, coords_start + 1, coords_end - 1)
-
-      Note("The crystal is located at ".. crystal)
-      SetCrystalTarget(crystal)
-      BroadcastPlugin(1, crystal)
-    else
-      local map_tab = split(location)
-      if #map_tab < 2 then
-        Note("Ran out attempts: " .. page)
-      else
-        local map_next = table.concat(map_tab, "\r\n", 2, #map_tab - 1)
-        doCrystalLoop(map_next)
-      end
-    end
-
-  else
-    Note("error accessing MagicMap - code: " .. retcode)
-  end
-end
-
-function replaceCrystalTime(trigger_style_runs, line, time_str)
-  local converted_time, year, month, day, hour, minute, second = convertToTime(time_str)
-  local details = getTimeDiff(converted_time)
-  local formatted_date = getFormattedDateTime(year, month, day, hour, minute, second)
+function ReplaceCrystalTime(trigger_style_runs, line, time_str)
+  local converted_time, year, month, day, hour, minute, second = consts.convertToTime(time_str)
+  local details = consts.getTimeDiffInMinutes(converted_time)
+  local formatted_date = consts.getFormattedDateTime(year, month, day, hour, minute, second)
   local fgcol = RGBColourToName(trigger_style_runs[1].textcolour)
   local bgcol = RGBColourToName(trigger_style_runs[1].backcolour)
   ColourTell(fgcol, bgcol, "* ")
@@ -493,10 +474,10 @@ function replaceCrystalTime(trigger_style_runs, line, time_str)
   ColourNote(fgcol, bgcol, ")")  
 end
 
-function replaceQuestTime(trigger_style_runs, line)
+function ReplaceQuestTime(trigger_style_runs, line)
   local details = "NOW!"
   if TIMES ~= nil and TIMES.QUEST_TIME ~= nil then
-    details = getTimeDiff(TIMES.QUEST_TIME)
+    details = consts.getTimeDiffInMinutes(TIMES.QUEST_TIME)
   end
   local fgcol = "lightgray"
   local bgcol = "black"
@@ -510,65 +491,10 @@ function replaceQuestTime(trigger_style_runs, line)
   ColourNote(fgcol, bgcol, "]")
 end
 
-function getTimeDiff(input_time)
-  local details = "NOW!"
-  local differenceInSeconds = input_time - os.time()
-  if differenceInSeconds > 0 then
-      local diff_minutes = math.floor(differenceInSeconds / 60)
-      details = "in " .. diff_minutes .. " minutes"
-  end
-
-  return details
-end
-
-function getFormattedDateTime(year, month, day, hour, minute, second)  
-  local ampm = "am"
-  if (hour == 24) then hour = 0 end
-  if (hour > 11) then ampm = "pm" end
-  if (hour == 0) then hour = 12 end 
-  if (hour > 12) then hour = hour - 12 end
-
-  local formatMinute = ""
-  if (minute < 10) then
-    formatMinute = "0"
-  end
-
-  return month .. "/" .. day .. "/" .. year .. " " .. hour .. ":" .. formatMinute .. minute .. " " .. ampm
-end
-
-function convertToTime(time_str)
-  local month_map = {
-      Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
-      Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12
-  }
-
-  local day = tonumber(time_str:sub(9, 10))
-  local hour = tonumber(time_str:sub(12, 13))
-  local minute = tonumber(time_str:sub(15, 16))
-  local second = tonumber(time_str:sub(18, 19))
-  local year = tonumber(time_str:sub(22, 25))
-
-  local month_str = time_str:sub(5, 7)
-  local month = month_map[month_str]
-
-  hour = hour + hour_offset;
-
-  local provided_time = os.time {
-      year = year + 2000,
-      month = month,
-      day = day,
-      hour = hour,
-      min = minute,
-      sec = second,
-  }
-
-  return provided_time, year, month, day, hour, minute, second
-end
-
-function setOffset(time_str)
+function SetOffset(time_str)
   EnableTrigger("capture_time_offset", false)
 
-  local input_time, year, month, day, hour, minute, second = convertToTime(time_str)
+  local input_time, year, month, day, hour, minute, second = consts.convertToTime(time_str)
   local offset_seconds = os.difftime(input_time, os.time())
   local offset_hours = math.floor(offset_seconds / 3600 + 0.5)
   hour_offset = tonumber(offset_hours)
@@ -576,25 +502,14 @@ function setOffset(time_str)
   SaveState()
 end
 
-function split(str)
-  local result = {}
-  for line in string.gmatch(str, "[^\r\n]+") do
-    table.insert(result, line)
-  end
-  return result
-end
-
-function checkForUpdates()
-  local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
-
-  if not updater_installed then
-    ColourNote("red" , "black", "Could not download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+function CheckForUpdates()
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "capture_quest.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/quest_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/questsearcher.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
   else
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/capture_quest.xml" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/quest_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/quest_miniwindow.lua" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/questsearcher.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/questsearcher.lua" }
-    })
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
 end
 

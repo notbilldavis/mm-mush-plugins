@@ -55,7 +55,7 @@ The location links will "run" or "mapper goto" where appropriate.
   </alias>
 
   <alias match="^curio[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>setCharacterName("%1")</send>
+    <send>SetCharacterName("%1")</send>
   </alias>
 
   <alias match="^curio[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
@@ -81,14 +81,11 @@ The location links will "run" or "mapper goto" where appropriate.
   </trigger>  
 
   <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^Type \'HELP CURIO\' for more information\.$">
-    <send>
-      EnableTriggerGroup("get_curios", false)
-      showSortedAltars()
-    </send>
+    <send>showSortedAltars()</send>
   </trigger>
 
   <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
-    <send>onFirstPrompt()</send>
+    <send>OnFirstPrompt()</send>
   </trigger>
 </triggers>
 
@@ -96,15 +93,31 @@ The location links will "run" or "mapper goto" where appropriate.
 
 <![CDATA[
 
+local can_update, update_helper = pcall(require, "updatehelper")
+local const_installed, consts = pcall(require, "consthelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
+end
+
+if can_update then
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+end
+
 require "gmcphelper"
 
-altars = {}
-ignore = {}
-affects = {}
-longest = {}
-hour_offset = 1
-show_all = true
-character_name = nil
+local saved_data = nil
+local altars = {}
+local longest = {}
+local hour_offset = nil
+local show_all = true
+local sort_by = "expiration"
+local sort_desc = true
+local character_name = nil
 
 altar_locations = {
   ["Curious Altar"] = { zone = "run runeforest", zone_label = "Rune Forest", room = "mapper goto 946163", room_label = "A Misty Path", },
@@ -144,87 +157,161 @@ altar_locations = {
   ["Chemically Altered Altar"] = { zone = "", zone_label = "Unknown", room = "", room_label = "Unknown", }
 }
 
-function OnPluginConnect()
-  hour_offset = GetVariable("hour_offset") or 1
-  EnableTriggerGroup("get_curios", false)
-end
-
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  EnableTriggerGroup("get_curios", false)
-end
-
-function onFirstPrompt()
-  EnableTrigger("first_prompt", false)
-  Execute("sendgmcp char.base")
-end
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
 
 function OnPluginBroadcast(msg, id, pname, text)
   if id == "f67c4339ed0591a5b010d05b" then
     if (text == "char.base") then
-      if character_name == nil or character_name == "" then
-        local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
-        luastmt = "gmcpdata = " .. gmcparg
-        assert(loadstring(luastmt or ""))()
-        setCharacterName(gmcpval("name"))
-      end
+      handleGmcpCharacterName()
     end
   end
 end
 
-function setCharacterName(name)
+function handleGmcpCharacterName()
+  if GetTriggerInfo("first_prompt", 8) then
+    EnableTrigger("first_prompt", false)
+    local gmcp_value = serialization_helper.GetGmcpValue("char.base")
+    SetCharacterName(gmcp_value.name)    
+  end
+end
+
+function pluginStart()
+  if not const_installed or not serializer_installed then 
+    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  end
+
+  longest.altar = 8
+  longest.zone = 8
+  longest.room = 8
+  longest.affect = 10
+  longest.expire = 10
+  
+  EnableTrigger("first_prompt", true)
+  EnableTriggerGroup("get_curios", false)
+end
+
+function pluginStop()
+  if can_update and IsAutoUpdateEnabled() then
+    CheckForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end
+end
+
+function IsAutoUpdateEnabled()
+  return false -- todo
+end
+
+function OnFirstPrompt()
+  Execute("sendgmcp char.base")
+  DoAfterSpecial(2, "tryGetOffset()", sendto.script)
+end
+
+function tryGetOffset()
+  hour_offset = consts.getHourOffset()
+  if hour_offset == nil then
+    EnableTrigger("capture_time_offset", true)
+    Note("Sending time to get hour offset from server...")
+    Send("time")
+  else
+    EnableTrigger("capture_time_offset", false)
+  end    
+end
+
+function SetCharacterName(name)
   if name == nil or name == "" then
     Note("Unknown character name, set with 'curio setchar <name>'") 
   else
     character_name = name
 
-    ignore = {}
-
-    local ignore_text = GetVariable(character_name .. "_ignored_altars") or ""   
-    if ignore_text == "" then
-      ignore_text = GetVariable("ignored_altars") or ""
-      if ignore_text ~= "" then
-        ignore = deserialize(ignore_text)
-        DeleteVariable("ignored_altars")
-        SetVariable(character_name .. "_ignored_altars", serialize(ignore))
-        SaveState()
-      end
-    else
-      ignore = deserialize(ignore_text)
-    end
-
-    affects = {}
-
-    local affects_text = GetVariable(character_name .. "_altar_affects") or ""   
-    if affects_text ~= "" then
-      affects = deserialize(affects_text)
-    end
+    loadData()
 
     DoAfterSpecial(3, "showExpiringAltars()", sendto.script)
   end
 end
 
-function setOffset(offset)
-  hour_offset = tonumber(offset)
-  SetVariable("hour_offset", hour_offset)
-  SaveState()
+function loadData()
+  saved_data = serialization_helper.GetSerializedVariable(character_name .. "_curiosort_data")
+  saved_data.ignore = serialization_helper.GetValueOrDefault(saved_data.ignore, { ["chemically altered altar"] = true })
+  saved_data.affects = serialization_helper.GetValueOrDefault(saved_data.affects, {})
+  saved_data.column_options = serialization_helper.GetValueOrDefault(saved_data.column_options, {})
+  saved_data.column_options.altar = serialization_helper.GetValueOrDefault(saved_data.column_options.altar, "show")
+  saved_data.column_options.zone = serialization_helper.GetValueOrDefault(saved_data.column_options.zone, "show")
+  saved_data.column_options.room = serialization_helper.GetValueOrDefault(saved_data.column_options.room, "show")
+  saved_data.column_options.affect = serialization_helper.GetValueOrDefault(saved_data.column_options.affect, "show")
+  saved_data.column_options.expire = serialization_helper.GetValueOrDefault(saved_data.column_options.expire, "show")
 end
 
-function beginCurioSort(ext)
-    show_all = true
-    if ext ~= nil and #ext > 2 and ext:sub(1, 3) == "exp" then 
-      show_all = false 
+function saveData()
+  if character_name ~= nil then
+    serialization_helper.SaveSerializedVariable(character_name .. "_curiosort_data", saved_data)
+  end
+end
+
+function setOffset(offset)
+  Note("Changing hour offset from " .. (hour_offset or "unset") .. " to " .. (offset or "unset") .. ".")
+  hour_offset = tonumber(offset)
+  SetVariable("hour_offset", hour_offset)
+  SaveState()  
+end
+
+function beginCurioSort(args)
+  if saved_data == nil then
+    Note("The plugin 'curio_sort' is not ready, try again in a few seconds.")
+    return
+  end
+
+  parseSortArgs(args)
+
+  longest.altar = 8
+  longest.zone = 8
+  longest.room = 8
+  longest.affect = 10
+  longest.expire = 10
+
+  EnableTriggerGroup("get_curios", true)
+  altars = {}
+  Send("curio")
+end
+
+function parseSortArgs(args)
+  args = Trim(args:lower())
+  show_all = true
+  if args == "filter" then 
+    show_all = false 
+  elseif args ~= "" then
+    local col_map = { altar = "name", zone = "zone", room = "room", affect = "affect", expire = "expiration" }
+    local valid_cols = { altar = true, zone = true, room = true, affect = true, expire = true }
+    local valid_opts = { show = true, shorten = true, collapse = true, hide = true}
+    local col, opt = args:match("([^%s]+)%s*(.*)")
+    if col ~= nil then
+      col = Trim(col)
+      if not valid_cols[col] then
+        Note("Invalid column '" .. col .. "' provided.")
+      else
+        if opt == nil or Trim(opt) == "" then
+          if sort_by == col_map[col] then
+            sort_desc = not sort_desc
+          else
+            sort_by = col_map[col]
+            sort_desc = true
+          end
+        else
+          opt = Trim(opt)
+          if not valid_opts[opt] then
+            Note("Invalid option '" .. opt .. "' provided.")
+          else
+            saved_data.column_options[col] = opt
+          end
+        end
+      end
     end
-
-    longest.altar = 0
-    longest.zone = 0
-    longest.room = 0
-    longest.affect = 0
-    longest.expire = 0
-
-    EnableTriggerGroup("get_curios", true)
-    altars = {}
-    Send("curio")
+  end
 end
 
 function addToAltar(name, affect, expiration)
@@ -239,59 +326,109 @@ function addToAltar(name, affect, expiration)
     local summon = affect:match("1 increased uses to (.+)")
     if summon ~= nil and #summon > 0 then affect = "1 " .. Trim(summon) end
 
-    local location = altar_locations[altar_name]
-    local color, timer_string = getTimerColorAndString(parsed_expiration)
-
     if affect ~= "- not active" then
-      affects[name] = affect
-    elseif affects[name] ~= nil then
-      affect = affects[name]
+      saved_data.affects[name] = affect
+    elseif saved_data.affects[name] ~= nil then
+      affect = saved_data.affects[name]
     end
 
-    if shouldShow(altar_name) and (show_all or color ~= "green") then
-      longest.altar = getLongest(longest.altar, altar_name)
-      longest.zone = getLongest(longest.zone, location.zone_label)
-      longest.room = getLongest(longest.room, location.room_label)
-      longest.affect = getLongest(longest.affect, affect, true)
-      longest.expire = getLongest(longest.expire, timer_string)
-    end
+    calculateLongest(altar_name, affect, parsed_expiration)
 
     table.insert(altars, { name = altar_name, affect = affect, expiration = parsed_expiration })
   end
 end
 
-function getLongest(current_max, string_to_check, debug)
-  current_max = current_max or 0
-  return math.max(current_max, #string_to_check)
+function calculateLongest(altar_name, affect, parsed_expiration)
+  local color, timer_string = getTimerColorAndString(parsed_expiration, saved_data.column_options.expire)
+  
+  if shouldShow(altar_name) and (show_all or color ~= "green") then
+    local location = altar_locations[altar_name]
+
+    local adjusted_altar_name = getAdjustedAltarName(altar_name, saved_data.column_options.altar or "show")
+    local adjusted_zone_name = getAdjustedZoneName(location, saved_data.column_options.zone or "show")
+    local adjusted_room_name = getAdjustedRoomName(location, saved_data.column_options.room or "show")
+    local adjusted_affect_name = getAdjustedAffectName(affect, saved_data.column_options.affect or "show")
+    
+    longest.altar = math.max(longest.altar, #adjusted_altar_name)
+    longest.zone = math.max(longest.zone, #adjusted_zone_name)
+    longest.room = math.max(longest.room, #adjusted_room_name)
+    longest.affect = math.max(longest.affect, #adjusted_affect_name)
+    longest.expire = math.max(longest.expire, #timer_string)
+  end
+end
+
+function getAdjustedAltarName(name, opt)
+  if opt == "shorten" then
+    return name:match("(.+) Altar")
+  elseif opt == "collapse" then
+    return name:sub(1, math.min(#name, 5))
+  elseif opt == "hide" then
+    return ""
+  else
+    return name
+  end
+end
+
+function getAdjustedZoneName(location, opt)
+  if opt == "shorten" then
+    return location.zone_label:sub(1, math.min(#location.zone_label, 10))
+  elseif opt == "collapse" then
+    return location.zone_label:sub(1, math.min(#location.zone_label, 5))
+  elseif opt == "hide" then
+    return ""
+  else
+    return location.zone_label
+  end
+end
+
+function getAdjustedRoomName(location, opt)
+  if opt == "shorten" then
+    local room = Trim(location.room:match("%d+") or "")
+    if room == "" then
+      room = location.room_label:sub(1, math.min(#location.room_label, 10))
+    end
+    return room
+  elseif opt == "collapse" then
+    local room = Trim(location.room:match("%d+") or "")
+    if room == "" then
+      room = location.room_label
+    end
+    return room:sub(1, math.min(#room, 5))    
+  elseif opt == "hide" then
+    return ""
+  else
+    return location.room_label
+  end
+end
+
+function getAdjustedAffectName(affect, opt)
+  if opt == "shorten" then
+    return affect:sub(1, math.min(#affect, 10)) or "-"
+  elseif opt == "collapse" then
+    return affect:match("%d+") or "-"
+  elseif opt == "hide" then
+    return ""
+  else
+    return affect
+  end
 end
 
 function ignoreAltar(name)
-  if character_name == nil or character_name == "" then
+  if saved_data == nil then
     Note("The plugin 'curio_sort' is not ready, try again in a few seconds.")
   else
     local lower_name = Trim(name:lower())
-    if ignore[lower_name] then
-      ignore[lower_name] = nil
-      Tell("No longer ignoring ")
-      ColourTell("white", "black", name)
-      Tell(".")
-      Note("")
-    else
-      ignore[lower_name] = true
-      Tell("Now ignoring ")
-      ColourTell("white", "black", name)
-      Tell(".")
-      Note("")
-    end
-
-    SetVariable(character_name .. "_ignored_altars", serialize(ignore))
-    SaveState()
+    saved_data.ignore[lower_name] = not saved_data.ignore[lower_name]
+    Tell((saved_data.ignore[lower_name] and "Now" or "No longer") .. " ignoring ")
+    ColourTell("white", "black", name)
+    Note(".")
+    saveData()
   end
 end
 
 function shouldShow(name)
   local lower_name = name:lower()
-  return ignore[lower_name] ~= true
+  return saved_data.ignore[lower_name] ~= true
 end
 
 function getDisplayName(ogName)
@@ -371,17 +508,23 @@ function getDisplayName(ogName)
 end
 
 function showSortedAltars()
+  EnableTriggerGroup("get_curios", false)
+
   table.sort(altars, function(a, b)
-    if (a.expiration == nil) then return false end
-    if (b.expiration == nil) then return true end
-    return b.expiration < a.expiration 
+    if (a[sort_by] == nil) then return false end
+    if (b[sort_by] == nil) then return true end
+    if sort_desc then
+      return b[sort_by] < a[sort_by]
+    else
+      return b[sort_by] > a[sort_by]
+    end
   end)
 
-  longest.altar = longest.altar + 2
-  longest.affect = longest.affect + 2
-  longest.zone = longest.zone + 2
-  longest.room = longest.room + 2
-  longest.expire = longest.expire + 2
+  longest.altar = getColumnWidth("altar")
+  longest.zone = getColumnWidth("zone")
+  longest.room = getColumnWidth("room")
+  longest.affect = getColumnWidth("affect")
+  longest.expire = getColumnWidth("expire")
 
   displayHeader()
 
@@ -391,18 +534,31 @@ function showSortedAltars()
       if (shouldShow(altar.name)) then
         total_count = total_count + 1
 
-        local color, timer_string = getTimerColorAndString(altar.expiration)
+        local color, timer_string = getTimerColorAndString(altar.expiration, saved_data.column_options.expire or "show")
+        local adjusted_altar_name = getAdjustedAltarName(altar.name, saved_data.column_options.altar or "show")
+        local adjusted_affect_name = getAdjustedAffectName(altar.affect, saved_data.column_options.affect or "show")
 
         if show_all or color ~= "green" then
-          Tell("|")      
-          ColourTell("white", "black", " " .. altar.name .. string.rep(" ", longest.altar - #altar.name - 1))
           Tell("|")
+          if saved_data.column_options.altar ~= "hide" then
+            ColourTell("white", "black", " " .. adjusted_altar_name .. string.rep(" ", longest.altar - #adjusted_altar_name - 1))
+            Tell("|")
+          end
+
           doLocation(altar.name)
-          Tell("|")
-          ColourTell("cyan", "black", " " .. altar.affect .. string.rep(" ", longest.affect - #altar.affect - 1))
-          Tell("|")
-          ColourTell(color, "black", " " .. timer_string .. string.rep(" ", longest.expire - #timer_string - 1))
-          Note("|")
+          
+          if saved_data.column_options.affect ~= "hide" then
+            if saved_data.column_options.affect == "collapse" then
+              ColourTell("cyan", "black", centerString(adjusted_affect_name, longest.affect))
+            else
+              ColourTell("cyan", "black", " " .. adjusted_affect_name .. string.rep(" ", longest.affect - #adjusted_affect_name - 1))
+            end
+            Tell("|")
+          end
+          if saved_data.column_options.expire ~= "hide" then
+            ColourTell(color, "black", " " .. timer_string .. string.rep(" ", longest.expire - #timer_string - 1))
+            Note("|")
+          end
 
           if color == "red" then expired_count = expired_count + 1
           elseif color == "yellow" or color == "orange" then expiring_count = expiring_count + 1 
@@ -421,8 +577,17 @@ function showSortedAltars()
 
   displayFooter(total_count, ignored_count, expiring_count, expired_count)
 
-  SetVariable(character_name .. "_altar_affects", serialize(affects))
-  SaveState()
+  saveData()
+end
+
+function getColumnWidth(col)
+  if saved_data.column_options[col] == "hide" then
+    return 0
+  elseif saved_data.column_options[col] == "collapse" then
+    return 7
+  else
+    return longest[col] + 2 
+  end
 end
 
 function showExpiringAltars()
@@ -431,9 +596,15 @@ function showExpiringAltars()
   Send("curio")
 end
 
-function getTimerColorAndString(time)
+function getTimerColorAndString(time, opt)
   if (time == nil) then
-    return "red", "This altar is not active, go get it."
+    if opt == "shorten" then
+      return "red", "not active"
+    elseif opt == "collapse" then
+      return "red", ""
+    else
+      return "red", "This altar is not active, go get it."
+    end
   else
     local now = os.time()
     local diff = os.difftime(time, now)
@@ -453,7 +624,14 @@ function getTimerColorAndString(time)
         color = "yellow"
       end
 
-      local expiration = string.format("%02d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
+      local expiration
+      if opt == "shorten" then
+        expiration = string.format("%02dd %02dh %02dm", days, hours, minutes)
+      elseif opt == "collapse" then
+        expiration = ""
+      else
+        expiration = string.format("%02d days, %02d hours, %02d minutes, %02d seconds", days, hours, minutes, seconds)
+      end
 
       return color, expiration
     end
@@ -463,24 +641,31 @@ end
 function doLocation(name)
   local zone = altar_locations[name]["zone"]
   local room = altar_locations[name]["room"]
-  local zone_label = altar_locations[name]["zone_label"]
-  local room_label = altar_locations[name]["room_label"]
+  
+  local adjusted_zone_name = getAdjustedZoneName(altar_locations[name], saved_data.column_options.zone or "show")
+  local adjusted_room_name = getAdjustedRoomName(altar_locations[name], saved_data.column_options.room or "show")
 
-  Tell(" ")
+  if saved_data.column_options.zone ~= "hide" then
+    Tell(" ")
+    if zone ~= nil and zone ~= "" then
+      Hyperlink(zone, adjusted_zone_name, zone, "silver", "black", false)
+    else
+      ColourTell("silver", "black", adjusted_zone_name)
+    end
+    Tell(string.rep(" ", longest.zone - #adjusted_zone_name - 1))
+    Tell("|")
+  end
 
-  if zone ~= nil and zone ~= "" then
-    Hyperlink(zone, zone_label, zone, "silver", "black", false)
-  else
-    ColourTell("silver", "black", zone_label)
+  if saved_data.column_options.room ~= "hide" then
+    Tell(" ")
+    if room ~= nil and room ~= "" then
+      Hyperlink(room, adjusted_room_name, room, "silver", "black", false)
+    else
+      ColourTell("silver", "black", adjusted_room_name)
+    end
+    Tell(string.rep(" ", longest.room - #adjusted_room_name - 1))
+    Tell("|")
   end
-  Tell(string.rep(" ", longest.zone - #zone_label - 1))
-  Tell("| ")
-  if room ~= nil and room ~= "" then
-    Hyperlink(room, room_label, room, "silver", "black", false)
-  else
-    ColourTell("silver", "black", room_label)
-  end
-  Tell(string.rep(" ", longest.room - #room_label - 1))
 end
 
 function parseDate(str)
@@ -522,66 +707,133 @@ function parseDate(str)
 end
 
 function displayHeader()
-  local total_width = longest.altar + longest.zone + longest.room + longest.affect + longest.expire + 4
+  local total_width = 4 + longest.altar + longest.zone + longest.room + longest.affect + longest.expire
+  
   Tell(".")
   Tell(string.rep("-", total_width))
   Note(".")
 
   Tell("|")
-  Tell(centerString("Curio Altars by Expiration", total_width))
-  Note("|")
+  local title_bar = centerString("Curio Altars by " .. (sort_by:gsub("^%l", string.upper)) .. " (" .. (sort_desc and "desc" or "asc") .. ")", total_width)
+  Tell(title_bar:sub(1, #title_bar - 2))
+  Hyperlink("!!" .. GetPluginID() .. ":showCommands()", "?", "Show Commands", "silver", "black", false)
+  Note(" |")
 
   Tell(".")
-  Tell(string.rep("-", longest.altar))
-  Tell(".")
-  Tell(string.rep("-", longest.zone))
-  Tell(".")
-  Tell(string.rep("-", longest.room))
-  Tell(".")
-  Tell(string.rep("-", longest.affect))
-  Tell(".")
-  Tell(string.rep("-", longest.expire))
-  Note(".")
+  if saved_data.column_options.altar ~= "hide" then
+    Tell(string.rep("-", longest.altar))
+    Tell(".")
+  end
+  if saved_data.column_options.zone ~= "hide" then
+    Tell(string.rep("-", longest.zone))
+    Tell(".")
+  end
+  if saved_data.column_options.room ~= "hide" then
+    Tell(string.rep("-", longest.room))
+    Tell(".")
+  end
+  if saved_data.column_options.affect ~= "hide" then
+    Tell(string.rep("-", longest.affect))
+    Tell(".")
+  end
+  if saved_data.column_options.expire ~= "hide" then
+    Tell(string.rep("-", longest.expire))
+    Note(".")
+  end
 
   Tell("|")
-  Tell(centerString("Altar Name", longest.altar))
-  Tell("|")
-  Tell(centerString("Zone", longest.zone))
-  Tell("|")
-  Tell(centerString("Room", longest.room))
-  Tell("|")
-  Tell(centerString("Affect", longest.affect))
-  Tell("|")
-  Tell(centerString("Expires", longest.expire))
-  Note("|")
+  displayClickableHeader("Name", "altar")
+  displayClickableHeader("Zone", "zone")
+  displayClickableHeader("Room", "room")
+  displayClickableHeader("Affect", "affect")
+  displayClickableHeader("Expires", "expire")
+  Note("")
 
   Tell(".")
-  Tell(string.rep("-", longest.altar))
-  Tell(".")
-  Tell(string.rep("-", longest.zone))
-  Tell(".")
-  Tell(string.rep("-", longest.room))
-  Tell(".")
-  Tell(string.rep("-", longest.affect))
-  Tell(".")
-  Tell(string.rep("-", longest.expire))
-  Note(".")
+  if saved_data.column_options.altar ~= "hide" then
+    Tell(string.rep("-", longest.altar))
+    Tell(".")
+  end
+  if saved_data.column_options.zone ~= "hide" then
+    Tell(string.rep("-", longest.zone))
+    Tell(".")
+  end
+  if saved_data.column_options.room ~= "hide" then
+    Tell(string.rep("-", longest.room))
+    Tell(".")
+  end
+  if saved_data.column_options.affect ~= "hide" then
+    Tell(string.rep("-", longest.affect))
+    Tell(".")
+  end
+  if saved_data.column_options.expire ~= "hide" then
+    Tell(string.rep("-", longest.expire))
+    Note(".")
+  end
+end
+
+function displayClickableHeader(title, column)
+  if saved_data.column_options[column] ~= "hide" then
+    if saved_data.column_options[column] == "collapse" then
+      title = title:sub(1, 1)
+    end
+    local s1, t, s2 = centerString(title, longest[column]):match("(%s*)(%S+)(%s*)")
+    if #s1 > 2 then
+      Tell(s1:sub(1, #s1 - 2))
+      if saved_data.column_options[column] == "collapse" then
+        Tell(" ")
+      elseif saved_data.column_options[column] == "shorten" then
+        Hyperlink("!!" .. GetPluginID() .. ":beginCurioSort(" .. column .. " collapse)", "<", "Collapse this column", "silver", "black", false)
+      else
+        Hyperlink("!!" .. GetPluginID() .. ":beginCurioSort(" .. column .. " shorten)", "<", "Shorten this column", "silver", "black", false)
+      end
+      Tell(" ")
+    else
+      Tell(s1)
+    end
+    
+    Hyperlink("!!" .. GetPluginID() .. ":beginCurioSort(" .. column .. ")", t, "Sort by this column", "white", "black", false)
+
+    if #s2 > 2 then
+      Tell(" ")
+      if saved_data.column_options[column] == "collapse" then
+        Hyperlink("!!" .. GetPluginID() .. ":beginCurioSort(" .. column .. " shorten)", ">", "Show more of this column", "silver", "black", false)
+      elseif saved_data.column_options[column] == "shorten" then
+        Hyperlink("!!" .. GetPluginID() .. ":beginCurioSort(" .. column .. " show)", ">", "Show all of this column", "silver", "black", false)
+      else
+        Tell(" ")
+      end
+      Tell(s2:sub(1, #s2 - 2) .. "|")
+    else
+      Tell(s2 .. "|")
+    end
+  end
 end
 
 function displayFooter(total, ignored, expiring, expired)
   local total_width = longest.altar + longest.zone + longest.room + longest.affect + longest.expire + 4
 
   Tell(".")
-  Tell(string.rep("-", longest.altar))
-  Tell(".")
-  Tell(string.rep("-", longest.zone))
-  Tell(".")
-  Tell(string.rep("-", longest.room))
-  Tell(".")
-  Tell(string.rep("-", longest.affect))
-  Tell(".")
-  Tell(string.rep("-", longest.expire))
-  Note(".")
+  if saved_data.column_options.altar ~= "hide" then
+    Tell(string.rep("-", longest.altar))
+    Tell(".")
+  end
+  if saved_data.column_options.zone ~= "hide" then
+    Tell(string.rep("-", longest.zone))
+    Tell(".")
+  end
+  if saved_data.column_options.room ~= "hide" then
+    Tell(string.rep("-", longest.room))
+    Tell(".")
+  end
+  if saved_data.column_options.affect ~= "hide" then
+    Tell(string.rep("-", longest.affect))
+    Tell(".")
+  end
+  if saved_data.column_options.expire ~= "hide" then
+    Tell(string.rep("-", longest.expire))
+    Note(".")
+  end
 
   local footer_text = {}
   if total > 0 then table.insert(footer_text, total .. " total altars") end
@@ -602,7 +854,7 @@ function centerString(str, total_length)
   if total_length == nil or total_length <= 0 then total_length = longest end
   local str_len = #str
   if total_length <= str_len then
-    return str
+    return str:sub(1, total_length)
   end
 
   local padding = total_length - str_len
@@ -614,9 +866,14 @@ end
 
 function showCommands()
   showCommand("curio sort", "show your curio altars sorted by expiration date")
-  showCommand("curio sort exp", "show only your expiring and expired altars")
+  showCommand("curio sort filter", "show only your expiring and expired altars")
   showCommand("curio ignore <altar>", "add or remove a specific altar from the sort output")
-  showCommand("curio offset <hour>", "set the hour(s) off you are from the server time")
+  showCommand("curio offset <hour>", "manually set the hour(s) offset from system time")
+  showCommand("curio sort <column>", "use the provided column to sort, or reverse it")
+  showCommand("curio sort <column> <option>", "change how the column is shown")
+  Note("   > columns: altar, zone, room, affect, expire")
+  Note("   > options: show, shorten, collapse, hide")
+  Send("")
 end
 
 function showCommand(cmd, desc)
@@ -626,47 +883,11 @@ function showCommand(cmd, desc)
   ColourNote("silver", "black", desc)
 end
 
-function checkForUpdates()
-  local updater_installed, updater = pcall(require, "updatehelper")
-
-  if updater_installed then
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/profession_tracker.xml" },
-    })
-  end
-end
-
-function serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
-function deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
+function CheckForUpdates()
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "curio_sort.xml")
   else
-    return nil, "Failed to load string"
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
 end
 
