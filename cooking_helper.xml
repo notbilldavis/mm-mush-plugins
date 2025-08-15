@@ -111,8 +111,8 @@ Commands:
     <send>StartRecipeCapture("%1")</send>
   </trigger>
 
-  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(\s+)\[(.*?)\]$">
-    <send>AddIngredientToRecipe("%2")</send>
+  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="14" sequence="100" omit_from_output="y" match="^(\s+)\[(.*?)\]$">
+    <send>AddIngredientToRecipe("%2", TriggerStyleRuns, "%0")</send>
   </trigger>
 
   <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^cooking recipe that you do not already have the mark for\.  $">
@@ -317,10 +317,10 @@ function ShowCooking()
       ColourTell("cyan", "black", " * ")
       ColourTell("white", "black", recipe.name:upper())
       ColourTell("gray", "black", " [")
-      Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(\"" .. recipe.name .. "\")", "n", "Show NPCs that will eat this", "silver", "black", false)
+      Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(" .. recipe.name .. ")", "n", "Show NPCs that will eat this", "silver", "black", false)
       ColourTell("gray", "black", "]")
       ColourTell("gray", "black", " [")
-      Hyperlink("!!" .. GetPluginID() .. ":ClearRecipe(\"" .. recipe.name .. "\")", "X", "Clear", "red", "black", false)
+      Hyperlink("!!" .. GetPluginID() .. ":ClearRecipe(" .. recipe.name .. ")", "X", "Clear", "red", "black", false)
       ColourNote("gray", "black", "]")
       showEaten(recipe.eaten)
     end
@@ -691,14 +691,19 @@ end
 function TrackPouchIngredient(ingredient)
   if ingredient and Trim(ingredient) ~= "" then
     ingredient = Trim(ingredient:lower())
-    config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
-    if config.tracked_ingredients[ingredient] then
-      Note("Tracking " .. ingredient .. " in pouch of plenitude.")
+    if ingredient == "clear" then
+      for ing, t in pairs(config.tracked_ingredients) do
+        config.tracked_ingredients[ingredient] = false
+      end
     else
-      Note("Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+      config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
+      if config.tracked_ingredients[ingredient] then
+        Note("Tracking " .. ingredient .. " in pouch of plenitude.")
+      else
+        Note("Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+      end
     end
-    SetVariable(character_name .. "_cooking_config", Serialize(config))
-    SaveState()
+    serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
   else
     local t_count = 0
     for ing, t in pairs(config.tracked_ingredients) do
@@ -707,7 +712,11 @@ function TrackPouchIngredient(ingredient)
         end
         if t then
           ColourTell("silver", "black", " * ")
-          ColourNote("white", "black", ing)
+          ColourTell("white", "black", ing)
+          ColourTell("gray", "black", " [")
+          Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ing .. ")", "X", "Clear", "red", "black", false)
+          ColourNote("gray", "black", "]")
+          
           t_count = t_count + 1
         end
     end
@@ -781,7 +790,23 @@ function StartRecipeCapture(recipe_name)
   EnableTriggerGroup("get_recipe", true)
 end
 
-function AddIngredientToRecipe(ingredient)
+function AddIngredientToRecipe(ingredient, trigger_style_runs, line)
+  local fgcol = "lightgray"
+  local bgcol = "black"
+  for i = 1, #trigger_style_runs do
+    fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
+    bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
+    ColourTell(fgcol, bgcol, trigger_style_runs[i].text)
+  end
+
+  if config.automate_pouch and not config.tracked_ingredients[ingredient] then
+    ColourTell(fgcol, bgcol, " [")
+    Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ingredient .. ")", "+", "add " .. Trim(ingredient) .. " to tracked ingredients", "lightgreen", "black", false)
+    ColourTell(fgcol, bgcol, "]")
+  end
+
+  Note("")
+
   if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 then
     return
   end
@@ -958,8 +983,7 @@ function AddRecipeToPouch()
     end
   end
 
-  SetVariable(character_name .. "_cooking_config", Serialize(config))
-  SaveState()
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
 end
 
 function ClearPouch()
@@ -969,8 +993,7 @@ function ClearPouch()
   end
 
   config.tracked_ingredients = {}
-  SetVariable(character_name .. "_cooking_config", Serialize(config))
-  SaveState()
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
   Note("Cleared all ingredients from pouch tracking.")
 end
 
