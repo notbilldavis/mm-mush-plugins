@@ -279,7 +279,8 @@ function SetCharacterName(name)
     Note("Unknown character name, set with 'cooking setchar <name>'") 
   else
     character_name = Trim(name)
-    tracked_recipes = serialization_helper.GetSerializedVariable(character_name .. "_cooking_recipes", {}, "recipes")
+
+    tracked_recipes = serialization_helper.GetSerializedVariable(character_name .. "_cooking_recipes")
     config = serialization_helper.GetSerializedVariable(character_name .. "_cooking_config")
     
     config.storage_container = serialization_helper.GetValueOrDefault(config.storage_container, "trunk")
@@ -551,6 +552,7 @@ function configureDone(group_id, option_id, config_changed)
   if option_id == "tracked_ingredients" then
     config.tracked_ingredients = {}
     for _, ingredient in ipairs(utils.split(Trim(config_changed.raw_value):lower(), ",")) do
+      ingredient = Trim(ingredient:lower())
       if ingredient ~= "" then
         config.tracked_ingredients[ingredient] = true
       end
@@ -692,9 +694,7 @@ function TrackPouchIngredient(ingredient)
   if ingredient and Trim(ingredient) ~= "" then
     ingredient = Trim(ingredient:lower())
     if ingredient == "clear" then
-      for ing, t in pairs(config.tracked_ingredients) do
-        config.tracked_ingredients[ingredient] = false
-      end
+      config.tracked_ingredients = {}      
     else
       config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
       if config.tracked_ingredients[ingredient] then
@@ -707,6 +707,7 @@ function TrackPouchIngredient(ingredient)
   else
     local t_count = 0
     for ing, t in pairs(config.tracked_ingredients) do
+        ing = Trim(ing:lower())
         if t_count == 0 then
           Note("Tracked ingredients in pouch of plenitude:")
         end
@@ -799,6 +800,7 @@ function AddIngredientToRecipe(ingredient, trigger_style_runs, line)
     ColourTell(fgcol, bgcol, trigger_style_runs[i].text)
   end
 
+  ingredient = Trim(ingredient:lower())
   if config.automate_pouch and not config.tracked_ingredients[ingredient] then
     ColourTell(fgcol, bgcol, " [")
     Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ingredient .. ")", "+", "add " .. Trim(ingredient) .. " to tracked ingredients", "lightgreen", "black", false)
@@ -975,6 +977,7 @@ function AddRecipeToPouch()
   end
 
   for _, ingredient in ipairs(current_recipe.ingredients) do
+    ingredient = Trim(ingredient:lower())
     if not config.tracked_ingredients[ingredient] then
       config.tracked_ingredients[ingredient] = true
       ColourNote("green", "black", "Added " .. ingredient .. " to pouch tracking.")
