@@ -1,11 +1,19 @@
-local BORDER_WIDTH = GetInfo(277)
-local BORDER_OFFSET = GetInfo(276)
-local OUTPUT_LEFT = GetInfo(290)
-local OUTPUT_TOP = GetInfo(291)
-local OUTPUT_RIGHT = GetInfo(292)
-local OUTPUT_BOTTOM = GetInfo(293)
-local CLIENT_HEIGHT = GetInfo(280)
-local CLIENT_WIDTH = GetInfo(281)
+local function getBorderWidth() return GetInfo(277) end
+local function getBorderOffset() return GetInfo(276) end
+local function getOutputLeft() return GetInfo(290) end
+local function getOutputTop() return GetInfo(291) end
+local function getOutputRight() return GetInfo(292) end
+local function getOutputBottom() return GetInfo(293) end
+local function getClientHeight() return GetInfo(280) end
+local function getClientWidth() return GetInfo(281) end
+
+local function getOutputLeftOutside() return getOutputLeft() - getBorderOffset() - getBorderWidth() - 1 end
+local function getOutputTopOutside() return getOutputTop() - getBorderOffset() - getBorderWidth() - 1 end
+local function getOutputRightOutside() return getOutputRight() - getBorderOffset() - getBorderWidth() + 1 end
+local function getOutputBottomOutside() return getOutputBottom() - getBorderOffset() - getBorderWidth() + 1 end
+
+local function getOutputHeight() return getOutputBottom() - getOutputTop() end
+local function getOutputWidth() return getOutputRight() - getOutputLeft() end
 
 local function clamp(val, min, max)
   val = val or 0
@@ -95,7 +103,6 @@ end
 local function getHourOffset()
   local hour_offset = GetVariable("hour_offset")
   if hour_offset == nil then
-    Note("offset nil")
     local other_plugins = { 
       bosses_killed = "ffe0696159421d1841e22b03",
       capture_quests = "892911b648d09c18e1ecd4e6",
@@ -107,9 +114,7 @@ local function getHourOffset()
     for _, p_id in pairs(other_plugins) do
       if hour_offset == nil and p_id ~= GetPluginID() then
         hour_offset = GetPluginVariable(p_id, "hour_offset")
-        SetVariable("hour_offset", hour_offset)
-        Note("found offset in " .. p_id)
-      else
+      elseif hour_offset ~= nil then
         break
       end
     end
@@ -118,28 +123,29 @@ local function getHourOffset()
   if hour_offset == nil then
     return nil
   else
-    return tonumber(GetVariable("hour_offset"))
+    SetVariable("hour_offset", hour_offset)
+    return tonumber(hour_offset)
   end
 end
 
 return {
-    border_width = BORDER_WIDTH,
-    border_offset = BORDER_OFFSET,
-    output_left_inside = OUTPUT_LEFT,
-    output_top_inside = OUTPUT_TOP,
-    output_right_inside = OUTPUT_RIGHT,
-    output_bottom_inside = OUTPUT_BOTTOM,
+    GetBorderWidth = getBorderWidth,
+    GetBorderOffset = getBorderOffset,
+    GetOutputLeft = getOutputLeft,
+    GetOutputTop = getOutputTop,
+    GetOutputRight = getOutputRight,
+    GetOutputBottom = getOutputBottom,
 
-    output_left_outside = OUTPUT_LEFT - BORDER_OFFSET - BORDER_WIDTH - 1,
-    output_top_outside = OUTPUT_TOP - BORDER_OFFSET - BORDER_WIDTH - 1,
-    output_right_outside = OUTPUT_RIGHT - BORDER_OFFSET - BORDER_WIDTH + 1,
-    output_bottom_outside = OUTPUT_BOTTOM - BORDER_OFFSET - BORDER_WIDTH + 1,
+    GetOutputLeftOutside = getOutputLeftOutside,
+    GetOutputTopOutside = getOutputTopOutside,
+    GetOutputRightOutside = getOutputRightOutside,
+    GetOutputBottomOutside = getOutputBottomOutside,
 
-    output_height = OUTPUT_BOTTOM - OUTPUT_TOP,
-    output_width = OUTPUT_RIGHT - OUTPUT_LEFT,
+    GetOutputHeight = getOutputHeight,
+    GetOutputWidth = getOutputWidth,
 
-    max_height = CLIENT_HEIGHT,
-    max_width = CLIENT_WIDTH,
+    GetClientHeight = getClientHeight,
+    GetClientWidth = getClientWidth,
 
     border_color = 12632256,
     black = ColourNameToRGB("black"),

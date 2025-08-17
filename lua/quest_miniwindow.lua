@@ -74,8 +74,8 @@ load = function()
   CONFIG.EXPAND_PHASES = serialization_helper.GetValueOrDefault(CONFIG.EXPAND_PHASES, 2)
   CONFIG.TIMES = serialization_helper.GetValueOrDefault(CONFIG.TIMES, { QUEST_TIME = 0, PURSUER_TIME = 0, CRYSTAL_TIME = 0 })
 
-  POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.output_right_inside - CONFIG.BUTTON_WIDTH - 10)
-  POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.output_bottom_inside - CONFIG.BUTTON_HEIGHT - 10)
+  POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRight() - CONFIG.BUTTON_WIDTH - 10)
+  POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottom() - CONFIG.BUTTON_HEIGHT - 10)
   POSITION.Z_POSITION = serialization_helper.GetValueOrDefault(POSITION.Z_POSITION, 1000)
 end
 
@@ -721,8 +721,8 @@ getConfiguration = function()
     BUTTON = {
       BUTTON_FONT = config_window.CreateFontOption(1, "Button Font", CONFIG.BUTTON_FONT, "The font used for the button."),
       QUEST_FONT = config_window.CreateFontOption(2, "Quest Font", CONFIG.QUEST_FONT, "The font used for the quest."),
-      BUTTON_HEIGHT = config_window.CreateNumberOption(3, "Height", CONFIG.BUTTON_HEIGHT, 5, consts.max_height, "The height of the button."),
-      BUTTON_WIDTH = config_window.CreateNumberOption(4, "Width", CONFIG.BUTTON_WIDTH, 10, consts.max_width, "The width of the button."),
+      BUTTON_HEIGHT = config_window.CreateNumberOption(3, "Height", CONFIG.BUTTON_HEIGHT, 5, consts.GetClientHeight(), "The height of the button."),
+      BUTTON_WIDTH = config_window.CreateNumberOption(4, "Width", CONFIG.BUTTON_WIDTH, 10, consts.GetClientWidth(), "The width of the button."),
       BUTTON_LABEL = config_window.CreateTextOption(5, "Label", CONFIG.BUTTON_LABEL, "Set the text of the button."),
     },
     COLORS = {
@@ -734,8 +734,8 @@ getConfiguration = function()
       DISABLED_LABEL_COLOR = config_window.CreateColorOption(2, "Inactive Label", CONFIG.DISABLED_LABEL_COLOR, "The color of the label when you do not have affects."),
     },
     POSITION = {
-      WINDOW_LEFT = config_window.CreateNumberOption(1, "Left", POSITION.WINDOW_LEFT, 0, consts.max_width - POSITION.WINDOW_WIDTH, "The left most position of the entire panel."),
-      WINDOW_TOP = config_window.CreateNumberOption(2, "Top", POSITION.WINDOW_TOP, 0, consts.max_height - POSITION.WINDOW_HEIGHT, "The top most position of the entire panel."),
+      WINDOW_LEFT = config_window.CreateNumberOption(1, "Left", POSITION.WINDOW_LEFT, 0, consts.GetClientWidth() - POSITION.WINDOW_WIDTH, "The left most position of the entire panel."),
+      WINDOW_TOP = config_window.CreateNumberOption(2, "Top", POSITION.WINDOW_TOP, 0, consts.GetClientHeight() - POSITION.WINDOW_HEIGHT, "The top most position of the entire panel."),
       ANCHOR = config_window.CreateListOption(5, "Preset", "Select...", ANCHOR_LIST, "Set the window position based on a set of preset rules."),
       Z_POSITION = config_window.CreateNumberOption(6, "Z Position", POSITION.Z_POSITION, -9999, 9999, "Increase this if your window is below another one and you need to see it.")
     }
@@ -781,37 +781,37 @@ adjustAnchor = function(anchor_idx)
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Bottom Left (Window)" then 
     POSITION.WINDOW_LEFT = 10
-    POSITION.WINDOW_TOP = consts.max_height - 10
+    POSITION.WINDOW_TOP = consts.GetClientHeight() - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Top Right (Window)" then
-    POSITION.WINDOW_LEFT = consts.max_width - CONFIG.BUTTON_WIDTH - 10
+    POSITION.WINDOW_LEFT = consts.GetClientWidth() - CONFIG.BUTTON_WIDTH - 10
     POSITION.WINDOW_TOP = 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = false
   elseif anchor == "Bottom Right (Window)" then
-    POSITION.WINDOW_LEFT = consts.max_width - CONFIG.BUTTON_WIDTH - 10
-    POSITION.WINDOW_TOP = consts.max_height - 10
+    POSITION.WINDOW_LEFT = consts.GetClientWidth() - CONFIG.BUTTON_WIDTH - 10
+    POSITION.WINDOW_TOP = consts.GetClientHeight() - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = false
   elseif anchor == "Top Left (Output)" then
-    POSITION.WINDOW_LEFT = consts.output_left_inside + 10
-    POSITION.WINDOW_TOP = consts.output_top_inside + 10
+    POSITION.WINDOW_LEFT = consts.GetOutputLeft() + 10
+    POSITION.WINDOW_TOP = consts.GetOutputTop() + 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = true
   elseif anchor == "Bottom Left (Output)" then
-    POSITION.WINDOW_LEFT = consts.output_left_inside + 10
-    POSITION.WINDOW_TOP = consts.output_bottom_inside - 10
+    POSITION.WINDOW_LEFT = consts.GetOutputLeft() + 10
+    POSITION.WINDOW_TOP = consts.GetOutputBottom() - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = true
   elseif anchor ==  "Top Right (Output)" then
-    POSITION.WINDOW_LEFT = consts.output_right_inside - 10
-    POSITION.WINDOW_TOP = consts.output_top_inside + 10
+    POSITION.WINDOW_LEFT = consts.GetOutputRight() - 10
+    POSITION.WINDOW_TOP = consts.GetOutputTop() + 10
     CONFIG.EXPAND_DOWN = true
     CONFIG.EXPAND_RIGHT = false
   elseif anchor ==  "Bottom Right (Output)" then
-    POSITION.WINDOW_LEFT = consts.output_right_inside - 10
-    POSITION.WINDOW_TOP = consts.output_bottom_inside - 10
+    POSITION.WINDOW_LEFT = consts.GetOutputRight() - 10
+    POSITION.WINDOW_TOP = consts.GetOutputBottom() - 10
     CONFIG.EXPAND_DOWN = false
     CONFIG.EXPAND_RIGHT = false
   end

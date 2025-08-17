@@ -11,18 +11,23 @@ local CONFIG = nil
 local SAVE_CALLBACK = nil
 local SECTION_STATUS = { }
 
-local show, hide, createFontOption, createNumberOption, createTextOption, createBoolOption, createColorOption, createListOption
+local show, hide, update, createFontOption, createNumberOption, createTextOption, createBoolOption, createColorOption, createListOption
 local initialize, calculate, draw, drawWindow, drawHeader, drawSection, drawOptions, drawOption,
  changeNumber, changeText, changeColor, changeBool, changeFont, changeList, validateNumber, measureSection,
  measureOption
 
-show = function (config, saveCallback)
+show = function(config, saveCallback)
   if not CONFIG then
     CONFIG = config
     SAVE_CALLBACK = saveCallback
     initialize()
   end
 
+  draw()
+end
+
+update = function(config)
+  CONFIG = config
   draw()
 end
 
@@ -46,7 +51,7 @@ draw = function()
   calculate()
   drawWindow()  
   drawHeader()
-  drawOptions()  
+  drawOptions()
 
   WindowShow(WIN, true)
 end
@@ -55,19 +60,19 @@ drawWindow = function()
   WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP , 4, 2)
   WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
   WindowRectOp(WIN, miniwin.rect_fill, 0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
-  for i = 1, consts.border_width + 1 do
+  for i = 1, consts.GetBorderWidth() + 1 do
     WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, POSITION.WINDOW_WIDTH - i, POSITION.WINDOW_HEIGHT - i, consts.silver)
   end
 end
 
 drawHeader = function()
-  WindowText(WIN, FONT, "Configuration", 4 + consts.border_width, 4 + consts.border_width, 0, 0, consts.white, true)
-  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, consts.white, miniwin.pen_solid, 2)
-  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, 2 + consts.border_width, consts.white, miniwin.pen_solid, 2)
-  WindowAddHotspot(WIN, "close_hotspot", POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.border_width, 2 + consts.border_width, POSITION.WINDOW_WIDTH - 2 - consts.border_width, SIZES.LINE_HEIGHT + 2 + consts.border_width, "", "", "", "", "configuration_onClose", "Close", miniwin.cursor_hand, 0)
+  WindowText(WIN, FONT, "Configuration", 4 + consts.GetBorderWidth(), 4 + consts.GetBorderWidth(), 0, 0, consts.white, true)
+  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), consts.white, miniwin.pen_solid, 2)
+  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), consts.white, miniwin.pen_solid, 2)
+  WindowAddHotspot(WIN, "close_hotspot", POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), "", "", "", "", "configuration_onClose", "Close", miniwin.cursor_hand, 0)
 
   local single, space = WindowTextWidth(WIN, FONT, "[+]"), WindowTextWidth(WIN, FONT, " ")
-  local start_x = 4 + consts.border_width + WindowTextWidth(WIN, FONT, "Configuration") + space
+  local start_x = 4 + consts.GetBorderWidth() + WindowTextWidth(WIN, FONT, "Configuration") + space
   local collapse_color, expand_color = consts.dimgray, consts.dimgray
 
   for k, _ in pairs(CONFIG) do
@@ -89,7 +94,7 @@ drawHeader = function()
 end
 
 drawOptions = function()
-  local y = SIZES.LINE_HEIGHT + (consts.border_width * 2)
+  local y = SIZES.LINE_HEIGHT + (consts.GetBorderWidth() * 2)
   for key, group in consts.pairsByKeys(CONFIG) do
     y = drawSection(0, y, key, group)
   end
@@ -104,17 +109,21 @@ drawSection = function(indents, y, key, group)
   title = title:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
 
   local title_width = WindowTextWidth(WIN, FONT, title)
-  WindowText(WIN, FONT, marker .. title, 4 + consts.border_width, y, 0, 0, consts.white, true)
-  WindowAddHotspot(WIN, key, consts.border_width, y, title_width + consts.border_width + 2, y + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
+  WindowText(WIN, FONT, marker .. title, 4 + consts.GetBorderWidth(), y, 0, 0, consts.white, true)
+  WindowAddHotspot(WIN, key, consts.GetBorderWidth(), y, title_width + consts.GetBorderWidth() + 2, y + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
   y = y + SIZES.LINE_HEIGHT
 
   local sortFunc = function(a, b)
     local sort_a = a.value.sort 
     local sort_b = b.value.sort
 
-    if sort_a == nil or sort_b == nil then
+    if sort_a == nil and sort_b == nil then
       sort_a = a.value.label or a.key or ""
       sort_b = b.value.label or b.key or ""
+    elseif sort_a == nil then
+      sort_a = 9999
+    elseif sort_b == nil then
+      sort_b = 9999
     end
 
     return sort_a < sort_b
@@ -145,11 +154,21 @@ drawOption = function(indents, y, parent_key, key, option)
   local marker = "  * "
   for i = 1, indents do marker = " " .. marker end
 
-  WindowText(WIN, FONT, marker .. option.label, 2 + consts.border_width, y, 0, 0, consts.white, true)
+  local label_color = consts.white
+  if option.enabled == false then
+    label_color = consts.dimgray
+  end
+
+  WindowText(WIN, FONT, marker .. option.label, 2 + consts.GetBorderWidth(), y, 0, 0, label_color, true)
+  if option.hint ~= nil and Trim(option.hint) ~= "" then
+    WindowAddHotspot(WIN, "hint_" .. parent_key .. "|" .. key, 2 + consts.GetBorderWidth(), y, 2 + consts.GetBorderWidth() + SIZES.LABEL_WIDTH, y + SIZES.LINE_HEIGHT, "", "", "", "", "", option.hint, miniwin.cursor_arrow, 0)
+  end
   if option.type == "color" then
-    WindowRectOp(WIN, miniwin.rect_fill, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, option.raw_value)
-    WindowRectOp(WIN, miniwin.rect_frame, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, consts.white)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width, y + 1, POSITION.WINDOW_WIDTH - 5 - consts.border_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+    WindowRectOp(WIN, miniwin.rect_fill, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y + 1, POSITION.WINDOW_WIDTH - 5 - consts.GetBorderWidth(), y + SIZES.LINE_HEIGHT - 1, option.raw_value)
+    WindowRectOp(WIN, miniwin.rect_frame, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y + 1, POSITION.WINDOW_WIDTH - 5 - consts.GetBorderWidth(), y + SIZES.LINE_HEIGHT - 1, consts.white)
+    if option.enabled == nil or option.enabled == true then
+      WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y + 1, POSITION.WINDOW_WIDTH - 5 - consts.GetBorderWidth(), y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+    end
   elseif option.type == "number" then
     if option.value == nil then option.value = tostring(option.raw_value) end
     local b_width = WindowTextWidth(WIN, FONT, "-")
@@ -157,19 +176,28 @@ drawOption = function(indents, y, parent_key, key, option)
     local minus_color = consts.white
     local add_color = consts.white
     if option.raw_value == nil then option.raw_value = tonumber(option.value or 0) end
-    if option.min ~= nil and option.raw_value <= option.min then minus_color = consts.dimgray end
-    if option.max ~= nil and option.raw_value >= option.max then add_color = consts.dimgray end
-    WindowText(WIN, FONT, "-", SIZES.LABEL_WIDTH + 20 + consts.border_width, y, 0, 0, minus_color, true)
-    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width * 2, y, 0, 0, consts.white, true)
-    WindowText(WIN, FONT, "+", SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 3, y, 0, 0, consts.white, true)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", SIZES.LABEL_WIDTH + 20 + consts.border_width, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to decrease (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width + b_width * 2, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 2, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 3, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width + b_width * 4, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to increase (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
+    if option.enabled == false or (option.min ~= nil and option.raw_value <= option.min) then minus_color = consts.dimgray end
+    if option.enabled == false or (option.max ~= nil and option.raw_value >= option.max) then add_color = consts.dimgray end
+    WindowText(WIN, FONT, "-", SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y, 0, 0, minus_color, true)
+    WindowText(WIN, FONT, "+", SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + v_width + b_width * 3, y, 0, 0, add_color, true)
+    
+    if option.enabled == false then
+      WindowText(WIN, FONT, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + b_width * 2, y, 0, 0, consts.dimgray, true)
+    else
+      WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + b_width * 2, y, 0, 0, consts.white, true)
+      WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|minus", SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y+1, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + b_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to decrease (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
+      WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + b_width * 2, y+1, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + v_width + b_width * 2, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+      WindowAddHotspot(WIN, parent_key .. "|" .. key .. "|add", SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + v_width + b_width * 3, y+1, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + v_width + b_width * 4, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to increase (shift+ctrl, shift, ctrl for 100, 50, 10)", miniwin.cursor_hand, 0)
+    end    
   else
     if option.value == nil then option.value = tostring(option.raw_value) end
     local v_width = WindowTextWidth(WIN, FONT, option.value)
-    WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.border_width, y, 0, 0, consts.white, true)
-    WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.border_width, y+1, SIZES.LABEL_WIDTH + 20 + consts.border_width + v_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+    if option.enabled == false then
+      WindowText(WIN, FONT, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y, 0, 0, consts.dimgray, true)
+    else
+      WindowText(WIN, FONT_UNDERLINE, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y, 0, 0, consts.white, true)
+      WindowAddHotspot(WIN, parent_key .. "|" .. key, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y+1, SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth() + v_width, y + SIZES.LINE_HEIGHT - 1, "", "", "", "", "configuration_onChangeOption", "click to change", miniwin.cursor_hand, 0)
+    end
   end
 
   return y + SIZES.LINE_HEIGHT
@@ -239,9 +267,9 @@ changeNumber = function(option, opt_mode, num)
   if opt_mode ~= nil then
     local current = option.raw_value
     if opt_mode == "minus" then    
-      option.raw_value = current - 1
+      option.raw_value = current - num
     elseif opt_mode == "add" then
-      option.raw_value = current + 1
+      option.raw_value = current + num
     end
     if option.min ~= nil and option.max ~= nil then
       option.raw_value = math.max(option.min, math.min(option.raw_value, option.max))
@@ -354,23 +382,25 @@ validateNumber = function(min, max)
 end
 
 calculate = function()
-  local height = 4 + consts.border_width + SIZES.LINE_HEIGHT
+  local height = 4 + consts.GetBorderWidth() + SIZES.LINE_HEIGHT
   local l_width, v_width = 0, 0
   for key, group in consts.pairsByKeys(CONFIG) do
     height, l_width, v_width = measureSection(0, height, key, group, l_width, v_width)
   end
+
+  WindowDeleteAllHotspots(WIN)
     
   SIZES.LABEL_WIDTH = math.max(SIZES.LABEL_WIDTH, l_width)
   SIZES.VALUE_WIDTH = math.max(SIZES.VALUE_WIDTH, v_width + WindowTextWidth(WIN, FONT, "- + "))
-  POSITION.WINDOW_HEIGHT = math.min(height + consts.border_width, consts.output_height - 50)
-  POSITION.WINDOW_WIDTH = math.min(SIZES.LABEL_WIDTH + 25 + SIZES.VALUE_WIDTH + (consts.border_width * 2), consts.output_width - 50)
-  POSITION.WINDOW_LEFT = ((consts.output_width) / 2 + consts.output_left_inside) - POSITION.WINDOW_WIDTH / 2
-  POSITION.WINDOW_TOP = ((consts.output_height) / 2 + consts.output_top_inside) - POSITION.WINDOW_HEIGHT / 2
+  POSITION.WINDOW_HEIGHT = math.min(height + consts.GetBorderWidth(), consts.GetOutputHeight() - 50)
+  POSITION.WINDOW_WIDTH = math.min(SIZES.LABEL_WIDTH + 25 + SIZES.VALUE_WIDTH + (consts.GetBorderWidth() * 2), consts.GetOutputWidth() - 50)
+  POSITION.WINDOW_LEFT = ((consts.GetOutputWidth()) / 2 + consts.GetOutputLeft()) - POSITION.WINDOW_WIDTH / 2
+  POSITION.WINDOW_TOP = ((consts.GetOutputHeight()) / 2 + consts.GetOutputTop()) - POSITION.WINDOW_HEIGHT / 2
 end
 
 measureSection = function(indents, height, key, group, l_width, v_width)
   height = height + SIZES.LINE_HEIGHT
-  if height > consts.output_height then
+  if height > consts.GetOutputHeight() then
     Note("Config screen is too big, collapse some sections.")
     return height, l_width, v_width
   end
@@ -409,6 +439,7 @@ measureOption = function(indents, height, parent_key, key, option, l_width, v_wi
 end
 
 createFontOption = function(sort, label, font, hint, enabled)
+  if enabled == nil then enabled = true end
   return {
     sort = sort,
     label = label,
@@ -416,11 +447,12 @@ createFontOption = function(sort, label, font, hint, enabled)
     value = font.name .. " (" .. font.size .. ")",
     raw_value = font,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 createNumberOption = function(sort, label, number, min, max, hint, enabled)
+  if enabled == nil then enabled = true end
   return {
     sort = sort,
     label = label,
@@ -430,11 +462,12 @@ createNumberOption = function(sort, label, number, min, max, hint, enabled)
     min = min,
     max = max,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 createTextOption = function(sort, label, text, hint, enabled)
+  if enabled == nil then enabled = true end
   return {
     sort = sort,
     label = label,
@@ -442,11 +475,12 @@ createTextOption = function(sort, label, text, hint, enabled)
     value = text,
     raw_value = text,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 createBoolOption = function(sort, label, bool, hint, enabled)
+  if enabled == nil then enabled = true end
   return {
     sort = sort,
     label = label,
@@ -454,11 +488,12 @@ createBoolOption = function(sort, label, bool, hint, enabled)
     value = tostring(bool),
     raw_value = bool,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 createColorOption = function(sort, label, color, hint, enabled)
+  if enabled == nil then enabled = true end
   return {
     sort = sort,
     label = label,
@@ -466,11 +501,12 @@ createColorOption = function(sort, label, color, hint, enabled)
     value = color or consts.black,
     raw_value = color,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 createListOption = function(sort, label, selection, list, hint, enabled)
+  if enabled == nil then enabled = true end
   local raw = 0
   for i, opt in ipairs(list) do
     if Trim(opt:lower()) == Trim(selection:lower()) then
@@ -486,13 +522,14 @@ createListOption = function(sort, label, selection, list, hint, enabled)
     raw_value = idx,
     list = list,
     hint = hint or "",
-    enabled = enabled or true
+    enabled = enabled
   }
 end
 
 return {
-  Show = show, 
-  Hide = hide, 
+  Show = show,
+  Hide = hide,
+  Update = update, 
   CreateFontOption = createFontOption, 
   CreateNumberOption = createNumberOption, 
   CreateTextOption = createTextOption,

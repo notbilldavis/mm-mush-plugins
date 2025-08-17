@@ -249,6 +249,8 @@ local non_food_items = {
   ["a vorma seed"] = true,
   ["a wineskin of gomutra ghanvati"] = true,
   ["a bottle of white wine"] = true,
+  ["a cup of water"] = true,
+  ["a faerie rum blend"] = true,
 }
 
 function PluginStart()
@@ -395,7 +397,7 @@ function TrackRecipe(args)
     end
   end
 
-  serialization_helper.SaveSerializedVariable(character_name .. "_cooking recipes", tracked_recipes)
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_recipes", tracked_recipes)
 end
 
 function ClearRecipe(args)
