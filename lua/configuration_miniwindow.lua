@@ -106,9 +106,10 @@ drawSection = function(indents, y, key, group)
   for i = 1, indents do marker = " " .. marker end
   local title = key:match(".+^(.+)$")
   if not title then title = key end
+  title = title:match("^_?%d*_?(.*)$")
   title = title:lower():gsub("_", " "):gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
 
-  local title_width = WindowTextWidth(WIN, FONT, title)
+  local title_width = WindowTextWidth(WIN, FONT, marker .. title)
   WindowText(WIN, FONT, marker .. title, 4 + consts.GetBorderWidth(), y, 0, 0, consts.white, true)
   WindowAddHotspot(WIN, key, consts.GetBorderWidth(), y, title_width + consts.GetBorderWidth() + 2, y + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
   y = y + SIZES.LINE_HEIGHT
@@ -116,6 +117,16 @@ drawSection = function(indents, y, key, group)
   local sortFunc = function(a, b)
     local sort_a = a.value.sort 
     local sort_b = b.value.sort
+
+    if sort_a == nil then
+      local sa = a.key:match("_(%d+)_")
+      if sa ~= nil then sort_a = tonumber(sa) end
+    end
+
+    if sort_b == nil then
+      local sb = a.key:match("_(%d+)_")
+      if sb ~= nil then sort_b = tonumber(sb) end
+    end
 
     if sort_a == nil and sort_b == nil then
       sort_a = a.value.label or a.key or ""

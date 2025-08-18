@@ -577,6 +577,17 @@ function configureDone(group_id, option_id, config_changed)
   end
 
   serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
+
+  local config_options = {
+    Options = {
+      storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
+      tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
+      automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
+      autoupdate = { sort = 4, type = "bool", label = "Auto-Update on Close", raw_value = true },
+    }
+  }
+  
+  config_window.Update(config_options)
 end
 
 function SearchCurrentRecipe()

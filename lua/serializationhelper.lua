@@ -38,15 +38,11 @@ local function getGmcpValue(gmcp_field)
   return deserialize(value)
 end
 
-local function getSerializedVariable(variable_name, default_value, backup_variable)
+local function getSerializedVariable(variable_name, default_value)
+  Note("Getting: " .. variable_name)
   local serialized_text = GetVariable(variable_name) or ""
   if serialized_text ~= "" then
     return deserialize(serialized_text)
-  elseif backup_variable ~= nil then
-    serialized_text = GetVariable(variable_name) or ""
-    if serialized_text ~= "" then
-      return deserialize(serialized_text)
-    end
   elseif default_value ~= nil then
     return default_value
   else

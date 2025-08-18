@@ -886,6 +886,8 @@ end
 function CheckForUpdates()
   if can_update then
     update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "curio_sort.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
   else
     ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end

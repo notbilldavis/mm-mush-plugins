@@ -439,10 +439,15 @@ end
 function Configure(args)
   local option, value = args:match("%s-(%a-)%s-(%a-)")
   if config_installed then   
-    config_window.Show(quest_window.GetConfiguration(), quest_window.OnConfigureDone)
+    config_window.Show(quest_window.GetConfiguration(), onConfigureDone)
   else
-    
+    -- todo
   end  
+end
+
+function onConfigureDone(group_id, option_id, config)
+  quest_window.OnConfigureDone(group_id, option_id, config)
+  config_window.Update(quest_window.GetConfiguration())
 end
 
 function ShowPursuerOptions()
@@ -512,6 +517,8 @@ function CheckForUpdates()
     update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/quest_miniwindow.lua")
     update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/questsearcher.lua")
     update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
   else
     ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end

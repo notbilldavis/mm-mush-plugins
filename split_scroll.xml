@@ -48,141 +48,100 @@ Use "split update" to update from github.
     <send>Configure()</send>
   </alias>
 
-  <alias match="^split[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>ShowDebug()</send>
-  </alias>
-
   <alias match="^split[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>checkForUpdates()</send>
   </alias>
 </aliases>
 
-<triggers>
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
-    <send>OnFirstPrompt()</send>
-  </trigger>
-</triggers>
-
 <script>
 
 <![CDATA[
 
-function tryRequire(required_name, required_remote_url)
-  local is_installed, required_ref = pcall(require, required_name)
-  if not is_installed then
-    local https = require("ssl.https")
-    local ltn12 = require("ltn12")
-    local response = {}
-    local _, dl_res = https.request {
-        url = required_remote_url,
-        sink = ltn12.sink.table(response)
-    }
-    if (dl_res == 200) then
-      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
-      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
-      new_file:write(required_ref_file)
-      new_file:flush()
-      new_file:close()
-      is_installed, required_ref = pcall(require, required_name)
-    end
-  end
+local can_update, update_helper = pcall(require, "updatehelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local const_installed, consts = pcall(require, "consthelper")
 
-  if not is_installed then
-    ColourNote("red" , "black", "Could not download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
-  end
-
-  return is_installed, required_ref
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
 end
 
-local can_configure, Configuration = tryRequire("configuration_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua")
+if can_update then
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+end
+
 local WIN = GetPluginID()
 local FONT = WIN .. "_font"
 
 local LINE_HEIGHT
-local BORDER
-local LEFT
-local RIGHT
-local TOP
 local WINDOW_HEIGHT
+local WINDOW_WIDTH
 
-local SS_CONFIGURATION = {
-  BUTTON_X_DISTANCE = 225,
-  BUTTON_Y_DISTANCE = 100,
-  BUTTON_HEIGHT = 50,
-  BUTTON_WIDTH = 50,
-  BUTTON_COLOR = ColourNameToRGB("dimgray"),
-  ARROW_COLOR = ColourNameToRGB("darkgray"),
-  SPLIT_FONT = nil,
-  ROW_COUNT = 25,
-  VARIABLE_COUNT = 650
-}
+local CONFIG = nil
 
 counter = 0
 init = false
 
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-end
-
-function OnPluginClose()
-  hideWindow()
-end
-
-function OnPluginDisable()
-  hideWindow()
-end
-
-function OnPluginDisconnect()
-  checkForUpdates()
-end
+function OnPluginInstall() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
 
 function doOnHelp()
   ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
 end
 
-function OnFirstPrompt()
-  EnableTrigger("first_prompt", false)
-
-  loadSavedData()
-  createWindowAndFont()
-
-  init = true
-end
-
-function loadSavedData()
-  local serialized_config = GetVariable("splitscroll_config") or ""
-  if serialized_config == "" then
-    local def_font, def_size = GetInfo(20) or "Lucida Console", GetInfo(213) or 10
-    SS_CONFIGURATION = {
-      BUTTON_X_DISTANCE = 250,
-      BUTTON_Y_DISTANCE = 100,
-      BUTTON_HEIGHT = 50,
-      BUTTON_WIDTH = 50,
-      BUTTON_COLOR = ColourNameToRGB("dimgray"),
-      ARROW_COLOR = ColourNameToRGB("darkgray"),
-      SPLIT_FONT = { name = def_font, size = def_size },
-      ROW_COUNT = 15,
-      VARIABLE_COUNT = 800
-    }
-  else
-    SS_CONFIGURATION = Deserialize(serialized_config)
+function pluginStart()
+  if not serialization_helper or not config_installed or not const_installed then
+    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
   end
+
+  loadConfig()
+  create()
 end
 
-function createWindowAndFont()
-  local font = SS_CONFIGURATION["SPLIT_FONT"]
-  
-  WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
+function pluginStop()
+  config_window.Hide()
+  if can_update and CONFIG.AUTOUPDATE then
+    checkForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end  
+end
+
+function loadConfig()
+  local def_font, def_size = GetInfo(20) or "Lucida Console", GetInfo(213) or 10
+  CONFIG = serialization_helper.GetSerializedVariable("splitscroll_config")  
+  CONFIG.BORDER_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BORDER_COLOR, ColourNameToRGB("silver"))
+  CONFIG.BUTTON_X_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_X_DISTANCE, 250)
+  CONFIG.BUTTON_Y_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_Y_DISTANCE, 100)
+  CONFIG.BUTTON_HEIGHT = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_HEIGHT, 50)
+  CONFIG.BUTTON_WIDTH = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_WIDTH, 50)
+  CONFIG.BUTTON_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_COLOR, ColourNameToRGB("dimgray"))
+  CONFIG.ARROW_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ARROW_COLOR, ColourNameToRGB("darkgray"))
+  CONFIG.SPLIT_FONT = serialization_helper.GetValueOrDefault(CONFIG.SPLIT_FONT, { name = def_font, size = def_size })
+  CONFIG.ROW_COUNT = serialization_helper.GetValueOrDefault(CONFIG.ROW_COUNT, 15)
+  CONFIG.VARIABLE_COUNT = serialization_helper.GetValueOrDefault(CONFIG.VARIABLE_COUNT, 800)
+  CONFIG.WINDOW_LEFT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LEFT, consts.GetOutputLeftOutside())
+  CONFIG.WINDOW_RIGHT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_RIGHT, consts.GetOutputRightOutside())
+end
+
+function create()
+  local font = CONFIG["SPLIT_FONT"]  
   WindowFont(WIN, FONT, font.name, font.size)
   
-  LINE_HEIGHT = GetInfo(212) --(WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 1) + 1
-  BORDER = GetInfo(277)
-  WINDOW_HEIGHT = LINE_HEIGHT * (SS_CONFIGURATION["ROW_COUNT"] + 1) + BORDER + 4
+  LINE_HEIGHT = GetInfo(212)
+  WINDOW_HEIGHT = LINE_HEIGHT * CONFIG.ROW_COUNT
+  WINDOW_WIDTH = CONFIG.WINDOW_RIGHT - CONFIG.WINDOW_LEFT
 
-  local bottom = GetPluginVariable("cb6469228f9f7e26129c1ebc", "trbottom") or GetInfo(293)
-  TOP =  (bottom - LINE_HEIGHT * (SS_CONFIGURATION["ROW_COUNT"] + 1)) - BORDER  
-  LEFT = (GetPluginVariable("cb6469228f9f7e26129c1ebc", "trleft") or GetInfo(290)) - BORDER
-  RIGHT =(GetPluginVariable("cb6469228f9f7e26129c1ebc", "trright") or GetInfo(292)) + BORDER + 2
+  local top = consts.GetOutputBottomOutside() - WINDOW_HEIGHT
+
+  WindowCreate(WIN, CONFIG.WINDOW_LEFT, top, WINDOW_WIDTH, WINDOW_HEIGHT,
+    miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
 end
 
 function OnPluginTick()
@@ -190,7 +149,7 @@ function OnPluginTick()
 end
 
 function drawSplitScroll()
-  if not init then return end
+  if CONFIG == nil then return end
 
   counter = counter + 1
   if counter % 13 == 0 then
@@ -201,7 +160,7 @@ function drawSplitScroll()
   local scroll = GetInfo(296)
   local total_height = GetLinesInBufferCount() * GetInfo(212)
 
-  if scroll < total_height - SS_CONFIGURATION["VARIABLE_COUNT"] then
+  if scroll < total_height - CONFIG.VARIABLE_COUNT then
     drawLines()
 
     WindowShow(WIN, true)
@@ -211,18 +170,19 @@ function drawSplitScroll()
 end
 
 function drawLines()
-  WindowCreate(WIN, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
-  WindowRectOp(WIN, miniwin.rect_fill, LEFT, TOP, RIGHT - LEFT, WINDOW_HEIGHT, ColourNameToRGB("black"))
-  WindowLine(WIN, 0, 0, RIGHT, 0, ColourNameToRGB("silver"), miniwin.pen_solid, 2)
-  WindowAddHotspot(WIN, "textarea", 0, 0, RIGHT - LEFT, WINDOW_HEIGHT, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)
+  WindowRectOp(WIN, miniwin.rect_fill, 0, 0, 0, 0, ColourNameToRGB("black"))
+  
+  for i = 0, consts.GetBorderWidth() - 1 do
+    WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, WINDOW_WIDTH - i, WINDOW_HEIGHT - i, CONFIG.BORDER_COLOR)
+  end  
+  
+  WindowAddHotspot(WIN, "textarea", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)
   WindowDragHandler(WIN, "textarea", "OnTextAreaMouseMove", "", 0x10)
   WindowScrollwheelHandler(WIN, "textarea", "OnWheelScroll")
   
-  SELECTED_TEXT = ""
-
   local cnt = 0
   local lines_in_buffer = GetLinesInBufferCount()
-  for line = lines_in_buffer - SS_CONFIGURATION["ROW_COUNT"], lines_in_buffer do
+  for line = lines_in_buffer - CONFIG.ROW_COUNT, lines_in_buffer do
     drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
     cnt = cnt + 1
   end
@@ -231,12 +191,12 @@ function drawLines()
 end
 
 function drawScrollToBottomButton()
-  local btn_left = RIGHT - SS_CONFIGURATION["BUTTON_X_DISTANCE"]
-  local btn_top = WINDOW_HEIGHT - SS_CONFIGURATION["BUTTON_Y_DISTANCE"]
-  local btn_right = btn_left + SS_CONFIGURATION["BUTTON_WIDTH"]
-  local btn_bottom = btn_top + SS_CONFIGURATION["BUTTON_HEIGHT"]
+  local btn_left = WINDOW_WIDTH - consts.GetBorderWidth() - CONFIG.BUTTON_X_DISTANCE
+  local btn_top = WINDOW_HEIGHT - consts.GetBorderWidth() - CONFIG.BUTTON_Y_DISTANCE
+  local btn_right = btn_left + CONFIG["BUTTON_WIDTH"]
+  local btn_bottom = btn_top + CONFIG["BUTTON_HEIGHT"]
 
-  WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, SS_CONFIGURATION["BUTTON_COLOR"])
+  WindowRectOp(WIN, miniwin.rect_fill, btn_left, btn_top, btn_right, btn_bottom, CONFIG.BUTTON_COLOR)
 
   local centerX = (btn_left + btn_right) / 2
   local point1 = { x = centerX, y = btn_bottom - 10 }
@@ -245,13 +205,13 @@ function drawScrollToBottomButton()
 
   local downArrow = string.format("%d,%d,%d,%d,%d,%d", point1.x, point1.y, point2.x, point2.y, point3.x, point3.y)
 
-  WindowPolygon(WIN, downArrow, SS_CONFIGURATION["ARROW_COLOR"], miniwin.pen_solid, 1, SS_CONFIGURATION["ARROW_COLOR"], miniwin.brush_solid, true, false)
+  WindowPolygon(WIN, downArrow, CONFIG.ARROW_COLOR, miniwin.pen_solid, 1, CONFIG.ARROW_COLOR, miniwin.brush_solid, true, false)
   WindowAddHotspot(WIN, "scroll_to_bottom", btn_left, btn_top, btn_right, btn_bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
 end
 
 function drawLine(i, y)
-  local x = BORDER + GetInfo(276)
-  local style_count = GetLineInfo (i, 11)
+  local x = consts.GetBorderWidth() + consts.GetBorderOffset()
+  local style_count = GetLineInfo(i, 11)
   if style_count == nil then 
     WindowText(WIN, FONT, "there was a problem with line " .. i .. ", sorry", x, y, 0, 0, ColourNameToRGB("white"))
     return 
@@ -274,11 +234,9 @@ end
 function OnTextAreaMouseUp(flags, hotspot_id)
   if flags == miniwin.hotspot_got_rh_mouse then
     local menu_items = "Scroll to Bottom | Configure"
-    if hasSelection() then menu_items = "Copy Selection | " .. menu_items end
     local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
     if result == "Scroll to Bottom" then OnScrollToBottom()
     elseif result == "Configure" then Configure()
-    elseif result == "Copy Selection" then copySelectedText()
     end
   end
 end
@@ -308,37 +266,38 @@ function hideWindow()
 end
 
 function Configure()
-  if can_configure then
+  if config_installed then
     local config = {
-      Return_Button = {
-        BUTTON_X_DISTANCE = { label = "Button X Distance", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_X_DISTANCE), raw_value = SS_CONFIGURATION.BUTTON_X_DISTANCE, min = 0, max = 800 },
-        BUTTON_Y_DISTANCE = { label = "Button Y Distance", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_Y_DISTANCE), raw_value = SS_CONFIGURATION.BUTTON_Y_DISTANCE, min = 0, max = 800 },
-        BUTTON_HEIGHT = { label = "Button Height", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_HEIGHT), raw_value = SS_CONFIGURATION.BUTTON_HEIGHT, min = 10, max = 100 },
-        BUTTON_WIDTH = { label = "Button Width", type = "number", value = tostring(SS_CONFIGURATION.BUTTON_WIDTH), raw_value = SS_CONFIGURATION.BUTTON_WIDTH, min = 10, max = 100 },
-        BUTTON_COLOR = { label = "Button Color", type = "color", value = SS_CONFIGURATION.BUTTON_COLOR, raw_value = SS_CONFIGURATION.BUTTON_COLOR },
-        ARROW_COLOR = { label = "Arrow Color", type = "color", value = SS_CONFIGURATION.ARROW_COLOR, raw_value = SS_CONFIGURATION.ARROW_COLOR },
+      _1_PANEL = {
+        BORDER_COLOR = config_window.CreateColorOption(1, "Border", CONFIG.BORDER_COLOR, "The border color for the entire panel."),
+        SPLIT_FONT = config_window.CreateFontOption(2, "Font", CONFIG.SPLIT_FONT, "The font used to display what is captured, should be the same as output."),
+        ROW_COUNT = config_window.CreateNumberOption(3, "Row Count", CONFIG.ROW_COUNT, 1, 20, "Total number of rows to keep updated while you scroll."),
+        VARIABLE_COUNT = config_window.CreateNumberOption(4, "Variable Count", CONFIG.VARIABLE_COUNT, 0, 2000, "A magic number you can fiddle with to fix when the split shows."),
       },
-      Split_Options = {
-        ROW_COUNT = { label = "Number of Rows", type = "number", value = tostring(SS_CONFIGURATION.ROW_COUNT), raw_value = SS_CONFIGURATION.ROW_COUNT },
-        SPLIT_FONT = { label = "Font", type = "font", value = SS_CONFIGURATION.SPLIT_FONT.name .. " (" .. SS_CONFIGURATION.SPLIT_FONT.size .. ")", raw_value = SS_CONFIGURATION.SPLIT_FONT },
-        VARIABLE_COUNT = { label = "Variable Count", type = "number", value = SS_CONFIGURATION.VARIABLE_COUNT, raw_value = SS_CONFIGURATION.VARIABLE_COUNT },
+      _2_SCROLL_BUTTON = {
+        BUTTON_X_DISTANCE = config_window.CreateNumberOption(1, "X-Offset", CONFIG.BUTTON_X_DISTANCE, 0, 1000, "The distance from the right edge of the panel."),
+        BUTTON_Y_DISTANCE = config_window.CreateNumberOption(2, "Y-Offset", CONFIG.BUTTON_Y_DISTANCE, 0, 1000, "The distance from the bottom edge of the panel."),
+        BUTTON_HEIGHT = config_window.CreateNumberOption(3, "Height", CONFIG.BUTTON_HEIGHT, 5, 250, "The height of the button."),
+        BUTTON_WIDTH = config_window.CreateNumberOption(4, "Width", CONFIG.BUTTON_WIDTH, 5, 250, "The width of the button."),
+        BUTTON_COLOR = config_window.CreateColorOption(5, "Background Color", CONFIG.BUTTON_COLOR, "The background color of the button."),
+        ARROW_COLOR = config_window.CreateColorOption(6, "Foreground Color", CONFIG.ARROW_COLOR, "The foreground color of the button. Specifically the arrow.")
+      },
+      _3_POSITION = {
+        WINDOW_LEFT = config_window.CreateNumberOption(1, "Left", CONFIG.WINDOW_LEFT, 0, CONFIG.WINDOW_RIGHT, "The left most position of the entire panel."),
+        WINDOW_RIGHT = config_window.CreateNumberOption(1, "Right", CONFIG.WINDOW_RIGHT, CONFIG.WINDOW_LEFT, consts.GetClientWidth() - 250, "The right most position of the entire panel."),
       }
     }
-    Configuration.Show(config, configureDone)
+    
+    config_window.Show(config, onConfigureDone)
   else
     Note("Make sure you have the configuration_miniwindow.lua file in your lua folder and reinstall this plugin.")
   end
 end
 
-function configureDone(group_id, option_id, config)
-  SS_CONFIGURATION[option_id] = config.raw_value
-  SetVariable("splitscroll_config", Serialize(SS_CONFIGURATION))
-  
-  if group_id == "Split_Options" then
-    createWindowAndFont()
-  end
-
-  drawSplitScroll()
+function onConfigureDone(group_id, option_id, config)
+  CONFIG[option_id] = config.raw_value
+  serialization_helper.SaveSerializedVariable("splitscroll_config", CONFIG)
+  create()  
 end
 
 function ShowDebug()
@@ -351,50 +310,14 @@ function ShowDebug()
   Note("right: " .. RIGHT)
 end
 
-function Serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return Serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
-function Deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
-  else
-    return nil, "Failed to load string"
-  end
-end
-
 function checkForUpdates()
-  local updater_installed, updater = tryRequire("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua")
-
-  if not updater_installed then
-    ColourNote("red" , "black", "Could not download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "split_scroll.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
   else
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/split_scroll.xml" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration.lua" }
-    })
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
 end
 

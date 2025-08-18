@@ -48,6 +48,9 @@ Use 'capture update' to check for updates from github.
   <alias enabled="y" match="^capture debug$" regexp="y" send_to="12" sequence="100">
     <send>doDebug()</send>
   </alias>
+  <alias enabled="y" match="^capture config$" regexp="y" send_to="12" sequence="100">
+    <send>configure()</send>
+  </alias>
   <alias match="^capture[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>checkForUpdates()</send>
   </alias>
@@ -218,6 +221,18 @@ Use 'capture update' to check for updates from github.
     <send>doCapture(TriggerStyleRuns, "%0", "relay")</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) the Powers have granted thee a Mark\!$" regexp="y" send_to="14" sequence="100">
+    <send>doCapture(TriggerStyleRuns, "%0", "announce")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You have made some progress towards improving your skill in (.*?)\!$" regexp="y" send_to="14" sequence="100">
+    <send>doCapture(TriggerStyleRuns, "%0", "betters")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^You have become more learned at (.*?)\.$" regexp="y" send_to="14" sequence="100">
+    <send>doCapture(TriggerStyleRuns, "%0", "betters")</send>
+  </trigger>
+
   <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
     <send>OnFirstPrompt()</send>
   </trigger>
@@ -228,99 +243,56 @@ Use 'capture update' to check for updates from github.
 
 <![CDATA[
 
-function ensureRequired(required_name, required_remote_url, should_return)
-  local existing_file = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "r")
-  if not existing_file then
-    local https = require("ssl.https")
-    local ltn12 = require("ltn12")
-    local response = {}
-    local _, dl_res = https.request {
-        url = required_remote_url,
-        sink = ltn12.sink.table(response)
-    }
-    if (dl_res == 200) then
-      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
-      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
-      new_file:write(required_ref_file)
-      new_file:flush()
-      new_file:close()
-    end
-  end
+local can_update, update_helper = pcall(require, "updatehelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local capture_installed, capture_window = pcall(require, "tabbed_miniwindow")
+local colors_installed, colors_helper = pcall(require, "colorshelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local const_installed, consts = pcall(require, "consthelper")
 
-  if should_return then 
-    return pcall(require, required_name)
-  end
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
 end
 
-ensureRequired("colorshelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/colorshelper.lua", false)
-ensureRequired("tabbed_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/tabbed_miniwindow.lua", false)
+if can_update then
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  if not capture_installed then capture_installed, capture_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/tabbed_miniwindow.lua") end
+  if not colors_installed then colors_installed, colors_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/colorshelper.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+end
 
 require "gmcphelper"
-require "colorshelper"
-require "tabbed_miniwindow"
 
-local GAGS = {
-  shout = { 
-    "Shop the fine wares at the Alyrian Bazaar", 
-    "Hear ye, hear ye, adventurers of", 
-    "back from a long absence!" 
-  },
-  yell = {
-    "available in Agatha's Shoppe of Illusions!",
-    "A masculine voice yells",
-    "Ferry is now docked at",
-    "The ship Merdraco be docked at",
-    "Step right up, step right up!",
-    "If you'd like information on quests, please visit me at the Shrine of St. Wisehart!",
-    "Unbreakable, level-scaling weapons for sale in the village's main street, near the Shrine!",
-    "Come visit the Crystal Guild's hall near the cemetery",
-    "Attention! Get your nefarious wares at the Xaltian Bazaar!"
-  },
-  say = {
-    "[CLAN]",
-    " clan members heard you say, '"
-  },
-  tell = {
-    "'I don't know any skills in which I could train you.'"
-  }
-}
+local CHARACTER_NAME = nil
 
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  EnableTrigger("first_prompt", true)
-  PrepareMiniWindow()
-end
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
 
-function OnPluginEnable()
+function pluginStart()
+  if not capture_installed or not config_installed or not colors_installed then
+    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  end
+
   CHARACTER_NAME = nil
   EnableTrigger("first_prompt", true)
-  PrepareMiniWindow()
+  capture_window.Prepare()
 end
 
-function OnPluginConnect()
-  CHARACTER_NAME = nil
-  EnableTrigger("first_prompt", true)
-  PrepareMiniWindow()
-end
-
-function OnPluginClose()
-  hideWindow()
-end
-
-function OnPluginDisable()
-  hideWindow()
-end
-
-function OnPluginSaveState()
-  saveMiniWindow()
-end
-
-function OnPluginDisconnect()
-  checkForUpdates()
-end
-
-function doOnHelp()
-  ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
+function pluginStop()
+  capture_window.Close()
+  config_window.Hide()
+  if can_update and capture_window.IsAutoUpdateEnabled() then
+    checkForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end  
 end
 
 function OnFirstPrompt()
@@ -334,7 +306,7 @@ function setCharacterName(name)
   else
     CHARACTER_NAME = name
     
-    InitializeMiniWindow(name)
+    capture_window.Initialize(name)
   end
 end
 
@@ -343,7 +315,10 @@ function OnPluginBroadcast(msg, id, pname, text)
     if text == "char.gecho_notification" then
       captureGlobalEcho()
     elseif (text == "char.base") then
-      HandleGmcpCharacterBase()
+      if character_name == nil or character_name == "" then
+        local character = serialization_helper.GetGmcpValue(text)
+        setCharacterName(character.name)
+      end
     end
   end
 
@@ -352,114 +327,42 @@ function OnPluginBroadcast(msg, id, pname, text)
   end
 end
 
-function HandleGmcpCharacterBase()
-  if CHARACTER_NAME == nil or CHARACTER_NAME == "" then
-    local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
-    luastmt = "gmcpdata = " .. gmcparg
-    assert(loadstring(luastmt or ""))()
-    local name = gmcpval("name")
-    setCharacterName(name)
-  end
-end
-
 function doCapture(trigger_style_runs, line, type)
-  if shouldSkip(type, line) then return end
-
-  captureText("silver", "black", "[".. getDateString() .. "] ", type)
-
-  for i = 1, #trigger_style_runs do
-    local txt = trigger_style_runs[i].text
-
-    if (string.find(txt, "Novice")) then
-      txt = string.gsub(txt, "%[CLAN Novice Adventurers%]", "%[Novice%]")
-      txt = string.gsub(txt, "Novice clan members", "Novices")
-      txt = string.gsub(txt, "Novice clan member", "Novice")
-    end
-
-    if (string.find(txt, "Vandemaar's Magic Mirror")) then
-      txt = string.gsub(txt, "^You hear (.+) say through Vandemaar's Magic Mirror:", "%(mirror%) %1:")
-    end
-
-    local fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
-    local bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
-
-    captureText(fgcol, bgcol, txt, type)
-  end
-
-  captureText("silver", "black", "\r\n", type)  
-end
-
-function captureText(fgcol, bgcol, txt, type)
-  if (not styles) then
-    styles = {}
-  end
-
-  if (txt == "\r\n") then
-    AddStyledLine(type, styles)
-    styles = {}
-  else
-    styles[#styles + 1] = {
-      text = txt,
-      textcolour = ColourNameToRGB(fgcol),
-      backcolour = ColourNameToRGB(bgcol)
-    }
-  end
-end
-
-function shouldSkip(channel, line)
-  if GAGS[channel] ~= nil then    
-    for i = 1, #GAGS[channel] do
-      if string.find(line:lower(), GAGS[channel][i]:lower(), 1, true) then
-        return true
-      end
-    end
-  end
-  return false
+  capture_window.Capture(trigger_style_runs, line, type)
 end
 
 function captureAffects(text)
-  captureText("silver", "black", "\r\n", "affects")
-  captureText("silver", "black", "[".. getDateString() .. "] ", "affects")
-  captureText("springgreen", "black", "[AFFECTS] ", "affects")
-  captureText("white", "black", text, "affects")
-  captureText("silver", "black", "\r\n", "affects")
+  local style_runs = {
+    { text = "[AFFECTS] ", textcolour = "springgreen", backcolour = "black" },
+    { text = text, textcolour = "white", backcolour = "black" }
+  }
+
+  capture_window.Capture(style_runs, text, "affects")
 end
 
 function captureGlobalEcho()
-  local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.gecho_notification")
-  luastmt = "gmcpdata = " .. gmcparg
-  assert(loadstring(luastmt or ""))()
-  local msg = gmcpval("gecho_msg")
-
-
-  if msg ~= nil and #msg > 0 then
-    captureText("silver", "black", "\r\n", "announce")
-    captureText("silver", "black", "[".. getDateString() .. "] ", "announce")
+  local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification").name)
+  if msg ~= nil and msg ~= "" then
 
     local aux = strip_crlfs(msg)
-
-    local fg, bg, col, txt
-    fg = "silver"
-    bg = "black"
-
-    for x in string.gmatch(aux, "|[^|]*") do
+    local fg, bg, col, txt = "silver", "black", nil, nil
+    
+    for x in aux:gmatch("|[^|]*") do
       fg, bg, col, txt = colorizeGlobalEcho(x, fg, bg, col, txt)
 
-      if (txt) then
-        if (string.find(txt, "|")) then
-          for line in string.gmatch(txt, "[^|]*|") do
-            line = string.match(line, "(.+)|")
+      if txt then
+        if txt:find("|") then
+          for line in txt:gmatch("[^|]*|") do
+            line = line:match("(.+)|")
             line = Trim(line or "")
 
             if (line ~= "") then
-              captureText(fg, bg, line, "announce")
+              capture_window.Capture({ text = line, textcolour = fg, backcolour = bg }, txt, "announce")
             end
-
-            captureText("silver", "black", "\r\n", "announce")
           end
 
         else
-          captureText(fg, bg, txt .. "\r\n", "announce")
+          capture_window.Capture({ text = txt, textcolour = fg, backcolour = bg }, txt, "announce")
         end
       end
     end
@@ -505,17 +408,19 @@ function colorizeGlobalEcho(x, fg, bg, col, txt)
 end
 
 function checkForUpdates()
-  local updater_installed, updater = ensureRequired("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua", true)
-
-  if not updater_installed then
-    ColourNote("red" , "black", "Could not get download 'updatehelper.lua' from github. Get it manually, reinstall, and try again.")
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "tabbed_captures.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/tabbed_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
   else
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/tabbed_captures.xml" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/tabbed_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/tabbed_miniwindow.lua" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua" }
-    })
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
+end
+
+function configure()
+  capture_window.Configure()
 end
 
 ]]>

@@ -88,207 +88,103 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 <aliases>
 
-  <alias match="^affects[ ]+add$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>AddButton(nil, nil, nil)</send>
+  <alias match="^affects[ ]+add(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>AddButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+add[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>AddButton("%1", "%2", "%3")</send>
+  <alias match="^affects[ ]+edit(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>EditButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+edit[ ]+(.*?) a\:(.*?) c\:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>EditButton("%1", "%2", "%3")</send>
+  <alias match="^affects[ ]+delete(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>DeleteButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+edit[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>EditButton("%1", nil, nil)</send>
+  <alias match="^affects[ ]+rename(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>RenameButton("%1", "%2")</send>
   </alias>
 
-  <alias match="^affects[ ]+delete[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.DeleteButton("%1")</send>
+  <alias match="^affects[ ]+move(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>MoveButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+rename[ ]+(.*?)[ ]+n:(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.RenameButton("%1", "%2")</send>
+  <alias match="^affects[ ]+(?:config|configure)\b(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Configure("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
-  </alias>
-
-  <alias match="^affects[ ]+move[ ]+up[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.MoveButtonUp("%1")</send>
-  </alias>
-
-  <alias match="^affects[ ]+move[ ]+down[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.MoveButtonDown("%1")</send>
-  </alias>
-
-  <alias match="^affects[ ]+buttons[ ]+width[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.SetWidth("%1")</send>
-  </alias>
-
-  <alias match="^affects[ ]+buttons[ ]+font$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.SetFont()</send>
-  </alias>
-
-  <alias match="^affects[ ]+header$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.ToggleHeader()</send>
-  </alias>
-
-  <alias match="^affects[ ]+header[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.SetHeaderText("%1")</send>
-  </alias>
-
-  <alias match="^affects[ ]+buttons[ ]+lock$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.ToggleLockPosition()</send>
-  </alias>
-
-  <alias match="^affects[ ]+stretch$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.ToggleStretchHeight()</send>
-  </alias>
-
-  <alias match="^affects[ ]+broadcast$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.ShowBroadcasts()</send>
-  </alias>
-
-  <alias match="^affects[ ]+broadcast[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.ToggleBroadcastAffect("%1")</send>
+  <alias match="^affects[ ]+broadcast(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>Broadcast("%1")</send>
   </alias>
 
   <alias match="^affects[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>setCharacterName("%1")</send>
-  </alias>
-
-  <alias match="^affects[ ]+negative$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>BadAffects.ToggleEnabled()</send>
-  </alias>
-
-  <alias match="^affects[ ]+configure$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Configure()</send>
+    <send>SetCharacterName("%1")</send>
   </alias>
 
   <alias match="^affects[ ]+cast[ ]+favorites" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons.CastFavorites()</send>
+    <send>CastFavorites()</send>
   </alias>
   
-  <alias match="^affects[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>Buttons._debug()</send>
-  </alias>
-
   <alias match="^affects[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
-    <send>checkForUpdates()</send>
+    <send>CheckForUpdates()</send>
   </alias>
 
 </aliases>
 
 <triggers>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) knocks (.*?) from your grip\.$">
-    <send>DisarmedBroadcast("%2")</send>
-  </trigger>
-
-  <trigger enabled="y" name="start_affects" keep_evaluating="y" match="^You are affected by the following\:$" regexp="y" send_to="12" sequence="100">
-    <send>
-        notify = false
-        EnableTriggerGroup("get_affects", true)
-        Buttons.ClearMiniWindow()
-    </send>
-  </trigger>
-
-  <trigger enabled="y" name="stop_affects1" keep_evaluating="y" match="^Total of (.*?) magical and (.*?) non\-magical affects\.$" regexp="y" send_to="12" sequence="100">
-    <send>
-        EnableTriggerGroup("get_affects", false)
-        Buttons.DrawMiniWindow()
-        notify = true
-    </send>
-  </trigger>
-
-  <trigger enabled="y" name="stop_affects2" keep_evaluating="y" match="^Total of (.*?) magical affects\.$" regexp="y" send_to="12" sequence="100">
-    <send>
-        EnableTriggerGroup("get_affects", false)
-        Buttons.DrawMiniWindow()
-        notify = true
-    </send>
-  </trigger>
-
-  <trigger enabled="y" name="stop_affects3" keep_evaluating="y" match="^Total of (.*?) non\-magical affects\.$" regexp="y" send_to="12" sequence="100">
-    <send>
-        EnableTriggerGroup("get_affects", false)
-        Buttons.DrawMiniWindow()
-        notify = true
-    </send>
-  </trigger>
-
-  <!-- casted affects with timer -->
-
-  <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "%4", false)</send>
-  </trigger>  
-
-  <trigger enabled="y" group="get_affects" keep_evaluating="n" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "%4", false)</send>
-  </trigger>
-
-  <!-- estimate duration when recasted before expiration -->
-
-  <trigger enabled="y" keep_evaluating="n" match="^You have increased the duration of the spell \'(.*?)\'\.$" regexp="y" send_to="12" sequence="100">
-    <send>RecastAffect("%1")</send>
-  </trigger>
-  
-  <!-- permanent affects -->
-
-  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Spell\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "-1", false)</send>
-  </trigger>
-
-  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Affect\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "-1", false)</send>
-  </trigger>
-
-  <trigger enabled="y" group="get_affects" keep_evaluating="y" match="^Disease\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("%1", "-1", false)</send>
-  </trigger>
-
-  <!-- removals -->
-
-  <trigger enabled="y" keep_evaluating="y" match="^\[Off\: You lose (.*?)\] (.*?)\.$" regexp="y" send_to="12" sequence="100">
-    <send>RemoveAffect("%1")</send>
-  </trigger>
-
-  <trigger enabled="y" keep_evaluating="y" match="^You are surrounded by an ochre glow as the last vestiges of \'(.*?)\' are burned from your body\.$" regexp="y" send_to="12" sequence="100">
-    <send>RemoveAffect("%1")</send>
-  </trigger>
-  
-  <!-- on first prompt -->
-
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+  <trigger match="^(|[^ ]+(.*?))(\<(.+)hp (.+)sp (.+)st\>|\(.+\)) $" enabled="y" name="first_prompt" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
     <send>OnFirstPrompt()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You are affected by the following\:$" enabled="y" name="start_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>StartCapturingAffects()</send>
+  </trigger>
+
+  <trigger match="^Total of (.*?)magical(.*?) affects\.$" enabled="y" name="stop_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>StopCapturingAffects()</send>
+  </trigger>
+
+  <trigger match="^(?:Spell|Affect)\:(.*?)\- Level (.*?)\, modifies (.*?) for (.*?) minute(.*?)$" enabled="y" group="get_affects" keep_evaluating="n" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "%4", false)</send>
+  </trigger>
+
+  <trigger match="^(?:Spell|Affect|Disease|Prof)\:(.*?)\- Level (.*?)\, modifies (.*?)by(.*?).(.*?)$" enabled="y" group="get_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>SetAffect("%1", "-1", false)</send>
+  </trigger>
+
+  <trigger match="^You have increased the duration of the spell \'(.*?)\'\.$" enabled="y" keep_evaluating="n" regexp="y" send_to="12" sequence="100">
+    <send>RecastAffect("%1")</send>
+  </trigger>
+
+  <trigger match="^\[Off\: You lose (.*?)\] (.*?)\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("%1")</send>
+  </trigger>
+
+  <trigger match="^You are surrounded by an ochre glow as the last vestiges of \'(.*?)\' are burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("%1")</send>
+  </trigger>
+  
+  <trigger match="^(.*?) knocks (.*?) from your grip\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" >
+    <send>DisarmedBroadcast("%2")</send>
+  </trigger> 
+
+  <trigger match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
     <send>SetAffect("wolf_familiar", "120")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" regexp="y" send_to="12" sequence="100">
+  <trigger match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
     <send>RemoveAffect("wolf_familiar")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^You feel relieved as the plague is burned from your body\.$" regexp="y" send_to="12" sequence="100">
-    <send>RemoveAffect("plague")</send>
-  </trigger>
-
-  <trigger enabled="y" keep_evaluating="y" match="^You feel relieved as the poison is burned from your body\.$" regexp="y" send_to="12" sequence="100">
-    <send>RemoveAffect("poison")</send>
+  <trigger match="^You feel relieved as the (plague|poison) is burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+    <send>RemoveAffect("%1")</send>
   </trigger>
 </triggers>
 
 <timers>
 
   <timer name="affects_timer" enabled="y" second="10" offset_second="0.00" send_to="12" active_closed="y">
-    <send>
-      Buttons.DrawMiniWindow()
-    </send>
+    <send>TimerTriggered()</send>
   </timer>
 
 </timers>
@@ -299,148 +195,240 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 require "gmcphelper"
 
-function tryRequire(required_name, required_remote_url)
-  local is_installed, required_ref = pcall(require, required_name)
-  if not is_installed then
-    local https = require("ssl.https")
-    local ltn12 = require("ltn12")
-    local response = {}
-    local _, dl_res = https.request {
-        url = required_remote_url,
-        sink = ltn12.sink.table(response)
-    }
-    if (dl_res == 200) then
-      local required_ref_file = table.concat(response):gsub("\r\n", "\n")
-      local new_file, res, res_code = io.open(GetInfo(56):gsub("\\", "/") .. "lua/" .. required_name .. ".lua", "wb")
-      new_file:write(required_ref_file)
-      new_file:flush()
-      new_file:close()
-      is_installed, required_ref = pcall(require, required_name)
+local can_update, update_helper = pcall(require, "updatehelper")
+local const_installed, consts = pcall(require, "consthelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local buttons_installed, buttons_window = pcall(require, "affectsbuttons_miniwindow")
+local badaffects_installed, badaffects_window = pcall(require, "badaffects_miniwindow")
+
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
+end
+
+if can_update then
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  if not buttons_installed then buttons_installed, buttons_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/affectsbuttons_miniwindow.lua") end
+  if not badaffects_installed then badaffects_installed, badaffects_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/badaffects_miniwindow.lua") end
+end
+
+local notify_changes = true
+
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
+
+function OnPluginBroadcast(msg, id, name, text)
+  if (id == "f67c4339ed0591a5b010d05b") then
+    if (text == "char.affect_application_msg") then
+      handleGmcpAdd()
+    elseif (text == "char.affect_removal_msg") then
+      handleGmcpRemove()
+    elseif (text == "char.base") then
+      handleGmcpCharacterName()
+    end
+  end
+end
+
+function pluginStart()
+  if not const_installed or not serializer_installed or not config_installed or not buttons_installed or not badaffects_installed then 
+    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  end
+  
+  EnableTrigger("first_prompt", true)
+  EnableTriggerGroup("get_affects", false)
+  buttons_window.Prepare()
+end
+
+function pluginStop()
+  if can_update and buttons_window.IsAutoUpdateEnabled() then
+    CheckForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end  
+
+  buttons_window.Close()
+  badaffects_window.Close()
+  config_window.Hide()
+end
+
+-----------------
+--   Aliases   --
+-----------------
+
+function AddButton(args)
+  local title, affect, command = getCrudArgs(args)
+  buttons_window.AddButton(title, affect, command)
+end
+
+function EditButton(args)
+  local title, affect, command = getCrudArgs(args)
+  buttons_window.EditButton(title, affect, command)
+end
+
+function DeleteButton(title)
+  buttons_window.DeleteButton(title)
+end
+
+function RenameButton(args)
+  local title, new_title = nil, nil
+  if string.find(args, "n:", 1, true) ~= nil then title, new_title = args:match("%s-(.+) n:(.+)%s-") 
+  else title = args end
+  buttons_window.RenameButton(title, new_title)
+end
+
+function getCrudArgs(args)
+  if args == nil then args = "" end
+  local has_affect, has_command = false, false
+  if string.find(args, "a:", 1, true) ~= nil then has_affect = true end
+  if string.find(args, "c:", 1, true) ~= nil then has_command = true end
+  
+  local title, affect, command = nil, nil, nil
+  if not has_affect and not has_command then
+    title = args
+  elseif not has_command then
+    title, affect = args:match("%s-(.+) a:(.+)%s-")
+  elseif not has_affect then
+    title, command = args:match("%s-(.+) c:(.+)%s-")
+  else
+    title, affect, command = args:match("%s-(.+) a:(.+)%s- c:(.+)%s-")
+    if title == nil or affect == nil or command == nil then
+      title, command, affect = args:match("%s-(.+) c:(.+)%s- a:(.+)%s-")
     end
   end
 
-  if not is_installed then
-    ColourNote("red" , "black", "Could not download '".. required_name .. ".lua' from github. Get it manually, reinstall, and try again.")
+  if affect ~= nil then affect = parseAffect(affect) end
+  return title, affect, command
+end
+
+function MoveButton(args)
+  local direction, title = args:match("%s-(%a+) (.+)%s-") 
+  if direction == nil or title == nil then 
+    Note("Move a button with 'affects move (up|down) <button title>'") 
+  else
+    if Trim(direction:lower()) == "up" then
+      buttons_window.MoveButtonUp(title)
+    elseif Trim(direction:lower()) == "down" then
+      buttons_window.MoveButtonDown(title)
+    else
+      Note("Move a button with 'affects move (up|down) <button title>'") 
+    end
+  end  
+end
+
+function Configure(args)
+  local which, option, value = args:match("%s-(%a+)%s-(%a-)%s-(%a-)")
+  if config_installed then 
+    local config = {}
+    if which == nil or which:sub(1, 6) == "button" then
+      config.Button_Options = buttons_window.GetConfiguration()
+    end
+    if which == nil or which:sub(1, 8) == "negative" then
+      config.Negative_Affects_Options = badaffects_window.GetConfiguration()
+    end
+    config_window.Show(config, buttons_window.OnConfigureDone)
+  else
+    
+  end  
+end
+
+function Broadcast(args)
+  if args == nil or Trim(args) == "" then
+    buttons_window.ShowBroadcasts()
+  else
+    buttons_window.ToggleBroadcastAffect(Trim(args:lower()))
   end
-
-  return is_installed, required_ref
 end
 
-buttons_installed, Buttons = tryRequire("affectsbuttons_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/affectsbuttons_minimindow.lua")
-config_installed, Configuration = tryRequire("configuration_miniwindow", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua")
-
-local CHARACTER_NAME
-
-notify = true
-
------------------
--- plugin stuff
------------------
-
-function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  if not buttons_installed or not config_installed then 
-    ColourNote("black", "red", "You do not have the required files in your lua directory. Expect issues.") 
-  end
-
-  EnableTrigger("first_prompt", true)
-  EnableTriggerGroup("get_affects", false)
-  Buttons.PrepareMiniWindow()
-end
-
-function OnPluginEnable()
-  CHARACTER_NAME = nil
-  EnableTriggerGroup("get_affects", false)
-  EnableTrigger("first_prompt", true)
-  Buttons.PrepareMiniWindow()
-end
-
-function OnPluginConnect()
-  CHARACTER_NAME = nil
-  EnableTriggerGroup("get_affects", false)
-  EnableTrigger("first_prompt", true)
-  Buttons.PrepareMiniWindow()
-end
-
-function OnPluginClose()
-  Buttons.CloseMiniWindow()
-  Configuration.Hide()
-end
-
-function OnPluginDisable()
-  Buttons.CloseMiniWindow()
-  Configuration.Hide()
-end
-
-function OnPluginSaveState()
-  Buttons.SaveMiniWindow()
-end
-
-function OnPluginDisconnect()
-  Buttons.CloseMiniWindow()
-  Configuration.Hide()
-  checkForUpdates()
-end
-
-function OnFirstPrompt()
-  EnableTrigger("first_prompt", false)
-  Execute("sendgmcp char.base")
-end
-
-function setCharacterName(name)
+function SetCharacterName(name)
   if name == nil or name == "" then
     Note("Unknown character name, set with 'affects setchar <name>'") 
   else
-    CHARACTER_NAME = name
-    
-    Buttons.InitializeMiniWindow(name)
-    
-    if Buttons.CURRENT_AFFECTS == nil then
-      Send("affects")
-    end
+    buttons_window.Initialize(name)
+    badaffects_window.Initialize(name)
+    DoAfter(1, "affects")
   end
 end
 
------------------
--- affects dict
------------------
+function CastFavorites()
+  buttons_window.CastFavorites()
+end
+
+function CheckForUpdates()
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "affects_buttons.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/affectsbuttons_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/badaffects_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
+  else
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
+  end
+end
+
+----------------
+-- Triggers   --
+----------------
+
+function OnFirstPrompt()
+  Execute("sendgmcp char.base")
+end
+
+function StartCapturingAffects()
+  notify_changes = false
+  EnableTriggerGroup("get_affects", true)
+  buttons_window.Clear()
+  badaffects_window.Clear()
+end
+
+function StopCapturingAffects()
+  notify_changes = true
+  EnableTriggerGroup("get_affects", false)
+  buttons_window.Draw()
+  badaffects_window.Draw()
+end
 
 function SetAffect(affect, time_str, refresh)
-  local parsed_affect = ParseAffect(affect)
+  local parsed_affect = parseAffect(affect)
   local converted_time = tonumber(time_str or 0) or 0  
-  Buttons.SetAffect(parsed_affect, converted_time, notify, refresh)
+  buttons_window.SetAffect(parsed_affect, converted_time, notify_changes, refresh)
+  badaffects_window.SetAffect(parsed_affect, converted_time, refresh)
 end
 
 function RecastAffect(affect)
-  local parsed_affect = ParseAffect(affect)
-  local est_duration = Buttons.GetDuration(parsed_affect)
+  local parsed_affect = parseAffect(affect)
+  local est_duration = buttons_window.GetDuration(parsed_affect)
   if est_duration ~= nil then
     local converted = est_duration / 60 * 4
     local converted_str = tostring(converted)
-    SetAffect(affect, converted_str, notify)
+    SetAffect(affect, converted_str, notify_changes)
   end
 end
 
 function RemoveAffect(affect)
-  local parsed_affect = ParseAffect(affect)
-  Buttons.RemoveAffect(parsed_affect, notify)
+  local parsed_affect = parseAffect(affect)
+  buttons_window.RemoveAffect(parsed_affect, notify_changes)
+  badaffects_window.RemoveAffect(parsed_affect, notify_changes)
 end
 
 function DisarmedBroadcast(weapon)
   BroadcastPlugin(1, "!!! YOU WERE DISARMED! RE-EQUIP " .. weapon:upper() .. " !!!")
 end
 
-function AddButton(title, affect, command)
-  if affect ~= nil then affect = ParseAffect(affect) end
-  Buttons.AddButton(title, affect, command)
+function TimerTriggered()
+  buttons_window.Draw()
+  badaffects_window.Draw()
 end
 
-function EditButton(title, new_affect, new_command)
-  if new_affect ~= nil then new_affect = ParseAffect(new_affect) end
-  Buttons.EditButton(title, new_affect, new_command)
-end
-
-function ParseAffect(affect)
+function parseAffect(affect)
   affect = affect:match("^%s*(.-)%s*$"):lower()
 
   if affect == "ice invocation" or affect == "force field" then
@@ -478,107 +466,36 @@ function ParseAffect(affect)
 end
 
 ---------------
--- Configuration
----------------
-
-function Configure()
-  Configuration.Show(Buttons.GetConfiguration(), Buttons.SaveConfiguration)
-end
-
-function Serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return Serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
----------------
 -- GMCP stuff
 ---------------
 
-function OnPluginBroadcast(msg, id, name, text)
-  if (id == "f67c4339ed0591a5b010d05b") then -- GMCP message
-    if (text == "char.affect_application_msg") then
-      HandleGmcpAdd()
-    elseif (text == "char.affect_removal_msg") then
-      HandleGmcpRemove()
-    elseif (text == "char.base") then
-      HandleGmcpCharacterBase()
-    end
+function handleGmcpAdd()
+  local gmcp_value = getGmcpValue("char.affect_application_msg")
+  if gmcp_value.target == "you" then
+    SetAffect(gmcp_value.skill:lower(), tonumber(gmcp_value.duration or 0))
   end
 end
 
-function HandleGmcpAdd()
-  GetGmcpAffectApplication()
-  who = gmcpval("target")
-  spell = gmcpval("skill"):lower()
-  duration = gmcpval("duration")
-  handleGmcpAffect(who, spell, true, duration)
-end
-
-function HandleGmcpRemove()
-  GetGmcpAffectApplication()
-  who = gmcpval("target")
-  spell = gmcpval("skill"):lower()
-  handleGmcpAffect(who, spell, false, 0)
-end
-
-function HandleGmcpCharacterBase()
-  if CHARACTER_NAME == nil or CHARACTER_NAME == "" then
-    local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
-    luastmt = "gmcpdata = " .. gmcparg
-    assert(loadstring(luastmt or ""))()
-    local name = gmcpval("name")
-    setCharacterName(name)
+function handleGmcpRemove()
+  local gmcp_value = getGmcpValue("char.affect_application_msg")
+  if gmcp_value.target == "you" then
+    RemoveAffect(gmcp_value.skill:lower())
   end
 end
 
-function GetGmcpAffectApplication()
-  local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.affect_application_msg")
-  luastmt = "gmcpdata = " .. gmcparg
-  assert(loadstring(luastmt or ""))()
-end
-
-function handleGmcpAffect(who, spell, isOn, duration)
-  if show_debug then Note("affects_buttons debug: gmcp for '" .. who .. "' for '" .. spell .. "'") end
-  if (who == "you") then
-    if (isOn) then
-      SetAffect(spell, tonumber(duration or 0))
-    else
-      RemoveAffect(spell)
-    end
+function handleGmcpCharacterName()
+  if GetTriggerInfo("first_prompt", 8) then
+    EnableTrigger("first_prompt", false)
+    local gmcp_value = getGmcpValue("char.base")
+    SetCharacterName(gmcp_value.name)
   end
 end
 
-function checkForUpdates()
-  local updater_installed, updater = tryRequire("updatehelper", "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua")
-
-  if updater_installed then
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/affects_buttons.xml" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/affectsbuttons_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/affectsbuttons_miniwindow.lua"},
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/badaffects_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/badaffects_miniwindow.lua"},
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua" },
-    })
-  end
+function getGmcpValue(field)
+  local res, value = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", field)
+  local func = load("return " .. value)
+  if func then return func()
+  else return nil end
 end
 
 ]]>

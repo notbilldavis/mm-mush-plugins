@@ -7,13 +7,16 @@ local function getOutputBottom() return GetInfo(293) end
 local function getClientHeight() return GetInfo(280) end
 local function getClientWidth() return GetInfo(281) end
 
-local function getOutputLeftOutside() return getOutputLeft() - getBorderOffset() - getBorderWidth() - 1 end
-local function getOutputTopOutside() return getOutputTop() - getBorderOffset() - getBorderWidth() - 1 end
-local function getOutputRightOutside() return getOutputRight() - getBorderOffset() - getBorderWidth() + 1 end
-local function getOutputBottomOutside() return getOutputBottom() - getBorderOffset() - getBorderWidth() + 1 end
-
 local function getOutputHeight() return getOutputBottom() - getOutputTop() end
 local function getOutputWidth() return getOutputRight() - getOutputLeft() end
+
+local function getOutputLeftOutside() return getOutputLeft() - getBorderOffset() - getBorderWidth() - 1 end
+local function getOutputTopOutside() return getOutputTop() - getBorderOffset() - getBorderWidth() - 1 end
+local function getOutputRightOutside() return getOutputRight() + getBorderOffset() + getBorderWidth() + 1 end
+local function getOutputBottomOutside() return getOutputBottom() + getBorderOffset() + getBorderWidth() + 1 end
+
+local function getOutputHeightOutside() return getOutputBottomOutside() - getOutputTopOutside() end
+local function getOutputWidthOutside() return getOutputRightOutside() - getOutputLeftOutside() end
 
 local function clamp(val, min, max)
   val = val or 0
@@ -143,6 +146,8 @@ return {
 
     GetOutputHeight = getOutputHeight,
     GetOutputWidth = getOutputWidth,
+    GetOutputHeightOutside = getOutputHeightOutside,
+    GetOutputWidthOutside = getOutputWidthOutside,
 
     GetClientHeight = getClientHeight,
     GetClientWidth = getClientWidth,
