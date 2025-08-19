@@ -348,6 +348,7 @@ function FinishCrystal()
 end
 
 function FinishPursuer()
+  BroadcastPlugin(3, "on")
   quest_window.Clear("pursuer")
   quest_window.SetPursuerTime()
 end

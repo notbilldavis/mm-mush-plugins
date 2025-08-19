@@ -169,7 +169,7 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   </trigger> 
 
   <trigger match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
-    <send>SetAffect("wolf_familiar", "120")</send>
+    <send>SetAffect("wolf_familiar", "120", true)</send>
   </trigger>
 
   <trigger match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
@@ -409,7 +409,7 @@ function RecastAffect(affect)
   if est_duration ~= nil then
     local converted = est_duration / 60 * 4
     local converted_str = tostring(converted)
-    SetAffect(affect, converted_str, notify_changes)
+    SetAffect(affect, converted_str, true)
   end
 end
 
@@ -472,7 +472,7 @@ end
 function handleGmcpAdd()
   local gmcp_value = getGmcpValue("char.affect_application_msg")
   if gmcp_value.target == "you" then
-    SetAffect(gmcp_value.skill:lower(), tonumber(gmcp_value.duration or 0))
+    SetAffect(gmcp_value.skill:lower(), tonumber(gmcp_value.duration or 0), true)
   end
 end
 

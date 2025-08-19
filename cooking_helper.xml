@@ -208,6 +208,9 @@ local cooking = false
 local cooking_amount = 1
 local cooking_infinite = false
 local pulled_food = false
+local automation_temp_off = false
+local triggered_while_off = false
+
 local db = nil
 
 local npcs = { 
@@ -267,6 +270,17 @@ function HandlePluginBroadcast(msg, id, name, text)
     if character_name == nil or character_name == "" then
       local character = serialization_helper.GetGmcpValue(text)
       SetCharacterName(character.name)
+    end
+  elseif id == "892911b648d09c18e1ecd4e6" and msg == 3 then
+    if config.automate_pouch then
+      if text:lower() == "off" then 
+        Note("Temporarily turning off pouch automation so you don't drop the body part!")
+        automation_temp_off = true
+      else 
+        Note("Turning pouch automation back on!")
+        automation_temp_off = false
+        if triggered_while_off then LootPouch() end
+      end
     end
   end
 end
@@ -586,7 +600,7 @@ function configureDone(group_id, option_id, config_changed)
       autoupdate = { sort = 4, type = "bool", label = "Auto-Update on Close", raw_value = true },
     }
   }
-  
+
   config_window.Update(config_options)
 end
 
@@ -913,6 +927,9 @@ function finishSearch()
     Note("")
   else
     if cooking then
+      if search_count < 10 and cooking_infinite then
+        cooking_infinite = false
+      end
       GetAll()
       return
     end
@@ -961,9 +978,13 @@ end
 
 function LootPouch()
   if config.automate_pouch then
-    SendNoEcho("open plenitude")
-    SendNoEcho("get all plenitude")
-    SendNoEcho("close plenitude")
+    if automation_temp_off then
+      triggered_while_off = true
+    else
+      SendNoEcho("open plenitude")
+      SendNoEcho("get all plenitude")
+      SendNoEcho("close plenitude")
+    end
   end
 end
 

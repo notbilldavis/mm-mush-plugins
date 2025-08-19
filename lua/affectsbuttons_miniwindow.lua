@@ -633,7 +633,7 @@ function affectsbuttons_buttonMouseUp(flags, hs_id)
       local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
       if result == nil or result == "" then return end
       if result == "Clear" then
-        Send("affects clear '" .. CURRENT_AFFECTS[split[3]] .. "'")
+        Send("affects clear '" .. split[3] .. "'")
       elseif result == "Edit" then
         editButton(split[1], nil, nil)
       elseif result == "Delete" then

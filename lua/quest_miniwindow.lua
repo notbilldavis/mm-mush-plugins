@@ -505,6 +505,7 @@ checkBodyPartDrop = function(part, victim)
   if PURSUER_TARGET ~= nil and PURSUER_TARGET:lower():find(Trim(victim:lower())) ~= nil then
     Send("get '" .. part .. "'")
     COLLECTED_PART = part
+    BroadcastPlugin(3, "off")
   end
 end
 

@@ -204,6 +204,7 @@ drawOption = function(indents, y, parent_key, key, option)
     end    
   else
     if option.value == nil then option.value = tostring(option.raw_value) end
+    if Trim(option.value or "") == "" then option.value = "..." end
     local v_width = WindowTextWidth(WIN, FONT, option.value)
     if option.enabled == false then
       WindowText(WIN, FONT, tostring(option.value), SIZES.LABEL_WIDTH + 20 + consts.GetBorderWidth(), y, 0, 0, consts.dimgray, true)
@@ -479,13 +480,32 @@ createNumberOption = function(sort, label, number, min, max, hint, enabled)
   }
 end
 
-createTextOption = function(sort, label, text, hint, enabled)
+createTextOption = function(sort, label, text, hint, enabled, max_display)
   if enabled == nil then enabled = true end
+  if max_display == nil then max_display = 100 end
+
+  if type(text) == "table" then
+    local new_table = {}
+    for k, v in pairs(text) do
+      if type(v) ~= "string" then
+        table.insert(new_table, k)
+      else
+        table.insert(new_table, v)
+      end
+    end
+    text = table.concat(new_table, ",")
+  end
+
+  local text_display = text
+  if max_display < #text then 
+    text_display = text:sub(1, max_display) .. "..." 
+  end
+
   return {
     sort = sort,
     label = label,
     type = "text",
-    value = text,
+    value = text_display,
     raw_value = text,
     hint = hint or "",
     enabled = enabled

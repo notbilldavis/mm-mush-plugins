@@ -66,6 +66,7 @@ load = function()
   CONFIG.ACTIVE_LABEL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ACTIVE_LABEL_COLOR,  16777215)
   CONFIG.DISABLED_BUTTON_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DISABLED_BUTTON_COLOR,  6908265)
   CONFIG.DISABLED_LABEL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DISABLED_LABEL_COLOR,  8421504)
+  CONFIG.EXTRA_AFFECTS = serialization_helper.GetValueOrDefault(CONFIG.EXTRA_AFFECTS, {})
 
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRight() - CONFIG.BUTTON_WIDTH - 10)
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottom() - CONFIG.BUTTON_HEIGHT - 10)
@@ -127,6 +128,7 @@ end
 
 clear = function() 
   TEXT_BUFFER = {}
+  BAD_STUFF = {}
   EXPANDED = false
   draw()
 end
@@ -150,6 +152,7 @@ getConfiguration = function()
       ENABLED = config_window.CreateBoolOption(1, "Enabled", CONFIG.ENABLED, "Whether or not you should ever even see this window."),
       LOCK_POSITION = config_window.CreateBoolOption(2, "Lock Position", CONFIG.LOCK_POSITION, "Disable dragging to move the panel."),
       EXPAND = config_window.CreateListOption(3, "Expand Direction", expand_direction, EXPAND_DIRECTION_LIST, "Set the direction the window will expand from the button."),
+      EXTRA_AFFECTS = config_window.CreateTextOption(4, "Extra Affects", CONFIG.EXTRA_AFFECTS, "Other affects you want to see in this list.", true, 17)
     },
     BUTTON = {
       BUTTON_FONT = config_window.CreateFontOption(1, "Button Font", CONFIG.BUTTON_FONT, "The font used for the button."),
@@ -193,6 +196,11 @@ onConfigureDone = function(group_id, option_id, config)
       else CONFIG.EXPAND_DOWN = true end
       if expand[2] == "Left" then CONFIG.EXPAND_RIGHT = false
       else CONFIG.EXPAND_RIGHT = true end
+    elseif option_id == "EXTRA_AFFECTS" then
+      CONFIG.EXTRA_AFFECTS = {}
+      for _, aff in ipairs(utils.split(Trim(config.raw_value):lower(), ",")) do
+        CONFIG.EXTRA_AFFECTS[Trim(aff:lower())] = true
+      end
     else
       CONFIG[option_id] = config.raw_value
     end
@@ -264,15 +272,11 @@ setSizeAndPositionToContent = function()
   local column1Final, column2Final = 0, 0
   local final_height = CONFIG.BUTTON_HEIGHT or 25
 
-  if TEXT_BUFFER == nil then
-    TEXT_BUFFER = { }
-  end
-
-  for i = #TEXT_BUFFER, 1, -1 do
-    local aff = TEXT_BUFFER[i]
-    
-    if aff == nil or aff.affect == nil or aff.expire == nil or aff.expire - os.time() <= 0 then
-      table.remove(TEXT_BUFFER, i)
+  TEXT_BUFFER = {}
+  for aff, time in pairs(BAD_STUFF) do
+    local converted_time = os.time() + (time / 4 * 60)
+    if converted_time > os.time() then
+      table.insert(TEXT_BUFFER, { affect = aff, expire = converted_time })
     end
   end
 
@@ -453,7 +457,7 @@ drawAffectsText = function()
         if expires_in > 0 then
           WindowText(WIN, BUTTONFONT, details.affect, x + 2, y, 0, 0, CONFIG.AFFECTS_FONT.colour)
           WindowText(WIN, BUTTONFONT, "-", COL_1_WIDTH + 10, y, 0, 0, CONFIG.BORDER_COLOR)
-          WindowText(WIN, BUTTONFONT, serialization_helper.GetFriendlyExpire(expires_in), COL_1_WIDTH + 22, y, 0, 0, CONFIG.AFFECTS_FONT.colour)
+          WindowText(WIN, BUTTONFONT, getFriendlyExpire(expires_in), COL_1_WIDTH + 22, y, 0, 0, CONFIG.AFFECTS_FONT.colour)
           y = y + LINE_HEIGHT
         end
       end
@@ -462,15 +466,17 @@ drawAffectsText = function()
 end
 
 setAffect = function(aff, time, redraw)
-  if CONFIG ~= nil and CONFIG.ENABLED and NEGATIVE_AFFECTS ~= nil and NEGATIVE_AFFECTS[aff] then
+  if CONFIG ~= nil and CONFIG.ENABLED and (CONFIG.EXTRA_AFFECTS[aff] or NEGATIVE_AFFECTS[aff]) then
     EXPANDED = true
 
-    if TEXT_BUFFER == nil then 
-      serialization_helper.ClearMiniWindow()
+    if BAD_STUFF == nil then 
+      BAD_STUFF = {}
     end
 
-    if time > os.time() then
-      table.insert(TEXT_BUFFER, { affect = aff, expire = time })
+    if (time == 0) then
+      removeAffect(aff)
+    else
+      BAD_STUFF[aff] = time
     end
 
     if redraw then
@@ -481,16 +487,11 @@ end
 
 removeAffect = function(affect, redraw)
   if CONFIG.ENABLED then
-    if TEXT_BUFFER == nil then 
-      serialization_helper.ClearMiniWindow()
+    if BAD_STUFF == nil then 
+      BAD_STUFF = {}
     end
 
-    for i = #TEXT_BUFFER, 1, -1 do
-      if TEXT_BUFFER[i].affect == affect then
-        table.remove(TEXT_BUFFER, i)
-        break
-      end
-    end
+    BAD_STUFF[affect] = nil
 
     if redraw then
       draw()
