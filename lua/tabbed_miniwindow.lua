@@ -1,15 +1,24 @@
-require "tableshelper"
-
-local config_window = require "configuration_miniwindow"
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local const_installed, consts = pcall(require, "consthelper")
 
 local WIN = GetPluginID()
 local FONT = WIN .. "_capture_font"
 local HEADERFONT = WIN .. "_header_font"
 
-local CONFIG = nil
+local prepare, initialize, capture, getDateString, close, isAutoUpdateEnabled, onConfigureDone, doDebug
+local load, save, create, draw, drawNotifications, addLineToTab, onScrollToBottom, drawWindow, drawTabs, drawLines,
+  drawScrollbar, drawResizeHandle, drawScrollToBottom, addTextToBuffer, clearTab, formatLines, populateSizes,
+  setSizeConst, renderRectangle, drawNotification, drawDragHandle, drawNotifications, drawSelection, hasSelection,
+  drawScrollbar, drawScrollbarDetails, drawResizeHandle, moveScrollBar, doRightClickHeaderMenu, doRightClickMenu,
+  showUnlockedRightClick, roundToNearestCharacter, copySelectedText, configure, addNewTab, adjustAnchor,
+  getSubstringByPixelRange, captureText, addStyledLine, shouldSkip, calculateOptimalWindowLines
 
+local CONFIG = nil
+local POSITION = nil
+
+local STYLES = nil
 local LINE_HEIGHT = nil
-local WINDOW_LINES = 0
 local HEADER_HEIGHT = 0
 local LAST_REFRESH = 0
 
@@ -34,74 +43,144 @@ local RESIZE_DRAG_X = nil
 local RESIZE_DRAG_Y = nil
 local START_DRAG_Y = 0
 local START_DRAG_OFFSET = 0
-
-local POSITION = {
-  WINDOW_LEFT = nil,
-  WINDOW_TOP = nil,
-  WINDOW_WIDTH = nil,
-  WINDOW_HEIGHT = nil
-}
-
-local SIZES = {
-  BORDER_WIDTH = GetInfo(277)
-}
-
+local SIZES = {}
 local INIT = false
 
 local ANCHOR_LIST = { 
-  "0: None", 
-  "1: Top Left (Window)", "2: Bottom Left (Window)", "3: Top Right (Window)", "4: Bottom Right (Window)", 
-  "5: Top Fit Width (Output)", "6: Bottom Fit Width (Output)", "7: Right Top (Output)", "8: Left Top (Output)",
-  "7: Right Bottom (Output)", "8: Left Bottom (Output)"
+  [1] = "Top Left (Window)", [2] = "Bottom Left (Window)", [3] = "Top Right (Window)", [4] = "Bottom Right (Window)", 
+  [5] = "Top Fit Width (Output)", [6] = "Bottom Fit Width (Output)", [7] = "Right Top (Output)", [8] = "Left Top (Output)",
+  [9] = "Right Bottom (Output)", [10] = "Left Bottom (Output)"
 }
 
 local STRETCH_LIST = {
-  "0: None", "1: Horizontal (Window)", "2: Vertical (Window)", "3: Horizontal (Output)", "4: Vertical (Output)"
+  [1] = "Horizontal (Window)", [2] = "Vertical (Window)", [3] = "Horizontal (Output)", [4] = "Vertical (Output)"
 }
 
 local POSSIBLE_CHANNELS = {
-  "affects", "alliance", "announce", "archon", "auction", "aucverb", "clan", "form",
-  "notify", "novice", "page", "relay", "say", "shout", "talk", "tell", "yell"
+  affects = true, alliance = true, announce = true, archon = true, auction = true, aucverb = true, clan = true, 
+  form = true, notify = true, novice = true, page = true, relay = true, say = true, shout = true, talk = true, 
+  tell = true, yell = true, betters = true
 }
 
-local refresh_type = {
-  NONE = 1,
-  NOTIFICATIONS = 2,
-  ALL = 3,
+local GAGS = {
+  shout = { 
+    "Shop the fine wares at the Alyrian Bazaar", 
+    "Hear ye, hear ye, adventurers of", 
+    "back from a long absence!" 
+  },
+  yell = {
+    "available in Agatha's Shoppe of Illusions!",
+    "A masculine voice yells",
+    "Ferry is now docked at",
+    "The ship Merdraco be docked at",
+    "Step right up, step right up!",
+    "If you'd like information on quests, please visit me at the Shrine of St. Wisehart!",
+    "Unbreakable, level-scaling weapons for sale in the village's main street, near the Shrine!",
+    "Come visit the Crystal Guild's hall near the cemetery",
+    "Attention! Get your nefarious wares at the Xaltian Bazaar!"
+  },
+  say = {
+    "[CLAN]",
+    " clan members heard you say, '"
+  },
+  tell = {
+    "'I don't know any skills in which I could train you.'"
+  }
 }
 
-function PrepareMiniWindow()
+local SERIALIZE_TAGS = {
+  LAST_CONFIG = "last_capture_config", CONFIG = "_capture_config", 
+  TABS = "_all_tabs", POSITION = "_capture_position"
+}
+
+local refresh_type = { NONE = 1, NOTIFICATIONS = 2, ALL = 3 }
+
+prepare = function()
   INIT = false
   CHARACTER_NAME = nil
   CONFIG = { TIME_24 = true }
-  local serialized_config = GetVariable("last_capture_config")
-  if serialized_config ~= nil then
-    local temp_config = Deserialize(serialized_config)
-    WindowCreate(WIN, temp_config.left, temp_config.top, temp_config.width, temp_config.height, 12, 2, 0)
-    WindowRectOp(WIN, miniwin.rect_fill, 0, 0, temp_config.width, temp_config.height, 0)
-    WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, temp_config.border)
-    CONFIG = { TIME_24 = temp_config.time_24 }
+  local last_config = serialization_helper.GetSerializedVariable(SERIALIZE_TAGS.LAST_CONFIG)
+  if last_config.left ~= nil then
+    WindowCreate(WIN, last_config.left, last_config.top, last_config.width, last_config.height, 12, 2, 0)
+    WindowRectOp(WIN, miniwin.rect_fill, 0, 0, last_config.width, last_config.height, 0)
+    WindowRectOp(WIN, miniwin.rect_frame, 0, 0, 0, 0, last_config.border)
+    CONFIG = { TIME_24 = last_config.time_24 }
     WindowShow(WIN, true)
   end
 end
 
-function InitializeMiniWindow(character_name)
+initialize = function(character_name)
   CHARACTER_NAME = character_name
 
-  loadSavedData()
-  createWindowAndFont()
+  load()
+  create()
   INIT = true
   if #PREINIT_LINES > 0 then
     for i = 1, #PREINIT_LINES do
-      AddStyledLine(PREINIT_LINES[i].channel, PREINIT_LINES[i].segments)
+      addStyledLine(PREINIT_LINES[i].channel, PREINIT_LINES[i].segments)
     end
     PREINIT_LINES = {}
   else
-    drawMiniWindow()
+    draw()
   end
 end
 
-function AddStyledLine(channel, styledLineSegments)
+capture = function(trigger_style_runs, line, type)
+  if shouldSkip(type, line) then return end
+
+  captureText("silver", "black", "[".. getDateString() .. "] ", type)
+
+  for i = 1, #trigger_style_runs do
+    local txt = trigger_style_runs[i].text
+
+    if txt:find("Novice") then
+      txt = txt:gsub("%[CLAN Novice Adventurers%]", "%[Novice%]")
+      txt = txt:gsub("Novice clan members", "Novices")
+      txt = txt:gsub("Novice clan member", "Novice")
+    end
+
+    if txt:find("Vandemaar's Magic Mirror") then
+      txt = txt:gsub("^You hear (.+) say through Vandemaar's Magic Mirror:", "%(mirror%) %1:")
+    end
+
+    local fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
+    local bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
+
+    captureText(fgcol, bgcol, txt, type)
+  end
+
+  captureText("silver", "black", "\r\n", type)  
+end
+
+captureText = function(fgcol, bgcol, txt, type)
+  if (not STYLES) then
+    STYLES = {}
+  end
+
+  if (txt == "\r\n") then
+    addStyledLine(type, STYLES)
+    STYLES = {}
+  else
+    STYLES[#STYLES + 1] = {
+      text = txt,
+      textcolour = ColourNameToRGB(fgcol),
+      backcolour = ColourNameToRGB(bgcol)
+    }
+  end
+end
+
+shouldSkip = function(channel, line)
+  if GAGS[channel] ~= nil then    
+    for i = 1, #GAGS[channel] do
+      if line:lower():find(GAGS[channel][i]:lower(), 1, true) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+addStyledLine = function(channel, styledLineSegments)
   if not INIT then
     table.insert(PREINIT_LINES, { channel = channel, segments = styledLineSegments })
     return
@@ -109,7 +188,7 @@ function AddStyledLine(channel, styledLineSegments)
 
   local currentOffset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
   local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
-  local was_at_bottom = #formattedLines <= currentOffset + WINDOW_LINES + 1
+  local was_at_bottom = #formattedLines <= currentOffset + CONFIG.WINDOW_LINES + 1
   local refresh = refresh_type.NONE
   local notifications = {}
 
@@ -123,125 +202,92 @@ function AddStyledLine(channel, styledLineSegments)
 
   if refresh == refresh_type.ALL then
     if was_at_bottom then
-      OnScrollToBottom()
+      onScrollToBottom()
     else
-      drawMiniWindow()
+      draw()
     end
   elseif refresh == refresh_type.NOTIFICATIONS then
     drawNotifications()
   end
 end
 
-function loadSavedData()
-  loadSavedConfig()
-  loadSavedTabs()
-  loadSavedPosition()
-end
+load = function()
+  CONFIG = serialization_helper.GetSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.CONFIG)
+  ALL_TABS = serialization_helper.GetSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.TABS)
+  POSITION = serialization_helper.GetSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.POSITION)
 
-function loadSavedConfig()
-  local serialized_config = GetVariable(CHARACTER_NAME .. "_capture_config") or ""
-  if serialized_config == "" then
-    serialized_config = GetVariable("capture_config") or ""
-    if serialized_config == "" then
-        CONFIG = {}
-    else
-        CONFIG = Deserialize(serialized_config)
-    end
-  else
-    CONFIG = Deserialize(serialized_config)
+  if CONFIG.WINDOW_LINES == nil and POSITION.WINDOW_HEIGHT ~= nil then
+    local tf1, tf2 = FONT .. "_temp", HEADERFONT .. "_temp"
+    WindowFont(WIN, tf1, CONFIG.CAPTURE_FONT.name, CONFIG.CAPTURE_FONT.size)
+    WindowFont(WIN, tf2, CONFIG.HEADER_FONT.name, CONFIG.HEADER_FONT.size)
+    local lh, hh = WindowFontInfo(WIN, tf1, 1), WindowFontInfo(WIN, tf2, 1) + 10
+    local text_area_height = POSITION.WINDOW_HEIGHT - hh - consts.GetBorderWidth() * 3
+    CONFIG.WINDOW_LINES = math.floor(text_area_height / lh)
   end
 
-  CONFIG.CAPTURE_FONT = getValueOrDefault(CONFIG.CAPTURE_FONT, { name = "Lucida Console", size = 9, colour = 0, bold = 0, italic = 0, underline = 0, strikeout = 0 })
-  CONFIG.HEADER_FONT = getValueOrDefault(CONFIG.HEADER_FONT, { name = "Lucida Console", size = 9, colour = 0, bold = 0, italic = 0, underline = 0, strikeout = 0 })
-  CONFIG.LOCK_POSITION = getValueOrDefault(CONFIG.LOCK_POSITION, false)
-  CONFIG.SCROLL_WIDTH = getValueOrDefault(CONFIG.SCROLL_WIDTH, 15)
-  CONFIG.MAX_LINES = getValueOrDefault(CONFIG.MAX_LINES, 1000)
-  CONFIG.NOTIFICATION_COLOR = getValueOrDefault(CONFIG.NOTIFICATION_COLOR, ColourNameToRGB("red"))
-  CONFIG.BORDER_COLOR = getValueOrDefault(CONFIG.BORDER_COLOR, ColourNameToRGB("silver"))
-  CONFIG.ACTIVE_COLOR = getValueOrDefault(CONFIG.ACTIVE_COLOR, ColourNameToRGB("darkgreen"))
-  CONFIG.INACTIVE_COLOR = getValueOrDefault(CONFIG.INACTIVE_COLOR, ColourNameToRGB("grey"))
-  CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("gray"))
-  CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
-  CONFIG.DETAIL_COLOR = getValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
-  CONFIG.SCROLL_COLOR = getValueOrDefault(CONFIG.SCROLL_COLOR, ColourNameToRGB("darkgray"))
-  CONFIG.BACKGROUND_COLOR = getValueOrDefault(CONFIG.BACKGROUND_COLOR, ColourNameToRGB("black"))
-  CONFIG.TIME_24 = getValueOrDefault(CONFIG.TIME_24, true)
-end
+  CONFIG.CAPTURE_FONT = serialization_helper.GetValueOrDefault(CONFIG.CAPTURE_FONT, { name = "Lucida Console", size = 9, colour = 0, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  CONFIG.HEADER_FONT = serialization_helper.GetValueOrDefault(CONFIG.HEADER_FONT, { name = "Lucida Console", size = 9, colour = 0, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  CONFIG.LOCK_POSITION = serialization_helper.GetValueOrDefault(CONFIG.LOCK_POSITION, false)
+  CONFIG.SCROLL_WIDTH = serialization_helper.GetValueOrDefault(CONFIG.SCROLL_WIDTH, 15)
+  CONFIG.MAX_LINES = serialization_helper.GetValueOrDefault(CONFIG.MAX_LINES, 1000)
+  CONFIG.WINDOW_LINES = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LINES, 15)
+  CONFIG.NOTIFICATION_COLOR = serialization_helper.GetValueOrDefault(CONFIG.NOTIFICATION_COLOR, ColourNameToRGB("red"))
+  CONFIG.BORDER_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BORDER_COLOR, ColourNameToRGB("silver"))
+  CONFIG.ACTIVE_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ACTIVE_COLOR, ColourNameToRGB("darkgreen"))
+  CONFIG.INACTIVE_COLOR = serialization_helper.GetValueOrDefault(CONFIG.INACTIVE_COLOR, ColourNameToRGB("grey"))
+  CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("gray"))
+  CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
+  CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
+  CONFIG.SCROLL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.SCROLL_COLOR, ColourNameToRGB("darkgray"))
+  CONFIG.BACKGROUND_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BACKGROUND_COLOR, ColourNameToRGB("black"))
+  CONFIG.Z_POSITION = serialization_helper.GetValueOrDefault(CONFIG.Z_POSITION, 500)
+  CONFIG.TIME_24 = serialization_helper.GetValueOrDefault(CONFIG.TIME_24, true)
+  CONFIG.AUTOUPDATE = serialization_helper.GetValueOrDefault(CONFIG.AUTOUPDATE, true)
 
-function loadSavedTabs()
-  local all_tabs_text = GetVariable(CHARACTER_NAME .. "_all_tabs") or ""
-  if (all_tabs_text == "") then
-    all_tabs_text = GetVariable("all_tabs") or ""
-    if (all_tabs_text == "") then
-      ALL_TABS = {}
-      local default_channels = { 
-        alliance = true, announce = true, archon = true, clan = true, form = true, notify = true, affects = true,
-        novice = true, page = true, relay = true, shout = true, talk = true, tell = true, yell = true
-      }
+  local default_tab = {
+    name = "Captures", 
+    channels = { 
+      alliance = true, announce = true, archon = true, clan = true, form = true, notify = true, affects = true,
+      novice = true, page = true, relay = true, shout = true, talk = true, tell = true, yell = true, betters = true,
+    },
+    notify = true
+  }
 
-      ALL_TABS[1] = { 
-        name = "Captures", 
-        channels = default_channels,
-        notify = true
-      }
-    else
-      ALL_TABS = Deserialize(all_tabs_text)
-    end
-  else
-    ALL_TABS = Deserialize(all_tabs_text)
-  end
-
+  ALL_TABS[1] = serialization_helper.GetValueOrDefault(ALL_TABS[1], default_tab)
   CURRENT_TAB_NAME = ALL_TABS[1]["name"] or ""
+
+  POSITION.WINDOW_WIDTH = serialization_helper.GetValueOrDefault(POSITION.WINDOW_WIDTH, consts.GetClientWidth() - consts.GetOutputRightOutside())
+  POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRightOutside())
+  POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT)
 end
 
-function loadSavedPosition()
-  local serialized_position = GetVariable(CHARACTER_NAME .. "_capture_position") or ""
-  if serialized_position == "" then
-    serialized_position = GetVariable("capture_position") or ""
-    if serialized_position == "" then
-      POSITION = {
-        WINDOW_LEFT = GetInfo(274) + GetInfo(276) + GetInfo(277) - 1,
-        WINDOW_TOP = GetInfo(275) + GetInfo(276) + GetInfo(277) - 250,
-        WINDOW_WIDTH = 500,
-        WINDOW_HEIGHT = 250
-      }
-    else
-      POSITION = Deserialize(serialized_position)
-    end
-  else
-    POSITION = Deserialize(serialized_position)
-  end
-
-  POSITION.WINDOW_HEIGHT = math.min(POSITION.WINDOW_HEIGHT, GetInfo(280))
-  POSITION.WINDOW_WIDTH = math.min(POSITION.WINDOW_WIDTH, GetInfo(281))
-end
-
-function createWindowAndFont()
+create = function()
   local capfont = CONFIG["CAPTURE_FONT"]
   local hdrfont = CONFIG["HEADER_FONT"]
 
   WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
   
   WindowFont(WIN, FONT, capfont.name, capfont.size, 
-    convertToBool(capfont.bold), 
-    convertToBool(capfont.italic), 
-    convertToBool(capfont.italic), 
-    convertToBool(capfont.strikeout))
+    serialization_helper.ConvertToBool(capfont.bold), 
+    serialization_helper.ConvertToBool(capfont.italic), 
+    serialization_helper.ConvertToBool(capfont.italic), 
+    serialization_helper.ConvertToBool(capfont.strikeout))
 
   WindowFont(WIN, HEADERFONT, hdrfont.name, hdrfont.size, 
-    convertToBool(hdrfont.bold), 
-    convertToBool(hdrfont.italic), 
-    convertToBool(hdrfont.italic), 
-    convertToBool(hdrfont.strikeout))
+    serialization_helper.ConvertToBool(hdrfont.bold), 
+    serialization_helper.ConvertToBool(hdrfont.italic), 
+    serialization_helper.ConvertToBool(hdrfont.italic), 
+    serialization_helper.ConvertToBool(hdrfont.strikeout))
 
   CHARACTER_WIDTH = WindowTextWidth(WIN, FONT, "X")
   LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1)
   HEADER_HEIGHT = WindowFontInfo(WIN, HEADERFONT, 1) + 10
-  WINDOW_LINES = math.ceil((POSITION.WINDOW_HEIGHT - HEADER_HEIGHT - 7) / LINE_HEIGHT)
+  
+  POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + CONFIG.WINDOW_LINES * LINE_HEIGHT
 end
 
-function drawMiniWindow()
-  --if not INIT then return end
+draw = function()
+  if not INIT then return end
     
   WindowShow(WIN, false)
 
@@ -255,7 +301,7 @@ function drawMiniWindow()
   WindowShow(WIN, true)
 end
 
-function addLineToTab(tab, channel, styledLineSegments)
+addLineToTab = function(tab, channel, styledLineSegments)
   if tab == nil or tab["channels"] == nil or tab["name"] == nil or tab["name"] == "" then
     return refresh_type.NONE
   end
@@ -277,7 +323,7 @@ function addLineToTab(tab, channel, styledLineSegments)
   return refresh_type.NONE
 end
 
-function addTextToBuffer(name, segments)
+addTextToBuffer = function(name, segments)
   if TEXT_BUFFERS[name] == nil then 
     clearTab(name)
   end
@@ -293,10 +339,10 @@ function addTextToBuffer(name, segments)
   end
 end
 
-function formatLines(list)
+formatLines = function(list)
   if TEXT_BUFFERS[list] == nil then return end
 
-  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 10 - GetInfo(277)
+  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 8 - consts.GetBorderWidth() * 2
 
   FORMATTED_LINES[list] = {}    
 
@@ -353,14 +399,14 @@ function formatLines(list)
   end
 end
 
-function drawWindow()
+drawWindow = function()
   populateSizes()
 
   WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP, 4, 2)
   WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
-  WindowSetZOrder(WIN, 999)
+  WindowSetZOrder(WIN, CONFIG.Z_POSITION)
 
-  renderRectangle(SIZES.ENTIRE_WINDOW, SIZES.BORDER_WIDTH)
+  renderRectangle(SIZES.ENTIRE_WINDOW, consts.GetBorderWidth())
 
   WindowDeleteAllHotspots(WIN)
 
@@ -369,31 +415,31 @@ function drawWindow()
   WindowScrollwheelHandler(WIN, "textarea", "OnWheel")  
 end
 
-function populateSizes()
+populateSizes = function()
   SIZES.ENTIRE_WINDOW = setSizeConst(0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
-  SIZES.TEXT_AREA = setSizeConst(SIZES.BORDER_WIDTH, HEADER_HEIGHT + SIZES.BORDER_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - CONFIG.SCROLL_WIDTH - 1, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH, CONFIG.BACKGROUND_COLOR)
+  SIZES.TEXT_AREA = setSizeConst(consts.GetBorderWidth(), HEADER_HEIGHT + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - consts.GetBorderWidth() - CONFIG.SCROLL_WIDTH - 1, POSITION.WINDOW_HEIGHT - consts.GetBorderWidth(), CONFIG.BACKGROUND_COLOR)
 
-  local header_right = POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH
-  local scroll_bottom = POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH
+  local header_right = POSITION.WINDOW_WIDTH - consts.GetBorderWidth()
+  local scroll_bottom = POSITION.WINDOW_HEIGHT - consts.GetBorderWidth()
 
   if not CONFIG.LOCK_POSITION then
     header_right = header_right - CONFIG.SCROLL_WIDTH
     scroll_bottom = scroll_bottom - CONFIG.SCROLL_WIDTH
 
-    SIZES.DRAG_HANDLE = setSizeConst(header_right, SIZES.BORDER_WIDTH + 1, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, HEADER_HEIGHT - 2, CONFIG.BACKGROUND_COLOR)
-    SIZES.RESIZE_HANDLE = setSizeConst(header_right, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, POSITION.WINDOW_HEIGHT - SIZES.BORDER_WIDTH - 1, CONFIG.BACKGROUND_COLOR)
+    SIZES.DRAG_HANDLE = setSizeConst(header_right, consts.GetBorderWidth() + 1, POSITION.WINDOW_WIDTH - consts.GetBorderWidth() - 1, HEADER_HEIGHT - 2, CONFIG.BACKGROUND_COLOR)
+    SIZES.RESIZE_HANDLE = setSizeConst(header_right, POSITION.WINDOW_HEIGHT - consts.GetBorderWidth() - CONFIG.SCROLL_WIDTH, POSITION.WINDOW_WIDTH - consts.GetBorderWidth() - 1, POSITION.WINDOW_HEIGHT - consts.GetBorderWidth() - 1, CONFIG.BACKGROUND_COLOR)
   end
 
-  SIZES.ENTIRE_HEADER = setSizeConst(SIZES.BORDER_WIDTH, SIZES.BORDER_WIDTH, header_right, HEADER_HEIGHT - SIZES.BORDER_WIDTH * 2, CONFIG.BACKGROUND_COLOR)
-  SIZES.SINGLE_TAB = setSizeConst(SIZES.BORDER_WIDTH, SIZES.BORDER_WIDTH, 20, HEADER_HEIGHT, ColourNameToRGB("cyan"))
-  SIZES.ENTIRE_SCROLL = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - SIZES.BORDER_WIDTH, HEADER_HEIGHT + SIZES.BORDER_WIDTH, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH - 1, scroll_bottom - 1, CONFIG.DETAIL_COLOR)
+  SIZES.ENTIRE_HEADER = setSizeConst(consts.GetBorderWidth(), consts.GetBorderWidth(), header_right, HEADER_HEIGHT - consts.GetBorderWidth() * 2, CONFIG.BACKGROUND_COLOR)
+  SIZES.SINGLE_TAB = setSizeConst(consts.GetBorderWidth(), consts.GetBorderWidth(), 20, HEADER_HEIGHT, ColourNameToRGB("cyan"))
+  SIZES.ENTIRE_SCROLL = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - consts.GetBorderWidth(), HEADER_HEIGHT + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - consts.GetBorderWidth() - 1, scroll_bottom - 1, CONFIG.DETAIL_COLOR)
   SIZES.SCROLL_SLIDER = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT + 5, SIZES.ENTIRE_SCROLL.TOP + CONFIG.SCROLL_WIDTH, SIZES.ENTIRE_SCROLL.RIGHT - 5, scroll_bottom - CONFIG.SCROLL_WIDTH - 1, CONFIG.BACKGROUND_COLOR)
   SIZES.SCROLL_TOP = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT, SIZES.ENTIRE_SCROLL.TOP, SIZES.ENTIRE_SCROLL.RIGHT, SIZES.ENTIRE_SCROLL.TOP + CONFIG.SCROLL_WIDTH, CONFIG.BACKGROUND_COLOR)
   SIZES.SCROLL_BOTTOM = setSizeConst(SIZES.ENTIRE_SCROLL.LEFT, SIZES.ENTIRE_SCROLL.BOTTOM - CONFIG.SCROLL_WIDTH, SIZES.ENTIRE_SCROLL.RIGHT, SIZES.ENTIRE_SCROLL.BOTTOM, CONFIG.BACKGROUND_COLOR)
-  SIZES.SCROLL_THUMB = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - SIZES.BORDER_WIDTH - 1, HEADER_HEIGHT + SIZES.BORDER_WIDTH * 2 + CONFIG.SCROLL_WIDTH + 1, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH, scroll_bottom, CONFIG.SCROLL_COLOR)
+  SIZES.SCROLL_THUMB = setSizeConst(POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - consts.GetBorderWidth() - 1, HEADER_HEIGHT + consts.GetBorderWidth() * 2 + CONFIG.SCROLL_WIDTH + 1, POSITION.WINDOW_WIDTH - consts.GetBorderWidth(), scroll_bottom, CONFIG.SCROLL_COLOR)
 end
 
-function setSizeConst(left, top, right, bottom, color)
+setSizeConst = function(left, top, right, bottom, color)
   local sizeConst = {}
   sizeConst.LEFT = left
   sizeConst.TOP = top
@@ -405,15 +451,15 @@ function setSizeConst(left, top, right, bottom, color)
   return sizeConst
 end
 
-function drawTabs()
-  local x = SIZES.BORDER_WIDTH
+drawTabs = function()
+  local x = consts.GetBorderWidth()
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
     if tab_name ~= "" then
       local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
       local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
       local center_pos_x = x + ((text_width + 20) / 2) - (text_width / 2)
-      local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + SIZES.BORDER_WIDTH
+      local center_pos_y = (HEADER_HEIGHT - WindowFontInfo(WIN, HEADERFONT, 1)) / 2 + consts.GetBorderWidth()
       local tab_tooltip = ""
 
       SIZES.SINGLE_TAB.LEFT = x
@@ -426,7 +472,7 @@ function drawTabs()
         drawNotification(tab_name, x + text_width)
       end
 
-      WindowLine(WIN, SIZES.ENTIRE_HEADER.LEFT, HEADER_HEIGHT, POSITION.WINDOW_WIDTH - SIZES.BORDER_WIDTH, HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, GetInfo(277))
+      WindowLine(WIN, SIZES.ENTIRE_HEADER.LEFT, HEADER_HEIGHT, POSITION.WINDOW_WIDTH - consts.GetBorderWidth(), HEADER_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, consts.GetBorderWidth())
       
       WindowAddHotspot(WIN, tab_name, x, 0, x + text_width + 20, HEADER_HEIGHT, "", "", "", "", "OnHeaderClick", tab_tooltip, miniwin.cursor_hand, 0)
 
@@ -439,7 +485,7 @@ function drawTabs()
   end
 end
 
-function drawNotifications()
+drawNotifications = function()
   local x = SIZES.ENTIRE_HEADER.LEFT
   for idx, tab in ipairs(ALL_TABS) do
     local tab_name = tab["name"] or ""
@@ -455,16 +501,16 @@ function drawNotifications()
   end
 end
 
-function drawNotification(tab_name, x)
+drawNotification = function(tab_name, x)
   local cnt = UNREAD_COUNT[tab_name] or 0
   if cnt > 0 then
-    WindowCircleOp(WIN, miniwin.circle_ellipse, x + 12, HEADER_HEIGHT / 2 - SIZES.BORDER_WIDTH, x + 16, HEADER_HEIGHT / 2 - SIZES.BORDER_WIDTH + 4, 
+    WindowCircleOp(WIN, miniwin.circle_ellipse, x + 12, HEADER_HEIGHT / 2 - consts.GetBorderWidth(), x + 16, HEADER_HEIGHT / 2 - consts.GetBorderWidth() + 4, 
       CONFIG.NOTIFICATION_COLOR, miniwin.pen_solid, 1, CONFIG.NOTIFICATION_COLOR, miniwin.brush_solid)
     WindowHotspotTooltip(WIN, tab_name, cnt .. " unread")
   end  
 end
 
-function drawLines()
+drawLines = function()
   renderRectangle(SIZES.TEXT_AREA)
     
   local lines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
@@ -475,7 +521,7 @@ function drawLines()
 
   for i = offset + 1, #lines do
     if y + LINE_HEIGHT > SIZES.TEXT_AREA.BOTTOM then
-      if offset >= #lines - WINDOW_LINES then
+      if offset >= #lines - CONFIG.WINDOW_LINES then
         Note("The capture window is trying to display lines off the screen, configure the font settings and size.")
       end
       break
@@ -495,7 +541,7 @@ function drawLines()
   end
 end
 
-function drawSelection(x, y, w, offset, s)
+drawSelection = function(x, y, w, offset, s)
   local selection = SELECTIONS[CURRENT_TAB_NAME]
   if not hasSelection(selection) then return end
 
@@ -541,12 +587,13 @@ function drawSelection(x, y, w, offset, s)
   end
 end
 
-function hasSelection(s)
+hasSelection = function(s)
+  if s == nil then s = SELECTIONS[CURRENT_TAB_NAME] end
   return s ~= nil and s.start_x ~= nil and s.start_y ~= nil and s.end_x ~= nil and s.end_y ~= nil 
     and (s.start_x - s.end_x >= CHARACTER_WIDTH or s.end_x - s.start_x >= CHARACTER_WIDTH or s.start_y - s.end_y >= CHARACTER_WIDTH or s.end_y - s.start_y >= CHARACTER_WIDTH)
 end
 
-function drawScrollbar()
+drawScrollbar = function()
   renderRectangle(SIZES.ENTIRE_SCROLL)
   renderRectangle(SIZES.SCROLL_SLIDER)
   renderRectangle(SIZES.SCROLL_TOP, 1)
@@ -555,8 +602,8 @@ function drawScrollbar()
   local current_offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
   local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local total_lines = #formattedLines  
-  local maxScroll = total_lines - WINDOW_LINES
-  local thumbsize = math.min(SIZES.SCROLL_SLIDER.HEIGHT, math.max(10, SIZES.SCROLL_SLIDER.HEIGHT * (WINDOW_LINES / (total_lines))))
+  local maxScroll = total_lines - CONFIG.WINDOW_LINES
+  local thumbsize = math.min(SIZES.SCROLL_SLIDER.HEIGHT, math.max(10, SIZES.SCROLL_SLIDER.HEIGHT * (CONFIG.WINDOW_LINES / (total_lines))))
   local scrollRatio = current_offset / math.max(maxScroll, 1)
 
   SIZES.SCROLL_THUMB.TOP = (scrollRatio * (SIZES.SCROLL_SLIDER.HEIGHT - thumbsize)) + SIZES.SCROLL_SLIDER.TOP
@@ -586,7 +633,7 @@ function OnScrollThumbDragMove()
   if DRAG_SCROLLING then
     local mouse_pos_y = WindowInfo(WIN, 18)
     local total_lines = #FORMATTED_LINES[CURRENT_TAB_NAME]
-    local scrollable_lines = math.max(total_lines - WINDOW_LINES, 0)
+    local scrollable_lines = math.max(total_lines - CONFIG.WINDOW_LINES, 0)
     local delta = mouse_pos_y - START_DRAG_Y
         
     local pixels_per_line = SIZES.SCROLL_SLIDER.HEIGHT / total_lines
@@ -604,7 +651,7 @@ function OnScrollThumbDragRelease()
   drawScrollbar()
 end
 
-function drawScrollbarDetails()
+drawScrollbarDetails = function()
   local upArrow = string.format("%i,%i,%i,%i,%i,%i", 
     SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 3), SIZES.SCROLL_TOP.BOTTOM - (SIZES.ENTIRE_SCROLL.WIDTH / 3),
     SIZES.ENTIRE_SCROLL.LEFT + (SIZES.ENTIRE_SCROLL.WIDTH / 2), SIZES.SCROLL_TOP.TOP + (SIZES.ENTIRE_SCROLL.WIDTH / 3), 
@@ -620,7 +667,7 @@ function drawScrollbarDetails()
   WindowPolygon(WIN, downArrow, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1, CONFIG.DETAIL_COLOR, miniwin.brush_solid, true, false)
 end
 
-function drawDragHandle()
+drawDragHandle = function()
   if not CONFIG.LOCK_POSITION then
     renderRectangle(SIZES.DRAG_HANDLE, 1)
     WindowLine(WIN, SIZES.DRAG_HANDLE.LEFT + 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 3, SIZES.DRAG_HANDLE.RIGHT - 3, SIZES.DRAG_HANDLE.TOP + SIZES.DRAG_HANDLE.HEIGHT / 3, CONFIG.DETAIL_COLOR, miniwin.pen_solid, 1)
@@ -644,7 +691,7 @@ end
 
 function drag_move(flags, hotspot_id)
   if IS_DRAGGING then
-    local pos_x = clamp(WindowInfo(WIN, 17) - RESIZE_DRAG_X, 0, GetInfo(281) - POSITION.WINDOW_WIDTH)
+    local pos_x = clamp(WindowInfo(WIN, 17) - RESIZE_DRAG_X, 0, consts.GetClientWidth() - POSITION.WINDOW_WIDTH)
     local pos_y = clamp(WindowInfo(WIN, 18) - RESIZE_DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
 
     SetCursor(miniwin.cursor_hand)
@@ -657,19 +704,12 @@ function drag_release(flags, hotspot_id)
     IS_DRAGGING = false
     POSITION.WINDOW_LEFT = WindowInfo(WIN, 10)
     POSITION.WINDOW_TOP = WindowInfo(WIN, 11)
-    saveMiniWindow()
+    save()
     Repaint()
   end
 end
 
-function clamp(val, min, max)
-  val = val or 0
-  min = min or 0
-  max = max or 0
-  return math.max(min, math.min(val, max))
-end
-
-function drawResizeHandle()
+drawResizeHandle = function()
   if not CONFIG.LOCK_POSITION then
     renderRectangle(SIZES.RESIZE_HANDLE, 1)
     
@@ -688,11 +728,11 @@ function drawResizeHandle()
   end  
 end
 
-function drawScrollToBottom()
+drawScrollToBottom = function()
   local lines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
 
-  if offset + WINDOW_LINES < #lines then
+  if offset + CONFIG.WINDOW_LINES < #lines then
     local left = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH * 4 - GetInfo(277)
     local top = POSITION.WINDOW_HEIGHT - CONFIG.SCROLL_WIDTH * 3 - GetInfo(277)
     local right = left + CONFIG.SCROLL_WIDTH * 2
@@ -709,15 +749,19 @@ function drawScrollToBottom()
 
     WindowPolygon(WIN, downArrow, CONFIG.SCROLL_COLOR, miniwin.pen_solid, 1, CONFIG.DETAIL_COLOR, miniwin.brush_solid, true, false)
 
-    WindowAddHotspot(WIN, "scroll_to_bottom", left, top, right, bottom, "", "", "OnScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
+    WindowAddHotspot(WIN, "scroll_to_bottom", left, top, right, bottom, "", "", "tabbedcaptures_onScrollToBottom", "", "", "Scroll to bottom", miniwin.cursor_hand, 0)
   end
 end
 
-function OnScrollToBottom()
+function tabbedcaptures_onScrollToBottom(flags, hotspot_id)
+  onScrollToBottom()
+end
+
+onScrollToBottom = function()
   local list = CURRENT_TAB_NAME
   local formattedLines = FORMATTED_LINES[list] or {}
-  SCROLL_OFFSETS[list] = math.max(0, #formattedLines - WINDOW_LINES)
-  drawMiniWindow()
+  SCROLL_OFFSETS[list] = math.max(0, #formattedLines - CONFIG.WINDOW_LINES)
+  draw()
 end
 
 -- Scroll handler
@@ -729,18 +773,18 @@ function OnWheel(flags, hotspot_id)
   end
 end
 
-function moveScrollBar(direction)
+moveScrollBar = function(direction)
   local offset = SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0
   local lines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   
   if direction == "down" then
-    offset = math.min(offset + 1, math.max(0, #lines - WINDOW_LINES))
+    offset = math.min(offset + 1, math.max(0, #lines - CONFIG.WINDOW_LINES))
   else
     offset = math.max(0, offset - 1)
   end
 
   SCROLL_OFFSETS[CURRENT_TAB_NAME] = offset
-  drawMiniWindow()
+  draw()
 end
 
 function OnHeaderClick(flags, hotspot_id)
@@ -749,9 +793,9 @@ function OnHeaderClick(flags, hotspot_id)
       formatLines(hotspot_id)
     end
     CURRENT_TAB_NAME = hotspot_id
-    OnScrollToBottom()
+    onScrollToBottom()
     UNREAD_COUNT[hotspot_id] = 0
-    drawMiniWindow()
+    draw()
   elseif flags == miniwin.hotspot_got_rh_mouse then
     doRightClickHeaderMenu(hotspot_id)
   end
@@ -784,9 +828,9 @@ end
 
 function OnResizerRelease()
   if IS_RESIZING then
-    saveMiniWindow()
-    createWindowAndFont()
-    drawMiniWindow()
+    save()
+    create()
+    draw()
     IS_RESIZING = false
   end
 end
@@ -819,41 +863,35 @@ function OnTextAreaMouseUp(flags, hotspot_id)
       SELECTIONS[CURRENT_TAB_NAME] = nil
     end
     
-    drawMiniWindow()
+    draw()
   end
 end
 
-function doRightClickMenu()
-  local menu_items = "copy|clear|clear all|-|configure"
+doRightClickMenu = function()
+  local menu_items = ""
+  if not hasSelection() then menu_items = "^" end
+  menu_items = menu_items .. "Copy|Clear|-|Configure"
 
   local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
-  if result == "copy" then
+  if result == "Copy" then
     copySelectedText()
-  elseif result == "clear" then
+  elseif result == "Clear" then
     FORMATTED_LINES[CURRENT_TAB_NAME] = {}
     TEXT_BUFFERS[CURRENT_TAB_NAME] = {}
     SCROLL_OFFSETS[CURRENT_TAB_NAME] = 0
-    drawMiniWindow()
-  elseif result == "clear all" then
-    for x, y in pairs(FORMATTED_LINES) do
-      FORMATTED_LINES[x] = {}
-      TEXT_BUFFERS[x] = {}
-      SCROLL_OFFSETS[x] = 0
-      UNREAD_COUNT = { }
-      drawMiniWindow()
-    end
-  elseif result == "configure" then
+    draw()
+  elseif result == "Configure" then
     configure()
   end
 end
 
-function doRightClickHeaderMenu(name)
-  local menu_items = ">channels | "
+doRightClickHeaderMenu = function(name)
+  local menu_items = ">Channels | "
   
   for i = 1, #ALL_TABS do
     local tab = ALL_TABS[i]
     if tab["name"] == name then
-      for idx, value in ipairs(POSSIBLE_CHANNELS) do
+      for value, _ in pairs(POSSIBLE_CHANNELS) do
         if tab["channels"][value] then
           menu_items = menu_items .. "+" .. value .. " | "
         else
@@ -861,83 +899,78 @@ function doRightClickHeaderMenu(name)
         end
       end
 
-      menu_items = menu_items .. "< | - | clear | mark as read | - | rename tab | add new tab"
+      menu_items = menu_items .. "< | - | Clear | Mark as Read | - | Rename | New Tab"
 
-      if i > 1 then
-        menu_items = menu_items .. " | delete tab"
-      end
-
+      if i <= 1 then menu_items = menu_items .. "^" end
+      menu_items = menu_items .. " | Delete Tab"
+      
       if tab["notify"] then
-        menu_items = menu_items .. " | +notify"
+        menu_items = menu_items .. " | +Notify"
       else
-        menu_items = menu_items .. " | notify"
+        menu_items = menu_items .. " | Notify"
       end
 
-      menu_items = menu_items .. "| - | configure"
+      menu_items = menu_items .. "| - | Configure"
 
       local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
 
-      if result == "clear" then
+      if result == "Clear" then
         clearTab(name)
-      elseif result == "mark as read" then
+      elseif result == "Mark as Read" then
         UNREAD_COUNT[name] = 0
-        drawMiniWindow()
+        draw()
 
-      elseif result == "rename tab" then
+      elseif result == "Rename" then
         local new_name = utils.inputbox(tab["name"] or "", "Rename Tab", name)
         if new_name ~= nil and #new_name > 0 then 
           ALL_TABS[i]["name"] = new_name
-          drawMiniWindow()
+          draw()
         end
 
-      elseif result == "add new tab" then
-        OnNewTabClick()
+      elseif result == "New Tab" then
+        addNewTab()
       
-      elseif result == "delete tab" then
+      elseif result == "Delete Tab" then
         if i > 1 then
           table.remove(ALL_TABS, i)
-          drawMiniWindow()
+          draw()
         else
           Note("You can't remove the first tab!")
         end
 
-      elseif result == "notify" then
+      elseif result == "Notify" then
         if ALL_TABS[i]["notify"] then
           ALL_TABS[i]["notify"] = nil
         else
           ALL_TABS[i]["notify"] = true
         end
       
-      elseif result == "configure" then
+      elseif result == "Configure" then
         configure()
         
       elseif result ~= "" then
-        if getTableIndex(POSSIBLE_CHANNELS, result) ~= nil then
+        if POSSIBLE_CHANNELS[result] then
           if tab["channels"][result] then
             ALL_TABS[i]["channels"][result] = nil
           else
             ALL_TABS[i]["channels"][result] = true
           end
 
-          drawMiniWindow()
+          draw()
         end
       end
 
-      saveMiniWindow()
+      save()
 
       break;
     end
   end 
 end
 
-function showUnlockedRightClick()
+showUnlockedRightClick = function()
   local menu_items =  "Lock Position | >Anchor | "
   for _, a in ipairs(ANCHOR_LIST) do
     menu_items = menu_items .. a .. " | "
-  end
-  menu_items = menu_items .. " < | >Stretch | "
-  for _, s in ipairs(STRETCH_LIST) do
-    menu_items = menu_items .. s .. " | "
   end
   menu_items = menu_items .. " < | - | Configure"
   local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), menu_items)
@@ -952,22 +985,17 @@ function showUnlockedRightClick()
         adjustAnchor(i)
       end
     end
-    for i, a in ipairs(STRETCH_LIST) do
-      if result == a then
-        adjustStretch(i)
-      end
-    end
   end
-  saveMiniWindow()
-  drawMiniWindow()
+  save()
+  draw()
 end
 
-function copySelectedText()
+copySelectedText = function()
   SetClipboard(SELECTED_TEXT)
   Note("Copied '" .. SELECTED_TEXT .. "' to the clipboard")
 end
 
-function getSubstringByPixelRange(text, startWidth, endWidth)
+getSubstringByPixelRange = function(text, startWidth, endWidth)
     local measuredWidth = 0
     local startIndex, endIndex
 
@@ -993,59 +1021,24 @@ function getSubstringByPixelRange(text, startWidth, endWidth)
     end
 end
 
-function saveMiniWindow()
+save = function()
   local sticky_options = { 
     left = WindowInfo(WIN, 10), top = WindowInfo(WIN, 11), 
     width = WindowInfo(WIN, 3), height = WindowInfo(WIN, 4), 
     border = CONFIG.BORDER_COLOR, time_24 = CONFIG.TIME_24
   }
 
-  SetVariable("last_capture_config", Serialize(sticky_options))
-  SetVariable(CHARACTER_NAME .. "_all_tabs", Serialize(ALL_TABS))
-  SetVariable(CHARACTER_NAME .. "_capture_position", Serialize(POSITION))
-  SetVariable(CHARACTER_NAME .. "_capture_config", Serialize(CONFIG))
-  SaveState()
+  serialization_helper.SaveSerializedVariable(SERIALIZE_TAGS.LAST_CONFIG, sticky_options)
+  serialization_helper.SaveSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.CONFIG, CONFIG)
+  serialization_helper.SaveSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.TABS, ALL_TABS)
+  serialization_helper.SaveSerializedVariable(CHARACTER_NAME .. SERIALIZE_TAGS.POSITION, POSITION)
 end
 
-function getDateString()
+getDateString = function()
   if CONFIG == nil or CONFIG.TIME_24 then
     return os.date("%H:%M:%S")
   end
   return os.date("%I:%M:%S %p")  
-end
-
-function Serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return Serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
-function Deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
-  else
-    return nil, "Failed to load string"
-  end
 end
 
 function OnTextAreaMouseMove(flags, hotspot_id)
@@ -1058,8 +1051,8 @@ function OnTextAreaMouseMove(flags, hotspot_id)
 
     local selection = SELECTIONS[CURRENT_TAB_NAME]
 
-    SELECTIONS[CURRENT_TAB_NAME].starting_line = clamp(math.floor((math.min(selection.start_y, selection.end_y) - HEADER_HEIGHT + 2) / LINE_HEIGHT) + SCROLL_OFFSETS[CURRENT_TAB_NAME] + 1, 1, #FORMATTED_LINES[CURRENT_TAB_NAME])
-    SELECTIONS[CURRENT_TAB_NAME].ending_line = clamp(math.floor((math.max(selection.start_y, selection.end_y) - HEADER_HEIGHT + 2) / LINE_HEIGHT) + SCROLL_OFFSETS[CURRENT_TAB_NAME] + 1, SELECTIONS[CURRENT_TAB_NAME].starting_line, #FORMATTED_LINES[CURRENT_TAB_NAME])
+    SELECTIONS[CURRENT_TAB_NAME].starting_line = consts.clamp(math.floor((math.min(selection.start_y, selection.end_y) - HEADER_HEIGHT + 2) / LINE_HEIGHT) + SCROLL_OFFSETS[CURRENT_TAB_NAME] + 1, 1, #FORMATTED_LINES[CURRENT_TAB_NAME])
+    SELECTIONS[CURRENT_TAB_NAME].ending_line = consts.clamp(math.floor((math.max(selection.start_y, selection.end_y) - HEADER_HEIGHT + 2) / LINE_HEIGHT) + SCROLL_OFFSETS[CURRENT_TAB_NAME] + 1, SELECTIONS[CURRENT_TAB_NAME].starting_line, #FORMATTED_LINES[CURRENT_TAB_NAME])
 
     if LAST_SELECTION == nil or math.abs(LAST_SELECTION.x - end_x) >= CHARACTER_WIDTH or math.abs(LAST_SELECTION.y - end_y) >= CHARACTER_WIDTH / 2 then
       LAST_SELECTION = { x = end_x, y = end_y }
@@ -1077,14 +1070,14 @@ function clearTab(tab)
   UNREAD_COUNT[tab] = 0
 
   if redraw then
-    drawMiniWindow()
+    draw()
   end
 end
 
-function OnNewTabClick()
+addNewTab = function()
   local new_index = #ALL_TABS + 1
   local channels = {}
-  for _, value in ipairs(POSSIBLE_CHANNELS) do
+  for value, _ in pairs(POSSIBLE_CHANNELS) do
     channels[value] = value
   end
   local new_tab_name = utils.inputbox("Enter a name for the new tab", "New Tab", "Tab " .. new_index)
@@ -1098,201 +1091,147 @@ function OnNewTabClick()
       notify = new_tab_notify == "yes"
     }
 
-    drawMiniWindow()
+    draw()
   end
 end
 
-function convertToBool(bool_value, def_value)
-  if bool_value == 0 or bool_value == "0" then
-    return false
-  elseif bool_value == 1 or bool_value == "1" then
-    return true
-  end
-
-  return def_value
-end
-
-function roundToNearestCharacter(position)
+roundToNearestCharacter = function(position)
   return position - (position % CHARACTER_WIDTH)
 end
 
-function showWindow()
-  WindowShow(WIN, true)
-end
-
-function hideWindow()
-  config_window.Hide()
+close = function()
   WindowShow(WIN, false)
 end
 
+isAutoUpdateEnabled = function()
+  return CONFIG.AUTOUPDATE
+end
+
 function configure()
-  local config = {
+    local config = {
     Colors = {
-      BACKGROUND_COLOR = { sort = 1, type = "color", raw_value = CONFIG.BACKGROUND_COLOR },
-      BORDER_COLOR = { sort = 2, type = "color", raw_value = CONFIG.BORDER_COLOR },
-      ACTIVE_COLOR = { sort = 3, label = "Active Tab Color", type = "color", raw_value = CONFIG.ACTIVE_COLOR },
-      INACTIVE_COLOR = { sort = 4, label = "Inactive Tab Color", type = "color", raw_value = CONFIG.INACTIVE_COLOR },
-      NOTIFICATION_COLOR = { sort = 5, type = "color", raw_value = CONFIG.NOTIFICATION_COLOR },      
-      SCROLL_COLOR = { sort = 6, label = "Scroll Handle Color", type = "color", raw_value = CONFIG.SCROLL_COLOR },
-      DETAIL_COLOR = { sort = 7, type = "color", raw_value = CONFIG.DETAIL_COLOR },
+      BACKGROUND_COLOR = config_window.CreateColorOption(1, "Background", CONFIG.BACKGROUND_COLOR, "The background color of the entire panel."),
+      BORDER_COLOR = config_window.CreateColorOption(2, "Border", CONFIG.BORDER_COLOR, "The border color for the entire panel."),
+      ACTIVE_COLOR = config_window.CreateColorOption(3, "Active Tab", CONFIG.ACTIVE_COLOR, "The background color of the active tab." ),
+      INACTIVE_COLOR = config_window.CreateColorOption(4, "Inactive Tab", CONFIG.INACTIVE_COLOR, "The background color of the non-active tabs." ),
+      SCROLL_COLOR = config_window.CreateColorOption(6, "Scroll Handle", CONFIG.SCROLL_COLOR, "The colors of the scrollbar drag handle." ),
+      DETAIL_COLOR = config_window.CreateColorOption(7, "Details", CONFIG.DETAIL_COLOR, "The colors of other details like arrows." ),
     },
     Fonts = {
-      CAPTURE_FONT = { type = "font", value = CONFIG.CAPTURE_FONT.name .. " (" .. CONFIG.CAPTURE_FONT.size .. ")", raw_value = CONFIG.CAPTURE_FONT },
-      HEADER_FONT = { type = "font", value = CONFIG.HEADER_FONT.name .. " (" .. CONFIG.HEADER_FONT.size .. ")", raw_value = CONFIG.HEADER_FONT }
+      CAPTURE_FONT = config_window.CreateFontOption(1, "Capture", CONFIG.CAPTURE_FONT, "The font used to display what is captured, should be the same as output."),
+      HEADER_FONT = config_window.CreateFontOption(2, "Header", CONFIG.HEADER_FONT, "The font used for the header titles.")
     },
     Other = {
-      LOCK_POSITION = { sort = 1, type = "bool", raw_value = CONFIG.LOCK_POSITION },
-      SCROLL_WIDTH = { sort = 2, label = "Scrollbar Width", type = "number", raw_value = CONFIG.SCROLL_WIDTH, min = 5, max = 50 },
-      MAX_LINES = { sort = 3, type = "number", raw_value = CONFIG.MAX_LINES, min = 50, max = 50000 }, 
-      TIME_24 = { sort = 4, label = "24-Hour Time", type = "bool", raw_value = CONFIG.TIME_24 }, 
-      ANCHOR = { sort = 5, type = "list", value = "None", raw_value = 1, list = ANCHOR_LIST },
-      STRETCH = { sort = 6, type = "list", value = "None", raw_value = 1, list = STRETCH_LIST }, 
+      LOCK_POSITION = config_window.CreateBoolOption(1, "Lock Position", CONFIG.LOCK_POSITION, "Disable dragging to move the panel."),
+      SCROLL_WIDTH = config_window.CreateNumberOption(2, "Scrollbar Width", CONFIG.SCROLL_WIDTH, 5, 50, "The width of the scrollbar."),
+      MAX_LINES = config_window.CreateNumberOption(3, "Cached Lines", CONFIG.MAX_LINES, 50, 50000, "The total number of lines to keep before removing them."), 
+      TIME_24 = config_window.CreateBoolOption(4, "24-Hour Time", CONFIG.TIME_24, "Show time in 24-hours instead of 12-hour + am/pm."),      
+      AUTOUPDATE = config_window.CreateBoolOption(5, "Auto-Update", CONFIG.AUTOUPDATE, "Whether of not this plugin will try to update itself when closing.")
     },
     Position = {
-      WINDOW_LEFT = { sort = 1, type = "number", raw_value = POSITION.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
-      WINDOW_TOP = { sort = 2, type = "number", raw_value = POSITION.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
-      WINDOW_WIDTH = { sort = 3, type = "number", raw_value = POSITION.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
-      WINDOW_HEIGHT = { sort = 4, type = "number", raw_value = POSITION.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
+      WINDOW_LEFT = config_window.CreateNumberOption(1, "Left", POSITION.WINDOW_LEFT, 0, consts.GetClientWidth() - POSITION.WINDOW_WIDTH, "The left most position of the entire panel."),
+      WINDOW_TOP = config_window.CreateNumberOption(2, "Top", POSITION.WINDOW_TOP, 0, consts.GetClientHeight() - POSITION.WINDOW_HEIGHT, "The top most position of the entire panel."),
+      WINDOW_WIDTH = config_window.CreateNumberOption(3, "Width", POSITION.WINDOW_WIDTH, 10, consts.GetClientWidth(), "The width of the entire panel."),
+      WINDOW_LINES = config_window.CreateNumberOption(4, "Visible Lines", CONFIG.WINDOW_LINES, 1, 50, "The number of lines visible, will adjust the height based on this."), 
+      ANCHOR = config_window.CreateListOption(5, "Preset", "Select...", ANCHOR_LIST, "Anchor the window based on a set of preset rules. Can change all position values."),
     }
   }
-  
-  config_window.Show(config, configureDone)
+ 
+  return config_window.Show(config, onConfigureDone)
 end
 
-function configureDone(group_id, option_id, config)
-  if group_id == "Position" then
-    POSITION[option_id] = config.raw_value
-  else
+onConfigureDone = function(group_id, option_id, config)
+  if group_id == "Position" and option_id ~= "WINDOW_LINES" then
     if option_id == "ANCHOR" then
       adjustAnchor(config.raw_value)
-    elseif option_id == "STRETCH" then
-      adjustStretch(config.raw_value)
     else
-      CONFIG[option_id] = config.raw_value
+      POSITION[option_id] = config.raw_value
     end
+  else
+    CONFIG[option_id] = config.raw_value
   end
 
-  saveMiniWindow()
-  createWindowAndFont()
-  drawMiniWindow()
+  save()
+  create()
+  draw()
 end
 
-function adjustAnchor(anchor_id)
-  local anchor = ANCHOR_LIST[anchor_id]:sub(4)
-  if anchor == nil or anchor == "" or anchor == "None" then
+adjustAnchor = function(anchor_id)
+  local anchor = ANCHOR_LIST[anchor_id]
+  if anchor == nil or anchor == "" then
     return
   end
 
-  local output_left = GetInfo(272) - GetInfo(276) - GetInfo(277) - 1
-  local output_top = GetInfo(273) - GetInfo(276) - GetInfo(277)
-  local output_right = GetInfo(274) + GetInfo(276) + GetInfo(277)
-  local output_bottom = GetInfo(275) + GetInfo(276) + GetInfo(277)
+  local min_height = HEADER_HEIGHT + consts.GetBorderWidth() * 3 + LINE_HEIGHT
 
   if anchor == "Top Left (Window)" then 
     POSITION.WINDOW_LEFT = 0
     POSITION.WINDOW_TOP = 0
   elseif anchor == "Bottom Left (Window)" then 
     POSITION.WINDOW_LEFT = 0
-    POSITION.WINDOW_TOP = GetInfo(280) - WindowInfo(WIN, 4)
+    POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
   elseif anchor == "Top Right (Window)" then
-    POSITION.WINDOW_LEFT = GetInfo(281) - POSITION.WINDOW_WIDTH
+    POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
     POSITION.WINDOW_TOP = 0    
   elseif anchor == "Bottom Right (Window)" then
-    POSITION.WINDOW_LEFT = GetInfo(281) - POSITION.WINDOW_WIDTH
-    POSITION.WINDOW_TOP = GetInfo(280) - WindowInfo(WIN, 4)    
+    POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
+    POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
   elseif anchor == "Top Fit Width (Output)" then
-    if output_top < 25 then
+    if consts.GetOutputTopOutside() < min_height then
       Note("There isn't enough room above the output to anchor there.")
     else
-      POSITION.WINDOW_LEFT = output_left
+      CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetOutputTopOutside())
+      POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
       POSITION.WINDOW_TOP = 0
-      POSITION.WINDOW_HEIGHT = output_top
-      POSITION.WINDOW_WIDTH = output_right - output_left
+      POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
     end
   elseif anchor == "Bottom Fit Width (Output)" then
-    if output_bottom > GetInfo(280) - 25 then
+    if consts.GetOutputBottomOutside() > consts.GetClientHeight() - min_height then
       Note("There isn't enough room below the output to anchor there.")
     else
-      POSITION.WINDOW_LEFT = output_left
-      POSITION.WINDOW_TOP = output_bottom
-      POSITION.WINDOW_HEIGHT = GetInfo(280) - output_bottom
-      POSITION.WINDOW_WIDTH = output_right - output_left
+      CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetClientHeight() - consts.GetOutputBottomOutside())
+      POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
+      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside()
+      POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
     end
   elseif anchor ==  "Right Top (Output)" then
-    if output_right > GetInfo(281) - 250 then
+    if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
       Note("There isn't enough room to the right of the output to anchor there.")
     else
-      POSITION.WINDOW_LEFT = output_right
-      POSITION.WINDOW_TOP = output_top
-      POSITION.WINDOW_WIDTH = GetInfo(281) - output_right
+      POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
+      POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
+      POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
     end
   elseif anchor ==  "Left Top (Output)" then
-    if output_left < 250 then
+    if consts.GetOutputLeftOutside() < 250 then
       Note("There isn't enough room to the left of the output to anchor there.")
     else
       POSITION.WINDOW_LEFT = 0
-      POSITION.WINDOW_TOP = output_top
-      POSITION.WINDOW_WIDTH = output_left
+      POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
+      POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
     end
-
-    elseif anchor ==  "Right Bottom (Output)" then
-    if output_right > GetInfo(281) - 250 then
+  elseif anchor ==  "Right Bottom (Output)" then
+    if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
       Note("There isn't enough room to the right of the output to anchor there.")
     else
-      POSITION.WINDOW_LEFT = output_right
-      POSITION.WINDOW_TOP = output_bottom - POSITION.WINDOW_HEIGHT
-      POSITION.WINDOW_WIDTH = GetInfo(281) - output_right
+      POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
+      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
+      POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
     end
   elseif anchor ==  "Left Bottom (Output)" then
-    if output_left < 250 then
+    if consts.GetOutputLeftOutside() < 250 then
       Note("There isn't enough room to the left of the output to anchor there.")
     else
       POSITION.WINDOW_LEFT = 0
-      POSITION.WINDOW_TOP = output_bottom - POSITION.WINDOW_HEIGHT
-      POSITION.WINDOW_WIDTH = output_left
+      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
+      POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
     end
   end
 
-  createWindowAndFont()
+  create()
 end
 
-function adjustStretch(stretch_id)
-  local stretch = STRETCH_LIST[stretch_id]:sub(4)
-  if stretch == nil or stretch == "" or stretch == "None" then
-    return
-  end
-  
-  local output_left = GetInfo(272) - GetInfo(276) - GetInfo(277)
-  local output_top = GetInfo(273) - GetInfo(276) - GetInfo(277)
-  local output_right = GetInfo(274) + GetInfo(276) + GetInfo(277)
-  local output_bottom = GetInfo(275) + GetInfo(276) + GetInfo(277)
-
-  if stretch == "Horizontal (Window)" then 
-    POSITION.WINDOW_LEFT = 0
-    POSITION.WINDOW_WIDTH = GetInfo(281)
-  elseif stretch == "Vertical (Window)" then 
-    POSITION.WINDOW_TOP = 0
-    POSITION.WINDOW_HEIGHT = GetInfo(280)
-  elseif stretch == "Horizontal (Output)" then
-    POSITION.WINDOW_LEFT = output_left
-    POSITION.WINDOW_WIDTH = output_right - output_left
-  elseif stretch == "Veritcal (Output)" then
-    POSITION.WINDOW_TOP = output_top
-    POSITION.WINDOW_HEIGHT = output_bottom - output_top
-  end
-
-  createWindowAndFont()
-end
-
-function getValueOrDefault(value, default)
-  if value == nil then
-    return default
-  end
-
-  return value
-end
-
-function renderRectangle(size_const, border, border_color)
+renderRectangle = function(size_const, border, border_color)
   border = border or 0
   border_color = border_color or CONFIG.BORDER_COLOR
 
@@ -1303,14 +1242,31 @@ function renderRectangle(size_const, border, border_color)
   end  
 end
 
-function doDebug()
-  --Note(Serialize(CONFIG))
-  --Note("LineHeight: " .. LINE_HEIGHT)
-  --Note("HeaderHeight: " .. HEADER_HEIGHT)
-  --Note("WindowLines: " .. WINDOW_LINES)
-  AddStyledLine("clan", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[CLAN] ClanMember: Wow, cool capture plugin!", textcolour = ColourNameToRGB("yellow"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("alliance", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[ALLIED 1] AllianceMember: Tabs? I've always wanted tabs.", textcolour = ColourNameToRGB("gold"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("tell", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "Someguy tell you 'Can I get that plugin?'", textcolour = ColourNameToRGB("red"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("form", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "You tell the formation 'You guys, using this capture plugins?", textcolour = ColourNameToRGB("cyan"), backcolour = ColourNameToRGB("black") }})
-  AddStyledLine("announce", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "YO THIS PLUGIN IS NEAT AND STUFF.", textcolour = ColourNameToRGB("white"), backcolour = ColourNameToRGB("black") }})
+calculateOptimalWindowLines = function(max_height)
+  local height, lines = LINE_HEIGHT, 1
+  while height < max_height do
+    lines = lines + 1
+    height = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + lines * LINE_HEIGHT
+  end
+  return lines - 1
 end
+
+doDebug = function()
+  addStyledLine("clan", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[CLAN] ClanMember: Wow, cool capture plugin!", textcolour = ColourNameToRGB("yellow"), backcolour = ColourNameToRGB("black") }})
+  addStyledLine("alliance", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "[ALLIED 1] AllianceMember: Tabs? I've always wanted tabs.", textcolour = ColourNameToRGB("gold"), backcolour = ColourNameToRGB("black") }})
+  addStyledLine("tell", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "Someguy tell you 'Can I get that plugin?'", textcolour = ColourNameToRGB("red"), backcolour = ColourNameToRGB("black") }})
+  addStyledLine("form", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "You tell the formation 'You guys, using this capture plugins?", textcolour = ColourNameToRGB("cyan"), backcolour = ColourNameToRGB("black") }})
+  addStyledLine("announce", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "YO THIS PLUGIN IS NEAT AND STUFF.", textcolour = ColourNameToRGB("white"), backcolour = ColourNameToRGB("black") }})
+  addStyledLine("betters", { { text = "[".. getDateString() .. "] ", textcolour = ColourNameToRGB("silver"), backcolour = ColourNameToRGB("black")}, { text = "You have become more learned at 'Offset' (" .. (SCROLL_OFFSETS[CURRENT_TAB_NAME] or 0) .. "%).", textcolour = ColourNameToRGB("white"), backcolour = ColourNameToRGB("black") }})
+end
+
+return {
+  Prepare = prepare,
+  Initialize = initialize, 
+  Capture = capture, 
+  GetDateString = getDateString, 
+  Close = close, 
+  IsAutoUpdateEnabled = isAutoUpdateEnabled, 
+  OnConfigureDone = onConfigureDone,
+  DoDebug = doDebug
+}

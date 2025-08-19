@@ -27,8 +27,10 @@ show = function(config, saveCallback)
 end
 
 update = function(config)
-  CONFIG = config
-  draw()
+  if WindowInfo(WIN, 5) then
+    CONFIG = config
+    draw()
+  end
 end
 
 initialize = function()

@@ -39,7 +39,6 @@ local function getGmcpValue(gmcp_field)
 end
 
 local function getSerializedVariable(variable_name, default_value)
-  Note("Getting: " .. variable_name)
   local serialized_text = GetVariable(variable_name) or ""
   if serialized_text ~= "" then
     return deserialize(serialized_text)

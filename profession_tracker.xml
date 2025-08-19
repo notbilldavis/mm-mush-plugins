@@ -111,10 +111,23 @@ Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
 
 <![CDATA[
 
+local can_update, update_helper = pcall(require, "updatehelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+
+if can_update and update_helper.version == nil then
+  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
+  package.loaded["updatehelper"] = nil
+  can_update, update_helper = pcall(require, "updatehelper")
+end
+
+if can_update then
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+end
+
 require "gmcphelper"
 
 needed_manuals = {
-  "enhanced strength", "refresh", "remove curse",
+  "enhanced strength", "refresh", "remove curse", "shield",
   "acid blast", "bless", "blindness", "spark", "call lightning", "calm", "cause critical",
   "cause light", "change sex", "chill touch", "color spray", "light", "cure blindness", 
   "cure critical", "cure disease", "cure light", "cure poison", "curse", "cure serious", 
@@ -199,10 +212,8 @@ function OnPluginBroadcast(msg, id, pname, text)
   if id == "f67c4339ed0591a5b010d05b" then
     if (text == "char.base") then
       if character_name == nil or character_name == "" then
-        local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "char.base")
-        luastmt = "gmcpdata = " .. gmcparg
-        assert(loadstring(luastmt or ""))()
-        setCharacterName(gmcpval("name"))
+        local character = serialization_helper.GetGmcpValue(text)
+        setCharacterName(character.name)
       end
     end
   end
@@ -214,26 +225,19 @@ function setCharacterName(name)
   else
     character_name = name
     
-    owned_manuals = {}
-    needed_manuals_set = {}
+    owned_manuals = serialization_helper.GetSerializedVariable(character_name .. "_owned_manuals")
+    discovered_manuals = serialization_helper.GetSerializedVariable("prof_tracker_discovered_manuals")
+
     owned_manuals_set = {}
-    discovered_manuals = {}
+    needed_manuals_set = {}
 
-    local owned_manuals_text = GetVariable(character_name .. "_owned_manuals") or ""
-    if (owned_manuals_text ~= "") then
-      owned_manuals = deserialize(owned_manuals_text)
-      for _, ability in ipairs(owned_manuals) do
-        owned_manuals_set[ability] = true
-      end
+    for _, ability in ipairs(owned_manuals) do
+      owned_manuals_set[ability] = true
     end
-
-    local discovered_manuals_text = GetVariable("prof_tracker_discovered_manuals") or ""
-    if (discovered_manuals_text ~= "") then
-      discovered_manuals = deserialize(discovered_manuals_text)
-      for _, ability in ipairs(discovered_manuals) do
-        table.insert(needed_manuals, ability)
-      end
-    end
+    
+    for _, ability in ipairs(discovered_manuals) do
+      table.insert(needed_manuals, ability)
+    end    
 
     for _, ability in ipairs(needed_manuals) do
       needed_manuals_set[ability] = true
@@ -241,11 +245,12 @@ function setCharacterName(name)
         longest = #ability + 2
       end
     end
-
-    for _, ability in ipairs(owned_manuals) do
-      owned_manuals_set[ability] = true
-    end    
   end
+end
+
+function saveData()
+  serialization_helper.SaveSerializedVariable(character_name .. "_owned_manuals", owned_manuals)
+  serialization_helper.SaveSerializedVariable("prof_tracker_discovered_manuals", discovered_manuals)
 end
 
 function clear()
@@ -255,8 +260,7 @@ function clear()
     if confirm_clear then
       owned_manuals_set = {}
       owned_manuals = {}
-      SetVariable(character_name .. "_owned_manuals", serialize(owned_manuals))
-      SaveState()
+      saveData()
       Note("Owned manuals have been cleared for this character.")
       confirm_clear = false
     else
@@ -315,8 +319,7 @@ function ensure(manual)
   if not needed_manuals_set[manual] then
     needed_manuals_set[manual] = true
     table.insert(discovered_manuals, manual)
-    SetVariable("prof_tracker_owned_manuals", serialize(discovered_manuals))
-    SaveState()
+    saveData()
 
     Note("This manual wasn't in the list of known manuals for the mark, oops!")
     Note("Try to send a tell or mail to Oona so they can add it to the script.")
@@ -358,8 +361,7 @@ function added(manual)
   if isManualNeeded(manual) then
     table.insert(owned_manuals, manual)
     owned_manuals_set[manual] = true
-    SetVariable(character_name .. "_owned_manuals", serialize(owned_manuals))
-    SaveState()
+    saveData()
     Note("Added the needed manual of " .. manual .. " to the owned manuals.")
   end
 end
@@ -505,46 +507,11 @@ function showCommand(cmd, desc)
 end
 
 function checkForUpdates()
-  local updater_installed, updater = pcall(require, "updatehelper")
-
-  if updater_installed then
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/profession_tracker.xml" },
-    })
-  end
-end
-
-function serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
-function deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "profession_tracker.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
   else
-    return nil, "Failed to load string"
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
 end
 

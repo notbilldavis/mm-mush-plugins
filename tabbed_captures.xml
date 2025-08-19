@@ -423,6 +423,10 @@ function configure()
   capture_window.Configure()
 end
 
+function doDebug()
+  capture_window.DoDebug()
+end
+
 ]]>
 
 </script>
