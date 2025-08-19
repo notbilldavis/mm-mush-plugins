@@ -128,6 +128,7 @@ function loadConfig()
   CONFIG.VARIABLE_COUNT = serialization_helper.GetValueOrDefault(CONFIG.VARIABLE_COUNT, 800)
   CONFIG.WINDOW_LEFT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LEFT, consts.GetOutputLeftOutside())
   CONFIG.WINDOW_RIGHT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_RIGHT, consts.GetOutputRightOutside())
+  CONFIG.TEXT_OFFSET = serialization_helper.GetValueOrDefault(CONFIG.TEXT_OFFSET, 0)
 end
 
 function create()
@@ -135,7 +136,7 @@ function create()
   WindowFont(WIN, FONT, font.name, font.size)
   
   LINE_HEIGHT = GetInfo(212)
-  WINDOW_HEIGHT = LINE_HEIGHT * CONFIG.ROW_COUNT
+  WINDOW_HEIGHT = LINE_HEIGHT * CONFIG.ROW_COUNT + consts.GetBorderWidth() * 2 + consts.GetBorderOffset() * 2
   WINDOW_WIDTH = CONFIG.WINDOW_RIGHT - CONFIG.WINDOW_LEFT
 
   local top = consts.GetOutputBottomOutside() - WINDOW_HEIGHT
@@ -183,7 +184,7 @@ function drawLines()
   local cnt = 0
   local lines_in_buffer = GetLinesInBufferCount()
   for line = lines_in_buffer - CONFIG.ROW_COUNT, lines_in_buffer do
-    drawLine(line - 1, (cnt * LINE_HEIGHT) + 2)
+    drawLine(line, cnt * LINE_HEIGHT + consts.GetBorderWidth() + consts.GetBorderOffset())
     cnt = cnt + 1
   end
 
@@ -210,7 +211,7 @@ function drawScrollToBottomButton()
 end
 
 function drawLine(i, y)
-  local x = consts.GetBorderWidth() + consts.GetBorderOffset()
+  local x = consts.GetBorderWidth() + consts.GetBorderOffset() + CONFIG.TEXT_OFFSET
   local style_count = GetLineInfo(i, 11)
   if style_count == nil then 
     WindowText(WIN, FONT, "there was a problem with line " .. i .. ", sorry", x, y, 0, 0, ColourNameToRGB("white"))
@@ -284,7 +285,8 @@ function Configure()
       },
       _3_POSITION = {
         WINDOW_LEFT = config_window.CreateNumberOption(1, "Left", CONFIG.WINDOW_LEFT, 0, CONFIG.WINDOW_RIGHT, "The left most position of the entire panel."),
-        WINDOW_RIGHT = config_window.CreateNumberOption(1, "Right", CONFIG.WINDOW_RIGHT, CONFIG.WINDOW_LEFT, consts.GetClientWidth() - 250, "The right most position of the entire panel."),
+        WINDOW_RIGHT = config_window.CreateNumberOption(2, "Right", CONFIG.WINDOW_RIGHT, CONFIG.WINDOW_LEFT, consts.GetClientWidth() - 250, "The right most position of the entire panel."),
+        TEXT_OFFSET = config_window.CreateNumberOption(3, "Text Offset", CONFIG.TEXT_OFFSET, -10, 10, "Offset just the text left or right."),
       }
     }
     
