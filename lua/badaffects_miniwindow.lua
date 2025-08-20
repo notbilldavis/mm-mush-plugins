@@ -274,9 +274,8 @@ setSizeAndPositionToContent = function()
 
   TEXT_BUFFER = {}
   for aff, time in pairs(BAD_STUFF) do
-    local converted_time = os.time() + (time / 4 * 60)
-    if converted_time > os.time() then
-      table.insert(TEXT_BUFFER, { affect = aff, expire = converted_time })
+    if time > os.time() then
+      table.insert(TEXT_BUFFER, { affect = aff, expire = time })
     end
   end
 
@@ -476,7 +475,7 @@ setAffect = function(aff, time, redraw)
     if (time == 0) then
       removeAffect(aff)
     else
-      BAD_STUFF[aff] = time
+      BAD_STUFF[aff] = os.time() + (time / 4 * 60)
     end
 
     if redraw then
