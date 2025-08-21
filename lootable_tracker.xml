@@ -154,7 +154,7 @@ function setCharacterName(name)
   else
     character_name = name
     EnsureTables()
-    DoAfterSpecial(1, "ShowValidLootables()", sendto.script)
+    DoAfterSpecial(2, "ShowValidLootables()", sendto.script)
   end
 end
 

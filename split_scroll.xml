@@ -101,7 +101,7 @@ function pluginStart()
   end
 
   loadConfig()
-  create()
+  DoAfterSpecial(1, "create()", sendto.script)
 end
 
 function pluginStop()
