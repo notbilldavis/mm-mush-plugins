@@ -83,10 +83,14 @@ local WINDOW_WIDTH
 
 local CONFIG = nil
 
-counter = 0
-init = false
+local counter = 0
+local init = false
+local shown = false
+local updated = true
 
 function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
 function OnPluginClose() pluginStop() end
 function OnPluginDisable() pluginStop() end
 function OnPluginDisconnect() pluginStop() end
@@ -100,8 +104,10 @@ function pluginStart()
     ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
   end
 
+  init = false
+  updated = true
+
   loadConfig()
-  DoAfterSpecial(1, "create()", sendto.script)
 end
 
 function pluginStop()
@@ -114,27 +120,26 @@ function pluginStop()
 end
 
 function loadConfig()
-  local def_font, def_size = GetInfo(20) or "Lucida Console", GetInfo(213) or 10
-  CONFIG = serialization_helper.GetSerializedVariable("splitscroll_config")  
-  CONFIG.BORDER_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BORDER_COLOR, ColourNameToRGB("silver"))
-  CONFIG.BUTTON_X_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_X_DISTANCE, 250)
-  CONFIG.BUTTON_Y_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_Y_DISTANCE, 100)
-  CONFIG.BUTTON_HEIGHT = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_HEIGHT, 50)
-  CONFIG.BUTTON_WIDTH = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_WIDTH, 50)
-  CONFIG.BUTTON_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_COLOR, ColourNameToRGB("dimgray"))
-  CONFIG.ARROW_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ARROW_COLOR, ColourNameToRGB("darkgray"))
-  CONFIG.SPLIT_FONT = serialization_helper.GetValueOrDefault(CONFIG.SPLIT_FONT, { name = def_font, size = def_size })
-  CONFIG.ROW_COUNT = serialization_helper.GetValueOrDefault(CONFIG.ROW_COUNT, 15)
-  CONFIG.VARIABLE_COUNT = serialization_helper.GetValueOrDefault(CONFIG.VARIABLE_COUNT, 800)
-  CONFIG.WINDOW_LEFT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LEFT, consts.GetOutputLeftOutside())
-  CONFIG.WINDOW_RIGHT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_RIGHT, consts.GetOutputRightOutside())
-  CONFIG.TEXT_OFFSET = serialization_helper.GetValueOrDefault(CONFIG.TEXT_OFFSET, 0)
+  if CONFIG == nil then
+    local def_font, def_size = GetInfo(20) or "Lucida Console", GetInfo(213) or 10
+    CONFIG = serialization_helper.GetSerializedVariable("splitscroll_config")  
+    CONFIG.BORDER_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BORDER_COLOR, ColourNameToRGB("silver"))
+    CONFIG.BUTTON_X_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_X_DISTANCE, 250)
+    CONFIG.BUTTON_Y_DISTANCE = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_Y_DISTANCE, 100)
+    CONFIG.BUTTON_HEIGHT = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_HEIGHT, 50)
+    CONFIG.BUTTON_WIDTH = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_WIDTH, 50)
+    CONFIG.BUTTON_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_COLOR, ColourNameToRGB("dimgray"))
+    CONFIG.ARROW_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ARROW_COLOR, ColourNameToRGB("darkgray"))
+    CONFIG.SPLIT_FONT = serialization_helper.GetValueOrDefault(CONFIG.SPLIT_FONT, { name = def_font, size = def_size })
+    CONFIG.ROW_COUNT = serialization_helper.GetValueOrDefault(CONFIG.ROW_COUNT, 15)
+    CONFIG.VARIABLE_COUNT = serialization_helper.GetValueOrDefault(CONFIG.VARIABLE_COUNT, 800)
+    CONFIG.WINDOW_LEFT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LEFT, consts.GetOutputLeftOutside())
+    CONFIG.WINDOW_RIGHT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_RIGHT, consts.GetOutputRightOutside())
+    CONFIG.TEXT_OFFSET = serialization_helper.GetValueOrDefault(CONFIG.TEXT_OFFSET, 0)
+  end
 end
 
 function create()
-  local font = CONFIG["SPLIT_FONT"]  
-  WindowFont(WIN, FONT, font.name, font.size)
-  
   LINE_HEIGHT = GetInfo(212)
   WINDOW_HEIGHT = LINE_HEIGHT * CONFIG.ROW_COUNT + consts.GetBorderWidth() * 2 + consts.GetBorderOffset() * 2
   WINDOW_WIDTH = CONFIG.WINDOW_RIGHT - CONFIG.WINDOW_LEFT
@@ -143,6 +148,11 @@ function create()
 
   WindowCreate(WIN, CONFIG.WINDOW_LEFT, top, WINDOW_WIDTH, WINDOW_HEIGHT,
     miniwin.pos_center_all, miniwin.create_absolute_location, ColourNameToRGB("black"))
+
+  local font = CONFIG["SPLIT_FONT"]  
+  WindowFont(WIN, FONT, font.name, font.size)
+
+  init = true
 end
 
 function OnPluginTick()
@@ -162,11 +172,21 @@ function drawSplitScroll()
   local total_height = GetLinesInBufferCount() * GetInfo(212)
 
   if scroll < total_height - CONFIG.VARIABLE_COUNT then
+    if not init then create() end
+    if not updated then return end
+
     drawLines()
 
-    WindowShow(WIN, true)
+    if not shown then
+      WindowShow(WIN, true)
+      shown = true
+    end
   else
-    WindowShow(WIN, false)
+    if shown then
+      WindowShow(WIN, false)
+      shown = false
+      updated = true
+    end
   end
 end
 
@@ -178,7 +198,6 @@ function drawLines()
   end  
   
   WindowAddHotspot(WIN, "textarea", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, "", "", "OnTextAreaMouseDown", "", "OnTextAreaMouseUp", "", miniwin.cursor_ibeam, 0)
-  WindowDragHandler(WIN, "textarea", "OnTextAreaMouseMove", "", 0x10)
   WindowScrollwheelHandler(WIN, "textarea", "OnWheelScroll")
   
   local cnt = 0
@@ -187,6 +206,8 @@ function drawLines()
     drawLine(line, cnt * LINE_HEIGHT + consts.GetBorderWidth() + consts.GetBorderOffset())
     cnt = cnt + 1
   end
+
+  updated = false
 
   drawScrollToBottomButton()
 end
@@ -219,17 +240,22 @@ function drawLine(i, y)
   end
   for s = 1, style_count do
     local fgcol = GetStyleInfo(i, s, 14)
-    local bgcol = GetStyleInfo(i, s, 15) or ColourNameToRGB("black")
+    local bgcol = GetStyleInfo(i, s, 15)
     local txt = GetStyleInfo(i, s, 1)
     local w = WindowTextWidth(WIN, FONT, txt)
 
     if bgcol then
       WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, bgcol)
     end
-    
+
     WindowText(WIN, FONT, txt, x, y, 0, 0, fgcol)
     x = x + w
   end
+end
+
+function OnPluginLineReceived(line)
+  updated = true
+  return true
 end
 
 function OnTextAreaMouseUp(flags, hotspot_id)
