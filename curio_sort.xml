@@ -110,7 +110,7 @@ if can_update then
 end
 
 if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
-if not serializer_installed then then table.insert(missing_required_files, "lua/serializationhelper.lua") end
+if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
 
 require "gmcphelper"
 
