@@ -161,6 +161,18 @@ Commands:
   <trigger enabled="y" keep_evaluating="y" match="^With care and precision, you practice your craft, creating a powerful work of art: (.*?)\.$" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>HandleMealCooked("%1")</send>
   </trigger>
+
+  <trigger enabled="n" keep_evaluating="y" match="^When you look inside\, you see\:$" group="cleaning_ingredients" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>startCleanCapture()</send>
+  </trigger>
+
+  <trigger enabled="n" keep_evaluating="y" match="^A total of (.*?) items weighing (.*?)\.$" group="cleaning_ingredients" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+    <send>endCleanCapture()</send>
+  </trigger>
+
+  <trigger enabled="n" keep_evaluating="y" match="^(.*?)$" group="cleaning_ingredients" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+    <send>cleanCapture("%0")</send>
+  </trigger>
 </triggers>
 
 <script>
@@ -212,6 +224,8 @@ local cooking = false
 local cooking_amount = 1
 local cooking_infinite = false
 local pulled_food = false
+local clean_started = false
+local clean_captured = {}
 local automation_temp_off = false
 local triggered_while_off = false
 
@@ -292,7 +306,7 @@ function HandlePluginBroadcast(msg, id, name, text)
       if text:lower() == "off" then 
         Note("Temporarily turning off pouch automation so you don't drop the body part!")
         automation_temp_off = true
-      else 
+      elseif automation_temp_off then
         Note("Turning pouch automation back on!")
         automation_temp_off = false
         if triggered_while_off then LootPouch() end
@@ -317,7 +331,7 @@ function SetCharacterName(name)
     
     config.storage_container = serialization_helper.GetValueOrDefault(config.storage_container, "trunk")
     config.tracked_ingredients = serialization_helper.GetValueOrDefault(config.tracked_ingredients, {})
-    config.automate_pouch = serialization_helper.GetValueOrDefault(config.automate_pouch, true)
+    config.automate_pouch = serialization_helper.GetValueOrDefault(config.automate_pouch, false)
     config.autoupdate = serialization_helper.GetValueOrDefault(config.autoupdate, true)
     
     DoAfterSpecial(1, "notifyPouchStatus()", sendto.script)
@@ -738,6 +752,8 @@ function TrackPouchIngredient(ingredient)
     ingredient = Trim(ingredient:lower())
     if ingredient == "clear" then
       config.tracked_ingredients = {}      
+    elseif ingredient == "clean" then
+      cleanContainerOfIngredients()
     else
       config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
       if config.tracked_ingredients[ingredient] then
@@ -772,6 +788,41 @@ function TrackPouchIngredient(ingredient)
     Note("You can toggle tracking of an ingredient with 'cooking pouch track <ingredient>'")
   end
 end
+
+function cleanContainerOfIngredients()
+  EnableTriggerGroup("cleaning_ingredients", true)
+  SendNoEcho("look '" .. config.storage_container .. "'")  
+  DoAfterSpecial(2, "endCleanCapture()", sendto.script)
+end
+
+function startCleanCapture()
+  clean_started = true
+  clean_captured = {}
+end
+
+function cleanCapture(item)
+  if clean_started then
+    item = Trim(item:gsub("%s*%b()", ""))
+    if item ~= "" then
+      clean_captured[item] = (config.tracked_ingredients[item] == true) or tracked_recipes[item:upper()] ~= nil
+    end
+  end
+end
+
+function endCleanCapture()
+  EnableTriggerGroup("cleaning_ingredients", false)
+  if clean_started then
+    clean_started = false
+    for item, tracked in pairs(clean_captured) do
+      if not tracked then
+        SendNoEcho("get all.'" .. item .. "' " .. config.storage_container)
+        SendNoEcho("drop all.'" .. item .. "'")
+      end
+    end
+  end  
+end
+
+
 
 function CookRecipe(times)
   if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 then
