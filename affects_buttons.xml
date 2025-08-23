@@ -249,12 +249,12 @@ function pluginStart()
   if #missing_required_files > 0 then
     ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
     EnableTriggerGroup("affects_buttons", false)
-    EnableAliasGroup("affects_)buttons", false)
+    EnableAliasGroup("affects_buttons", false)
     EnableTimerGroup("affects_buttons", false)
     return
   else
     EnableTriggerGroup("affects_buttons", true)
-    EnableAliasGroup("affects_)buttons", true)
+    EnableAliasGroup("affects_buttons", true)
     EnableTimerGroup("affects_buttons", true)
   end
   
