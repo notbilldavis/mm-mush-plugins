@@ -271,9 +271,9 @@ function pluginStop()
     Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
   end  
 
+  config_window.Hide()
   buttons_window.Close()
   badaffects_window.Close()
-  config_window.Hide()
 end
 
 -----------------
@@ -350,10 +350,18 @@ function Configure(args)
     if which == nil or which:sub(1, 8) == "negative" then
       config.Negative_Affects_Options = badaffects_window.GetConfiguration()
     end
-    config_window.Show(config, buttons_window.OnConfigureDone)
+    config_window.Show(config, onConfigureDone)
   else
-    
+    -- todo
   end  
+end
+
+function onConfigureDone(group_id, option_id, config)
+  if group_id:find("Negative_Affects") ~= nil then
+    badaffects_window.OnConfigureDone(group_id, option_id, config)
+  else
+    buttons_window.OnConfigureDone(group_id, option_id, config)
+  end
 end
 
 function Broadcast(args)
