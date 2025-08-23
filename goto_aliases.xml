@@ -63,55 +63,55 @@ Go to the orc pursuer in wroth:
 
 <aliases>
 
-<alias match="^goto[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doDebug()</send>
 </alias>
 
-<alias match="^goto[ ]+north$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+north$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doNorthGate()</send>
 </alias>
 
-<alias match="^goto[ ]+south$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+south$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doSouthGate()</send>
 </alias>
 
-<alias match="^goto[ ]+west$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+west$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doWestGate()</send>
 </alias>
 
-<alias match="^goto[ ]+east$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+east$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doEastGate()</send>
 </alias>
 
-<alias match="^goto[ ]+next$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+next$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doNextCity()</send>
 </alias>
 
-<alias match="^goto[ ]+qm$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+qm$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doQuestMaster()</send>
 </alias>
 
-<alias match="^goto[ ]+rep$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+rep$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doTownRep()</send>
 </alias>
 
-<alias match="^goto[ ]+crystal$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+crystal$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doCrystal()</send>
 </alias>
 
-<alias match="^goto[ ]+pursuer$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+pursuer$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doPursuer()</send>
 </alias>
 
-<alias match="^goto[ ]+cancel$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+cancel$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>cancelGoto()</send>
 </alias>
 
-<alias match="^goto[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^goto[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
 </alias>
 
-<alias match="^run (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+<alias match="^run (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
   <send>tryRun("%1")</send>
 </alias>
 
@@ -119,20 +119,7 @@ Go to the orc pursuer in wroth:
 
 <triggers>
 
-<trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) savage\-looking orc stands here\, his every limb chained to the wall\.$">
-  <send>
-    Tell("Orc Pursuer: ")
-    Hyperlink("!!" .. GetPluginID() .. ":getPursuerTarget()", "[get target]", "", "silver", "black", false)
-    Tell(" - ")
-    Hyperlink("give head orc", "[give head orc]", "", "silver", "black", false)
-    Tell(" - ")
-    Hyperlink("give leg orc", "[give leg orc]", "", "silver", "black", false)
-    Tell(" - ")
-    Hyperlink("give arm orc", "[give arm orc]", "", "silver", "black", false)
-  </send>
-</trigger>
-
-<trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+<trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="goto_aliases">
   <send>OnFirstPrompt()</send>
 </trigger>
 
@@ -143,7 +130,13 @@ Go to the orc pursuer in wroth:
 <![CDATA[
 
 require "gmcphelper"
-require "serializationhelper"
+
+local can_update, update_helper = pcall(require, "updatehelper")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+
+if can_update and not serializer_installed then 
+  serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
+end
 
 local init = false
 local running_to_pursuer = false
@@ -189,18 +182,23 @@ local underground_destinations = {
 
 local sug_destinations = { 
   "renn", "hlegmal", "goblam", "grigmorth", "cogworkcity",
-  "waylandersretreat", "unreinforcedtunnel", "goblam"
+  "waylandersretreat", "unreinforcedtunnel", "goblam", "vaatt"
 }
 
 function OnPluginInstall()
-  Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
-  Note("")
-  Note(" > Added aliases for: goto <direction>, goto qm, goto rep, goto crystal, and goto pursuer")
-  Note(" > See goto help for more information!")
-  Note("")
+  if not serializer_installed then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): lua/serializationhelper.lua")
+    EnableTriggerGroup("goto_aliases", false)
+    EnableAliasGroup("goto_aliases", false)
+    return
+  else
+    EnableTriggerGroup("goto_aliases", true)
+    EnableAliasGroup("goto_aliases", true)
+  end
 end
 
 function OnPluginDisconnect()
+  if not serializer_installed then return end
   checkForUpdates()
 end
 
@@ -209,6 +207,7 @@ function OnFirstPrompt()
 end
 
 function OnPluginBroadcast(msg, id, name, text)
+  if not serializer_installed then return end
   if (id =="f67c4339ed0591a5b010d05b") then
     if (text == "room.info") then
       if running_to_pursuer then

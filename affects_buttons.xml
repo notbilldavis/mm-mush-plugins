@@ -88,43 +88,43 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 <aliases>
 
-  <alias match="^affects[ ]+add(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+add(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>AddButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+edit(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+edit(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>EditButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+delete(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+delete(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>DeleteButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+rename(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+rename(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RenameButton("%1", "%2")</send>
   </alias>
 
-  <alias match="^affects[ ]+move(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+move(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>MoveButton("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+(?:config|configure)\b(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+(?:config|configure)\b(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>Configure("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+broadcast(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+broadcast(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>Broadcast("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>SetCharacterName("%1")</send>
   </alias>
 
-  <alias match="^affects[ ]+cast[ ]+favorites" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+cast[ ]+favorites" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>CastFavorites()</send>
   </alias>
   
-  <alias match="^affects[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^affects[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>CheckForUpdates()</send>
   </alias>
 
@@ -132,15 +132,15 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 <triggers>
 
-  <trigger match="^(|[^ ]+(.*?))(\<(.+)hp (.+)sp (.+)st\>|\(.+\)) $" enabled="y" name="first_prompt" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^(|[^ ]+(.*?))(\<(.+)hp (.+)sp (.+)st\>|\(.+\)) $" enabled="y" name="first_prompt" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>OnFirstPrompt()</send>
   </trigger>
 
-  <trigger match="^You are affected by the following\:$" enabled="y" name="start_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You are affected by the following\:$" enabled="y" name="start_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>StartCapturingAffects()</send>
   </trigger>
 
-  <trigger match="^Total of (.*?)magical(.*?) affects\.$" enabled="y" name="stop_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^Total of (.*?)magical(.*?) affects\.$" enabled="y" name="stop_affects" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>StopCapturingAffects()</send>
   </trigger>
 
@@ -152,38 +152,38 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>SetAffect("%1", "-1", false)</send>
   </trigger>
 
-  <trigger match="^You have increased the duration of the spell \'(.*?)\'\.$" enabled="y" keep_evaluating="n" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You have increased the duration of the spell \'(.*?)\'\.$" enabled="y" keep_evaluating="n" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RecastAffect("%1")</send>
   </trigger>
 
-  <trigger match="^\[Off\: You lose (.*?)\] (.*?)\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^\[Off\: You lose (.*?)\] (.*?)\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAffect("%1")</send>
   </trigger>
 
-  <trigger match="^You are surrounded by an ochre glow as the last vestiges of \'(.*?)\' are burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You are surrounded by an ochre glow as the last vestiges of \'(.*?)\' are burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAffect("%1")</send>
   </trigger>
   
-  <trigger match="^(.*?) knocks (.*?) from your grip\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" >
+  <trigger match="^(.*?) knocks (.*?) from your grip\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>DisarmedBroadcast("%2")</send>
   </trigger> 
 
-  <trigger match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>SetAffect("wolf_familiar", "120", true)</send>
   </trigger>
 
-  <trigger match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^There is a slight \*poof\* as an alert wolf vanishes from your inventory\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAffect("wolf_familiar")</send>
   </trigger>
 
-  <trigger match="^You feel relieved as the (plague|poison) is burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100">
+  <trigger match="^You feel relieved as the (plague|poison) is burned from your body\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAffect("%1")</send>
   </trigger>
 </triggers>
 
 <timers>
 
-  <timer name="affects_timer" enabled="y" second="10" offset_second="0.00" send_to="12" active_closed="y">
+  <timer name="affects_timer" enabled="y" second="10" offset_second="0.00" send_to="12" active_closed="y"  group="affects_buttons">
     <send>TimerTriggered()</send>
   </timer>
 
@@ -195,6 +195,7 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
 require "gmcphelper"
 
+local missing_required_files = {}
 local can_update, update_helper = pcall(require, "updatehelper")
 local const_installed, consts = pcall(require, "consthelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
@@ -216,6 +217,12 @@ if can_update then
   if not badaffects_installed then badaffects_installed, badaffects_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/badaffects_miniwindow.lua") end
 end
 
+if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
+if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
+if not config_installed then table.insert(missing_required_files, "lua/configuration_miniwindow.lua") end
+if not buttons_installed then table.insert(missing_required_files, "lua/affectsbuttons_miniwindow.lua") end
+if not badaffects_installed then table.insert(missing_required_files, "lua/badaffects_miniwindow.lua") end
+
 local notify_changes = true
 
 function OnPluginInstall() pluginStart() end
@@ -226,6 +233,7 @@ function OnPluginDisable() pluginStop() end
 function OnPluginDisconnect() pluginStop() end
 
 function OnPluginBroadcast(msg, id, name, text)
+  if #missing_required_files > 0 then return end
   if (id == "f67c4339ed0591a5b010d05b") then
     if (text == "char.affect_application_msg") then
       handleGmcpAdd()
@@ -238,8 +246,16 @@ function OnPluginBroadcast(msg, id, name, text)
 end
 
 function pluginStart()
-  if not const_installed or not serializer_installed or not config_installed or not buttons_installed or not badaffects_installed then 
-    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  if #missing_required_files > 0 then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
+    EnableTriggerGroup("affects_buttons", false)
+    EnableAliasGroup("affects_)buttons", false)
+    EnableTimerGroup("affects_buttons", false)
+    return
+  else
+    EnableTriggerGroup("affects_buttons", true)
+    EnableAliasGroup("affects_)buttons", true)
+    EnableTimerGroup("affects_buttons", true)
   end
   
   EnableTrigger("first_prompt", true)
@@ -248,6 +264,7 @@ function pluginStart()
 end
 
 function pluginStop()
+  if #missing_required_files > 0 then return end
   if can_update and buttons_window.IsAutoUpdateEnabled() then
     CheckForUpdates()
   else

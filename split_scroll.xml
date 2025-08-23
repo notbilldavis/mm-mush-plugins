@@ -57,6 +57,7 @@ Use "split update" to update from github.
 
 <![CDATA[
 
+local missing_required_files = {}
 local can_update, update_helper = pcall(require, "updatehelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
 local config_installed, config_window = pcall(require, "configuration_miniwindow")
@@ -73,6 +74,10 @@ if can_update then
   if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
   if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
 end
+
+if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
+if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
+if not config_installed then table.insert(missing_required_files, "lua/configuration_miniwindow.lua") end
 
 local WIN = GetPluginID()
 local FONT = WIN .. "_font"
@@ -100,8 +105,9 @@ function doOnHelp()
 end
 
 function pluginStart()
-  if not serialization_helper or not config_installed or not const_installed then
-    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  if #missing_required_files > 0 then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
+    return
   end
 
   init = false
@@ -111,6 +117,7 @@ function pluginStart()
 end
 
 function pluginStop()
+  if #missing_required_files > 0 then return end
   config_window.Hide()
   if can_update and CONFIG.AUTOUPDATE then
     checkForUpdates()

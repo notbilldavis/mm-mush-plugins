@@ -35,74 +35,74 @@ Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
 
 <aliases>
 
-  <alias match="^prof[ ]+owned$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+owned$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>showOwned()</send>
   </alias>
 
-  <alias match="^prof[ ]+needed$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+needed$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>showNeeded()</send>
   </alias>
 
-  <alias match="^prof[ ]+add[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+add[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>add("%1")</send>
   </alias>
 
-  <alias match="^prof[ ]+clear$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+clear$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>clear()</send>
   </alias>
 
-  <alias match="^prof[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>setCharacterName("%1")</send>
   </alias>
 
-  <alias match="^prof[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^prof[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>checkForUpdates()</send>
   </alias>
 
-  <alias enabled="y" match="^prof$" regexp="y" send_to="12" sequence="100">
+  <alias enabled="y" match="^prof$" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>showCommands()</send>
   </alias>
  
 </aliases>
 
 <triggers>
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a manual of (.*?) \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a manual of (.*?) \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100" group="profession_tracker">
     <send>need("%1", "%2")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^You put a manual of (.*?) in Vandemaar\'s Trunk\.$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^You put a manual of (.*?) in Vandemaar\'s Trunk\.$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>added("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^\'Ohh\, a manual of (.*?)\!\' a depressed romantic exclaims to you\. \'That\'s exactly what I needed\! Thank you\, (.*?)\!\'$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^\'Ohh\, a manual of (.*?)\!\' a depressed romantic exclaims to you\. \'That\'s exactly what I needed\! Thank you\, (.*?)\!\'$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>added("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^.+Could you get me a manual of (.*?)\? It\'s very important to me.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^.+Could you get me a manual of (.*?)\? It\'s very important to me.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>ensure("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^.+have you brought me that manual of (.*?) like I asked\?.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^.+have you brought me that manual of (.*?) like I asked\?.+$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>ensure("%1")</send>
   </trigger>  
 
-  <trigger enabled="y" keep_evaluating="y" match="^You focus your powers of observation on Vandemaar\'s Trunk(.*?)$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^When you look inside\, you see\:$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>startCount()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a gold-leaf binder of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a gold-leaf binder of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100" group="profession_tracker">
     <send>addBinders("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a silver-bound folio of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a silver-bound folio of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100" group="profession_tracker">
     <send>addFolios("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^functioning as a grisly keyhole(.*?)$" regexp="y" omit_from_output="n" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^A total of (.*?) items weighing (.*?)\.$" regexp="y" omit_from_output="n" send_to="12" sequence="100" group="profession_tracker">
     <send>endCount()</send>
   </trigger>
 
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>onFirstPrompt()</send>
   </trigger>
 </triggers>
@@ -185,21 +185,27 @@ local count_binder = 0
 
 local longest = 20
 
-function OnPluginInstall()
-  EnableTrigger("first_prompt", true)
-end
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
 
-function OnPluginEnable()
-  character_name = nil
-  EnableTrigger("first_prompt", true)
-end
+function pluginStart()
+  if not serializer_installed then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): lua/serializationhelper.lua")
+    EnableTriggerGroup("profession_tracker", false)
+    EnableAliasGroup("profession_tracker", false)
+    return
+  else
+    EnableTriggerGroup("profession_tracker", true)
+    EnableAliasGroup("profession_tracker", true)
+  end
 
-function OnPluginConnect()
   character_name = nil
   EnableTrigger("first_prompt", true)
 end
 
 function OnPluginDisconnect()
+  if not serializer_installed then return end
   checkForUpdates()
 end
 
@@ -209,6 +215,7 @@ function onFirstPrompt()
 end
 
 function OnPluginBroadcast(msg, id, pname, text)
+  if not serializer_installed then return end
   if id == "f67c4339ed0591a5b010d05b" then
     if (text == "char.base") then
       if character_name == nil or character_name == "" then

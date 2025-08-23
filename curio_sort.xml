@@ -42,23 +42,23 @@ The location links will "run" or "mapper goto" where appropriate.
 </plugin>
 
 <aliases>
-  <alias match="^curio sort(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^curio sort(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>beginCurioSort("%1")</send>
   </alias>
 
-  <alias match="^curio[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^curio[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>setOffset("%1")</send>
   </alias>
 
-  <alias match="^curio[ ]+ignore[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^curio[ ]+ignore[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>ignoreAltar("%1")</send>
   </alias>
 
-  <alias match="^curio[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^curio[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>SetCharacterName("%1")</send>
   </alias>
 
-  <alias match="^curio[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^curio[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>showCommands()</send>
   </alias>
 </aliases>
@@ -84,7 +84,7 @@ The location links will "run" or "mapper goto" where appropriate.
     <send>showSortedAltars()</send>
   </trigger>
 
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>OnFirstPrompt()</send>
   </trigger>
 </triggers>
@@ -93,6 +93,7 @@ The location links will "run" or "mapper goto" where appropriate.
 
 <![CDATA[
 
+local missing_required_files = {}
 local can_update, update_helper = pcall(require, "updatehelper")
 local const_installed, consts = pcall(require, "consthelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
@@ -107,6 +108,9 @@ if can_update then
   if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
   if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
 end
+
+if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
+if not serializer_installed then then table.insert(missing_required_files, "lua/serializationhelper.lua") end
 
 require "gmcphelper"
 
@@ -165,6 +169,7 @@ function OnPluginDisable() pluginStop() end
 function OnPluginDisconnect() pluginStop() end
 
 function OnPluginBroadcast(msg, id, pname, text)
+  if #missing_required_files > 0 then return end
   if id == "f67c4339ed0591a5b010d05b" then
     if (text == "char.base") then
       handleGmcpCharacterName()
@@ -181,8 +186,14 @@ function handleGmcpCharacterName()
 end
 
 function pluginStart()
-  if not const_installed or not serializer_installed then 
-    ColourNote("black", "red", GetPluginName() .. ": You do not have the required files in your lua directory. Expect issues.") 
+  if #missing_required_files > 0 then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
+    EnableTriggerGroup("curio_sort", false)
+    EnableAliasGroup("curio_sort", false)
+    return
+  else
+    EnableTriggerGroup("curio_sort", true)
+    EnableAliasGroup("curio_sort", true)
   end
 
   longest.altar = 8
@@ -196,6 +207,7 @@ function pluginStart()
 end
 
 function pluginStop()
+  if #missing_required_files > 0 then return end
   if can_update and IsAutoUpdateEnabled() then
     CheckForUpdates()
   else

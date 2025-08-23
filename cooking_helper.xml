@@ -45,69 +45,69 @@ Commands:
     <send>SetCharacterName("%1")</send>
   </alias>
 
-  <alias match="^cooking$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>ShowCooking()</send>
   </alias>
 
-  <alias match="^cooking[ ]+track(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+track(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>TrackRecipe("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+clear(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+clear(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>ClearRecipe("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+clean(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+clean(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>CleanRecipe("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+npcs?(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+npcs?(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>ShowNpcs("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+config(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+config(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>Configure("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+search$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+search$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>SearchCurrentRecipe()</send>
   </alias>
 
-  <alias match="^cooking[ ]+getall(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+getall(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>GetAll("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+find[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+find[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>FindIngredient("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+pouch$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+pouch$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>Configure("automate")</send>
   </alias>
 
-  <alias match="^cooking[ ]+pouch[ ]+track(.*)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+pouch[ ]+track(.*)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>TrackPouchIngredient("%1")</send>
   </alias>
 
-  <alias match="^cooking[ ]+cook(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^cooking[ ]+cook(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>CookRecipe("%1")</send>
   </alias>
 </aliases>
 
 <triggers>
-  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>OnFirstPrompt()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) hungrily gobbles (.*?) down\.$">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="cooking_helper" match="^(.*?) hungrily gobbles (.*?) down\.$">
     <send>AddNpcTracking("%1", "%2")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?) is not impressed by your cuisine and discards the meal\. But they are feeling generous today\, and will allow you to try again\.$">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="cooking_helper" match="^(.*?) is not impressed by your cuisine and discards the meal\. But they are feeling generous today\, and will allow you to try again\.$">
     <send>RemoveLastNpc("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^The recipe for (.*?)\:$">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="cooking_helper" match="^The recipe for (.*?)\:$">
     <send>StartRecipeCapture("%1")</send>
   </trigger>
 
@@ -130,7 +130,7 @@ Commands:
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^\.\.\.and more (.*?)\.$">
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^[ ]+a pouch of plenitude \(new\)$" regexp="y" send_to="14" omit_from_output="y" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^[ ]+a pouch of plenitude \(new\)$" regexp="y" send_to="14" omit_from_output="y" sequence="100" group="cooking_helper">
     <send>DisplayPouchStatus(TriggerStyleRuns, "%0")</send>
   </trigger>
 
@@ -146,19 +146,19 @@ Commands:
     <send>StopPouchAutomation()</send>
   </trigger>
 
-  <trigger enabled="y" group="cooking_open_pouch" keep_evaluating="y" match="^You take (\d+ of )?(.*?) from a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
+  <trigger group="cooking_open_pouch" keep_evaluating="y" match="^You take (\d+ of )?(.*?) from a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
     <send>HandlePouchIngredient("%2")</send>
   </trigger>
 
-  <trigger enabled="y" group="cooking_open_pouch" keep_evaluating="y" match="^(.*?) emits a bright flare of white light as you take it and it binds with you\.$" regexp="y" send_to="12" sequence="100">
+  <trigger group="cooking_open_pouch" keep_evaluating="y" match="^(.*?) emits a bright flare of white light as you take it and it binds with you\.$" regexp="y" send_to="12" sequence="100">
     <send>HandlePouchIngredient("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^You do not have the required items to cook that\.$" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^You do not have the required items to cook that\.$" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>EndCooking()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^With care and precision, you practice your craft, creating a powerful work of art: (.*?)\.$" regexp="y" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^With care and precision, you practice your craft, creating a powerful work of art: (.*?)\.$" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>HandleMealCooked("%1")</send>
   </trigger>
 </triggers>
@@ -175,6 +175,7 @@ function OnPluginBroadcast(msg, id, name, text)
   HandlePluginBroadcast(msg, id, name, text)
 end
 
+local missing_required_files = {}
 local updater_installed, update_helper = pcall(require, "updatehelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
 local config_installed, config_window = pcall(require, "configuration_miniwindow")
@@ -194,6 +195,9 @@ if updater_installed then
   else update_helper.Update(GetInfo(66), "recipes.db")
   end
 end
+
+if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
+if not config_installed then table.insert(missing_required_files, "lua/configuration_miniwindow.lua") end
 
 local config = nil
 local tracked_recipes = { }
@@ -257,6 +261,17 @@ local non_food_items = {
 }
 
 function PluginStart()
+  if #missing_required_files > 0 then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
+    EnableTriggerGroup("cooking_helper", false)
+    EnableTriggerGroup("cooking_pouch", false)
+    EnableAliasGroup("cooking_helper", false)
+    return
+  else
+    EnableTriggerGroup("cooking_helper", true)
+    EnableTriggerGroup("cooking_pouch", true)
+    EnableAliasGroup("cooking_helper", true)
+  end
   EnableTrigger("first_prompt", true)
   EnableTriggerGroup("cooking_open_pouch", false)
   character_name = nil
@@ -266,6 +281,7 @@ function PluginStart()
 end
 
 function HandlePluginBroadcast(msg, id, name, text)
+  if #missing_required_files > 0 then return end
   if (id == "f67c4339ed0591a5b010d05b" and text == "char.base") then
     if character_name == nil or character_name == "" then
       local character = serialization_helper.GetGmcpValue(text)
