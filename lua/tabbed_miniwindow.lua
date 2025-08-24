@@ -143,8 +143,13 @@ capture = function(trigger_style_runs, line, type)
       txt = txt:gsub("^You hear (.+) say through Vandemaar's Magic Mirror:", "%(mirror%) %1:")
     end
 
-    local fgcol = ColourNameToRGB(trigger_style_runs[i].textcolour)
-    local bgcol = ColourNameToRGB(trigger_style_runs[i].backcolour)
+    local fgcol = trigger_style_runs[i].textcolour
+    local bgcol = trigger_style_runs[i].backcolour
+    
+    if type(trigger_style_runs[i].textcolour) == "number" then
+      fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
+      bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
+    end    
 
     captureText(fgcol, bgcol, txt, type)
   end
