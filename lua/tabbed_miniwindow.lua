@@ -125,10 +125,10 @@ initialize = function(character_name)
   end
 end
 
-capture = function(trigger_style_runs, line, type)
-  if shouldSkip(type, line) then return end
+capture = function(trigger_style_runs, line, chan)
+  if shouldSkip(chan, line) then return end
 
-  captureText("silver", "black", "[".. getDateString() .. "] ", type)
+  captureText("silver", "black", "[".. getDateString() .. "] ", chan)
 
   for i = 1, #trigger_style_runs do
     local txt = trigger_style_runs[i].text
@@ -151,10 +151,10 @@ capture = function(trigger_style_runs, line, type)
       bgcol = RGBColourToName(trigger_style_runs[i].backcolour)
     end    
 
-    captureText(fgcol, bgcol, txt, type)
+    captureText(fgcol, bgcol, txt, chan)
   end
 
-  captureText("silver", "black", "\r\n", type)  
+  captureText("silver", "black", "\r\n", chan)  
 end
 
 captureText = function(fgcol, bgcol, txt, type)
