@@ -498,12 +498,8 @@ function ReplaceCrystalTime(trigger_style_runs, line, time_str)
 end
 
 function ReplaceQuestTime(trigger_style_runs, line)
-  local details = "NOW!"
-  if TIMES ~= nil and TIMES.QUEST_TIME ~= nil then
-    details = consts.getTimeDiffInMinutes(TIMES.QUEST_TIME)
-  end
-  local fgcol = "lightgray"
-  local bgcol = "black"
+  local details = consts.getTimeDiffInMinutes(quest_window.GetQuestTime())  
+  local fgcol, bgcol = "lightgray", "black"
   for i = 1, #trigger_style_runs do
     fgcol = RGBColourToName(trigger_style_runs[i].textcolour)
     bgcol = RGBColourToName(trigger_style_runs[i].backcolour)

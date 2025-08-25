@@ -4,7 +4,7 @@ local const_installed, consts = pcall(require, "consthelper")
 
 local initialize, clear, close, save, getConfiguration, onConfigureDone, setQuestInfo, addLine, 
   setPursuerTarget, setCrystalTarget, checkBodyPartDrop, showTimes, setQuestTime, setPursuerTime,
-  setCrystalTime, showPursuerOptions, isSilentRefreshEnabled, isAutoUpdateEnabled
+  setCrystalTime, showPursuerOptions, isSilentRefreshEnabled, isAutoUpdateEnabled, getQuestTime
 local load, create, draw, setSizeAndPositionToContent, drawToggleButton, drawQuestWindows, drawQuestText,
   drawCollapseText, adjustAnchor, doTimeString, getTimerColorAndString, getExpandPhasesText
 
@@ -421,20 +421,20 @@ drawQuestText = function()
 
     local prefix_length = WindowTextWidth(WIN, QUESTFONT, "Orc Pursuer: ")
     if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
-      y = y + 1
+      if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, consts.silver)
       WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
-      y = y + 1
+      y = y + 3
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y + LINE_HEIGHT, 0, 0, consts.silver)
       WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, consts.white)
     elseif CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then
-      y = y + 1
+      if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, consts.silver)
       WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
     elseif CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
-      y = y + 1
+      if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y, 0, 0, consts.silver)
       WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
     end
@@ -610,6 +610,13 @@ showTimes = function()
   doTimeString(CONFIG.TIMES.QUEST_TIME, "You can get another quest")
   doTimeString(CONFIG.TIMES.PURSUER_TIME, "You can get another pursuer target")
   doTimeString(CONFIG.TIMES.CRYSTAL_TIME, "You can get another crystal map")
+end
+
+getQuestTime = function()
+  if CONFIG ~= nil and CONFIG.TIMES ~= nil and CONFIG.TIMES.QUEST_TIME ~= nil then
+    return CONFIG.TIMES.QUEST_TIME
+  end
+  return nil
 end
 
 setQuestTime = function(alyrian_time)
@@ -844,5 +851,6 @@ return {
   SetCrystalTime = setCrystalTime, 
   ShowPursuerOptions = showPursuerOptions, 
   IsSilentRefreshEnabled = isSilentRefreshEnabled, 
-  IsAutoUpdateEnabled = isAutoUpdateEnabled
+  IsAutoUpdateEnabled = isAutoUpdateEnabled,
+  GetQuestTime = getQuestTime
 }
