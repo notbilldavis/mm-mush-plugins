@@ -395,12 +395,15 @@ end
 
 function showEaten(eaten)
   local total_eaten = 0
-  for _, consumer in pairs(eaten) do
-    if consumer.name and consumer.name ~= "" then
-      total_eaten = total_eaten + 1
-      ColourTell("magenta", "black", "  - ")
-      ColourTell("white", "black", consumer.name)
-      ColourNote("yellow", "black", " (" .. consumer.date .. ")")
+  if type(eaten) == "table" then
+    for _, consumer in pairs(eaten) do
+      if consumer.name and consumer.name ~= "" then
+        total_eaten = total_eaten + 1
+        local formatted_name = consumer.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)
+        ColourTell("magenta", "black", "  - ")
+        ColourTell("white", "black", formatted_name)
+        ColourNote("yellow", "black", " (" .. consumer.date .. ")")
+      end
     end
   end
   if total_eaten == 0 then
@@ -865,7 +868,7 @@ function RemoveLastNpc(npc)
     if string.find(recipe.name:upper(), last_npc_food:upper()) ~= nil then
       local eaten = tracked_recipes[last_npc_food:upper()].eaten
       if eaten[Trim(npc:upper())] then
-        eaten[Trim(npc:upper())] = false
+        eaten[Trim(npc:upper())] = nil
         Note("Consumer '" .. npc .. "' has been removed from the '" .. last_npc_food .. "' list of consumers.")
       end
       break
