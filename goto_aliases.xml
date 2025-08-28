@@ -22,9 +22,10 @@ Aliases to get you where you wanna go. Takes into account your current location.
 
 Auto run to the exit of the city you are in:
 
- * goto <north|east|south|west>
+ * goto <north|east|south|west|gate>
 
- Won't do anything if you try to go to an exit that doesn't exist.
+ Won't do anything if you try to go to an exit that doesn't exist but just gate will
+ take you to what the default gate is of that place.
 
 Go to the next logical city when you are outside an exit:
 
@@ -63,10 +64,6 @@ Go to the orc pursuer in wroth:
 
 <aliases>
 
-<alias match="^goto[ ]+debug$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
-    <send>doDebug()</send>
-</alias>
-
 <alias match="^goto[ ]+north$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doNorthGate()</send>
 </alias>
@@ -81,6 +78,10 @@ Go to the orc pursuer in wroth:
 
 <alias match="^goto[ ]+east$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doEastGate()</send>
+</alias>
+
+<alias match="^goto[ ]+gate$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>doDefaultGate()</send>
 </alias>
 
 <alias match="^goto[ ]+next$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
@@ -117,14 +118,6 @@ Go to the orc pursuer in wroth:
 
 </aliases>
 
-<triggers>
-
-<trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="goto_aliases">
-  <send>OnFirstPrompt()</send>
-</trigger>
-
-</triggers>
-
 <script>
 
 <![CDATA[
@@ -138,51 +131,60 @@ if can_update and not serializer_installed then
   serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
 end
 
-local init = false
 local running_to_pursuer = false
-
-locations = {
-    rune = { north = "10435", south = "2832529", east = "2816440", west = "2809518", qm = "31323", rep = nil },
-    sigil = { north = "3881069", south = "3908670", east = nil, west = nil, qm = "28450", rep = "27890" },
-    newrigel = { north = "2315135", south = "2358832", east = nil, west = nil, qm = "62566", rep = "62036" },
-    xaventry = { north = "2066541", south = "2105636", east = "2084947", west = "2087227", qm = "73968", rep = "73100" },
-    tellerium = { north = "2638058", south = "2656450", east = nil, west = nil, qm = "41852", rep = "41790" },
-    templeton = { north = "47337", south = nil, east = nil, west = "2309054", qm = "47421", rep = nil },
-    piratescove = { north = "3288425", south = "3318326", east = "3295329", west = "3304508", qm = nil, rep = nil },
-    vospire = { north = nil, south = nil, east = "3765964", west = "3768246", qm = nil, rep = nil },
-    diocletian = { north = nil, south = "4189387", east = nil, west = nil, qm = nil, rep = nil },
-    lowangen = { north = nil, south = "2030293", east = nil, west = nil, qm = nil, rep = nil },
-    maldra = { north = nil, south = "3573738", east = nil, west = nil, qm = "67947", rep = nil },
-    thorn = { north = nil, south = nil, east = "1807082", west = "1788665", qm = nil, rep = nil},
-    decara = { north = nil, south = nil, east = "11125213", west = nil, qm = "116546", rep = nil},
-    vir = { north = nil, south = nil, east = "12426873", west = nil, qm = nil, rep = nil},
-    gilvery = { north = nil, south = nil, east = "1880596", west = "1880584", qm = nil, rep = nil},
-    desertthorn = { north = nil, south = nil, east = "1807082", west = "1788665", qm = nil, rep = nil }
-}
-
-taverns = {
-  travelersretreat = "2558911",
-  tavernoftheboars = "2085131",
-  twinmoons = "1765641",
-  lonelydragon = "2669134"
-}
+local locations = {}
 
 local alyria_destinations = {
-  "newrigel", "diocletian", "xaventry", "avarice", "desertthorn", "gilvery", "lasler", "lowangen",
-  "mandrake", "newkolvir", "runeforest", "towerofart", "wroth", "twinmoons", "hillgiants", 
-  "travelersretreat", "lonelydragon", "jointmagicconsortium", "tavernoftheboars",
-  "shlarksh", "takhtin", "emperorscrossroads", "vospire", "tellerium", "templeton", "dorathon",
-  "winton", "keep", "deceit", "vandemaar", "xalt", "mulakanathos", "gorth", "vesuvius", "frostgiantskeep",
-  "sigil", "piratescove", "aroxa", "oilwells", "desertoasis"
+  sepharia = { 
+    newrigel = "newrigel", xaventry = "xaventry", avarice = "avarice", desertthorn = "desertthorn", runeforest = "runeforest",
+    gilvery = "gilvery", lasler = "lasler", lowangen = "lowangen", mandrake = "mandrake", newkolvir = "newkolvir", rune = "rune",
+    towerofart = "towerofart", wroth = "wroth", twinmoons = "twinmoons", hillgiants = "hillgiants", tavernoftheboars = "tavernoftheboars",
+    travelersretreat = "travelersretreat", lonelydragon = "lonelydragon", jointmagicconsortium = "jointmagicconsortium",
+    toa = "towerofart", thorn = "desertthorn", forest = "runeforest", jmc = "jointmagicconsortium"
+  },
+  auryn = {
+    diocletian = "diocletian", shlarksh = "shlarksh", takhtin = "takhtin", emperorscrossroads = "emperorscrossroads", vospire = "vospire",
+    vesuvius = "vesuvius", sigil = "sigil",
+  },
+  avros = {
+    tellerium = "tellerium", templeton = "templeton", dorathon = "dorathon", winton = "winton", frostgiantskeep = "frostgiantskeep",
+    aroxa = "aroxa", oilwells = "oilwells", desertoasis = "desertoasis", oasis = "desertoasis", fgk = "frostgiantskeep"
+  },
+  beltane = {
+    keep = "keep", deceit = "deceit", vandemaar = "vandemaar", xalt = "xalt", mulakanathos = "mulakanathos", gorth = "gorth", piratescove = "pc"
+  }
 }
 
 local underground_destinations = { 
-  "decara", "ariendyth", "smugglersgulch", "vir" 
+  decara = "decara", decaradocks = "decaradocks", docks = "decaradocks", ariendyth = "ariendyth", smugglersgulch = "smugglersgulch", 
+  vir = "vir", hellbent = "hellbent"
 }
 
 local sug_destinations = { 
-  "renn", "hlegmal", "goblam", "grigmorth", "cogworkcity",
-  "waylandersretreat", "unreinforcedtunnel", "vaatt"
+  renn = "renn", hlegmal = "hlegmal", tavern = "hlegmal", goblam = "goblam", grigmorth = "grigmorth", cogworkcity = "cogworkcity",
+  cogs = "cogworkcity", waylandersretreat = "waylandersretreat", unreinforcedtunnel = "unreinforcedtunnel", vaatt = "vaatt"
+}
+
+local zone_key_map = {
+  ["Towne of Rune"] = "rune", ["Runic Castle"] = "rune", ["Player Homes - Rune"] = "rune", ["Rune Condominiums"] = "rune", 
+  ["Rune Estates"] = "rune", ["Rune Realty"] = "rune", ["Temple Crypt"] = "rune",["Temple of Sumter"] = "rune", ["Winterborn Mansion"] = "rune", 
+  ["Focault Magic Equipment Company"] = "rune", ["Focault's Residence"] = "rune",["Van Pelt's Emporium"] = "rune", ["Sigil"] = "sigil", 
+  ["The Sigilian Stronghold"] = "sigil", ["Sigil Castle"] = "sigil", ["Player Homes - Sigil"] = "sigil", ["Sigil Condominiums"] = "sigil", 
+  ["Sigil Realty"] = "sigil", ["The Towne of New Rigel"] = "newrigel", ["New Rigel Condominiums"] = "newrigel", ["New Rigel Gardens"] = "newrigel", 
+  ["New Rigel Realty"] = "newrigel", ["Player Homes - New Rigel"] = "newrigel", ["The Towne of Xaventry"] = "xaventry",
+  ["The Xaventry Stronghold"] = "xaventry", ["Xaventry Condominiums"] = "xaventry", ["Xaventry Realty"] = "xaventry",  ["Tellerium"] = "tellerium",
+  ["Player Homes - Tellerium"] = "tellerium", ["Tellerium Condominiums"] = "tellerium", ["Tellerium Realty"] = "tellerium", ["Templeton"] = "templeton",
+  ["The Templetonian Stronghold"] = "templeton", ["Pirate's Cove"] = "piratescove", ["Pirate's Cove Realty"] = "piratescove",
+  ["Player Homes - Pirates Cove"] = "piratescove", ["Vospire"] = "vospire", ["Palace of Diocletian"] = "diocletian", ["Lowangen"] = "lowangen",
+  ["Maldra Keep"] = "maldra", ["Desert Thorn"] = "thorn", ["Towne of Decara"] = "decara", ["Decara Condominiums"] = "decara", ["Decara Realty"] = "decara", 
+  ["Player Homes - Decara"] = "decara", ["Vir"] = "vir", ["Vir Condominiums"] = "vir", ["Gilvery"] = "gilvery", ["Rune Forest"] = "runeforest", 
+  ["New Kolvir"] = "newkolvir", ["Dungeon Avarice"] = "avarice", ["Mandrake Woods"] = "mandrake", ["Shadow Castle"] = "mandrake", ["Dungeon Wroth"] = "wroth",
+  ["A Hill Giant Refuge"] = "hillgiants", ["Tower of Art"] = "toa", ["The Joint Magical Consortium"] = "jmc", ["Emperor's Crossroads"] = "emperorscrossroads",
+  ["Shlarksh"] = "shlarksh", ["Mount Vesuvius"] = "vesuvius", ["Takhtin"] = "takhtin", ["The Fishing Village of Dorathon"] = "dorathon",
+  ["The Hamlet of Winton"] = "winton", ["Forst Giant's Keep"] = "frostgiantskeep", ["Dungeon Deceit"] = "deceit", ["Vandemaar's Keep"] = "vandemaar",
+  ["Xalt, Unseelie Outpost"] = "xalt", ["The Village of Mulakanathos"] = "mulakanathos", ["Gorth"] = "gorth", ["Traveler's Retreat"] = "travelersretreat",
+  ["Tavern of the Boars"] = "tavernoftheboars", ["Inn of the Twin Moons"] = "twinmoons", ["The Lonely Dragon Inn"] = "lonelydragon", 
+  ["The Indestructible Cenotaphy"] = "cenotaphy",
 }
 
 function OnPluginInstall()
@@ -192,18 +194,10 @@ function OnPluginInstall()
     EnableAliasGroup("goto_aliases", false)
     return
   else
+    populateLocations()
     EnableTriggerGroup("goto_aliases", true)
     EnableAliasGroup("goto_aliases", true)
   end
-end
-
-function OnPluginDisconnect()
-  if not serializer_installed then return end
-  checkForUpdates()
-end
-
-function OnFirstPrompt()
-  init = true
 end
 
 function OnPluginBroadcast(msg, id, name, text)
@@ -217,50 +211,75 @@ function OnPluginBroadcast(msg, id, name, text)
   end
 end
 
-function doDebug() -- Debug
-    get_gmcp_room()
-    local num = gmcpval("num")
-    local zone = gmcpval("zone")
-    Note(zone .. " (" .. num .. ")")
+function OnPluginDisconnect()
+  if not serializer_installed then return end
+  checkForUpdates()
+end
+
+function populateLocations()
+  setLocation("rune", "sepharia", "10435", "2832529", "2816440", "2809518", "2816440", "31323")
+  setLocation("sigil", "auryn", "3881069", "3908670", nil, nil, "3881069", "28450", "27890")
+  setLocation("newrigel", "sepharia", "2315135", "2358832", nil, nil, "2315135", "62566", "62036")
+  setLocation("xaventry", "sepharia", "2066541", "2105636", "2084947", "2087227", "2105636", "73968", "73100")
+  setLocation("tellerium", "avros", "2638058", "2656450", nil, nil, "2638058", "41852", "41790")
+  setLocation("templeton", "avros", "47337", nil, nil, "2309054", "2309054", "47421")
+  setLocation("piratescove", "beltane", "3288425", "3318326", "3295329", "3304508")
+  setLocation("vospire", "auryn", nil, nil, "3765964", "3768246", "3765964")
+  setLocation("diocletian", "auryn", nil, "4189387")
+  setLocation("lowangen", "sepharia", nil, "2030293")
+  setLocation("maldra", "beltane", nil, "3573738", nil, nil, "3573738", "67947")
+  setLocation("thorn", "sepharia", nil, nil, "1807082", "1788665")
+  setLocation("decara", "underground", nil, nil, "11125213", nil, nil, "116546")
+  setLocation("vir", "underground", nil, nil, "12426873")
+  setLocation("gilvery", "sepharia", nil, nil, "1880596", "1880584", "1880584")
+  setLocation("runeforest", "sepharia", nil, nil, "2625535")
+  setLocation("newkolvir", "sepharia", nil, nil, nil, "3324605")
+  setLocation("avarice", "sepharia", "2377105")
+  setLocation("mandrake", "sepharia", nil, nil, "1900988")
+  setLocation("wroth", "sepharia", "1960870")
+  setLocation("hillgiants", "sepharia", nil, nil, nil, "2602424")
+  setLocation("toa", "sepharia", nil, nil, nil, "1547405")
+  setLocation("jmc", "sepharia", "1586161")
+  setLocation("emperorscrossroads", "auryn", nil, "4072040")
+  setLocation("shlarksh", "auryn", "3823947", "3835453")
+  setLocation("vesuvius", "auryn", "3729129")
+  setLocation("takhtin", "auryn", nil, "3844854") -- technically beltane but runnable from auryn
+  setLocation("dorathon", "avros", nil, "2152729", "2145833", "2143525", "2143525")
+  setLocation("winton", "avros", "1964016")
+  setLocation("frostgiantskeep", "avros", nil, "1957223")
+  setLocation("deceit", "beltane", nil, "3525388")
+  setLocation("vandemaar", "beltane", "3925733")
+  setLocation("xalt", "beltane", nil, "3831487")
+  setLocation("mulakanathos", "beltane", "3900588")
+  setLocation("gorth", "beltane", nil, nil, nil, "3875363")
+  setLocation("travelersretreat", "sepharia", nil, nil, nil, "2558911")
+  setLocation("tavernoftheboars", "sepharia", nil, "2085131")
+  setLocation("twinmoons", "sepharia", nil, "1765641")
+  setLocation("lonelydragon", "sepharia", nil, "2669134")
+  setLocation("teolaven", "auryn", nil, nil, nil, "4058343")
+  setLocation("cenotaphy", "beltane", nil, "3916564")
+end
+
+function setLocation(key, continent, north, south, east, west, default_gate, qm, rep)
+  if default_gate == nil then default_gate = north or south or east or west end
+  locations[key] = { north = north, south = south, east = east, west = west, qm = qm, rep = rep, continent = continent, default_gate = default_gate }
 end
 
 function getZoneKey()
-    get_gmcp_room()
-    local zone = gmcpval("zone")
-    local room = gmcpval("num")
-
-    if (isRune(zone, room)) then
-        return "rune"
-    elseif (isSigil(zone, room)) then
-        return "sigil"
-    elseif (isNewRigel(zone, room)) then
-        return "newrigel"
-    elseif (isXaventry(zone, room)) then
-        return "xaventry"
-    elseif (isTellerium(zone, room)) then
-        return "tellerium"
-    elseif (isTempleton(zone, room)) then
-        return "templeton"
-    elseif (isPiratesCove(zone, room)) then
-        return "piratescove"
-    elseif (isVospire(zone, room)) then
-        return "vospire"
-    elseif (isDiocletian(zone, room)) then
-        return "diocletian"
-    elseif (isLowangen(zone, room)) then
-        return "lowangen"
-    elseif (isMaldra(zone, room)) then
-        return "maldra"
-    elseif (isDesertThorn(zone, room)) then
-        return "thorn"
-    elseif (isDecara(zone, room)) then
-        return "decara"
-    elseif (isVir(zone, room)) then
-        return "vir"
-    else
-        Note("Unknown zone: " .. zone .. " (room: " .. room .. ")")
-        return nil
+  get_gmcp_room()
+  local zone = gmcpval("zone")
+  local room = gmcpval("num")
+  if zone == "Alyria" then    
+    for key, location in pairs(locations) do
+      if location.north == room or location.south == room or location.west == room or location.east == room then
+        return key, zone, room
+      end
     end
+  else
+    return zone_key_map[zone], zone, room
+  end
+  
+  return nil, zone, room
 end
 
 function getDestinationRoom(destination)
@@ -289,15 +308,19 @@ function doNorthGate() -- North Gate
 end
 
 function doSouthGate() -- South Gate
-    doLocation("south")
+  doLocation("south")
 end
 
 function doWestGate() -- West Gate
-    doLocation("west")
+  doLocation("west")
 end
 
 function doEastGate() -- East Gate
-    doLocation("east")
+  doLocation("east")
+end
+
+function doDefaultGate() -- Default Gate
+  doLocation("default_gate")
 end
 
 function doQuestMaster() -- Quest Master
@@ -392,6 +415,11 @@ function doCrystal() -- Crystal Quests
 end
 
 function doPursuer() -- Orc Pursuer
+  local zone_key, zone, room = getZoneKey() 
+  if (zone_key == nil and zone ~= "Alyria") or (locations[zone_key] ~= nil and locations[zone_key].continent == "beltane") then
+    Note("You can't get to the orc pursuer from where you are!")
+    return
+  end
   running_to_pursuer = true
   handleRunningToPursuer(true)
 end
@@ -401,13 +429,20 @@ function handleRunningToPursuer(initial)
 
   Note("Running to the Orc Pursuer. Type 'goto cancel' to stop when the current leg completes.")  
 
-  get_gmcp_room()
-  local zone = gmcpval("zone")
-  local room = gmcpval("num") 
-  
-  if zone == "Dungeon Wroth" or room == "1960870" then -- or outside wroth
+  local zone_key, zone, room = getZoneKey() 
+
+  if zone_key == nil then
+    if zone == "Alyria" then 
+      Note("Get to a gate to start running to the pursuer.")
+    else 
+      Note("You don't know how to get there from here.")
+      running_to_pursuer = false
+    end
+    return
+  end 
+
+  if zone_key == "wroth" then
     if initial and room == "7461" then
-      -- todo: track if you have the part to turn in
       getPursuerTarget()
       running_to_pursuer = false
     elseif room == "7682" then
@@ -417,37 +452,40 @@ function handleRunningToPursuer(initial)
     elseif initial or room == "1960870" then
       Execute("mapper goto 7682")
     end
-  elseif zone == "Alyria" then
-    if isGateRunnableToPursuer(room) then
-      Send("run wroth")
-    end
-  elseif initial and isRune(zone, room) then
-    Execute("mapper goto " .. locations["rune"]["west"])
-  elseif initial and isNewRigel(zone, room) then
-    Execute("mapper goto " .. locations["newrigel"]["north"])
-  elseif initial and isXaventry(zone, room) then
-    Execute("mapper goto " .. locations["xaventry"]["south"])
-  elseif initial and isLowangen(zone, room) then
-    Execute("mapper goto " .. locations["lowangen"]["south"])
-  elseif initial then
-    Note("You don't know how to get there from here.")
+    return
   end
-  
-end
 
-function isGateRunnableToPursuer(room)
-  if isRune("Alyria", room) then return true end
-  if isXaventry("Alyria", room) then return true end
-  if isNewRigel("Alyria", room) then return true end
-  if isLowangen("Alyria", room) then return true end
-  if isGilvery("Alyria", room) then return true end
-  if isDesertThorn("Alyria", room) then return true end
-  if room == taverns["travelersretreat"] then return true end
-  if room == taverns["tavernoftheboars"] then return true end
-  if room == taverns["twinmoons"] then return true end
-  if room == taverns["lonelydragon"] then return true end
+  local location = locations[zone_key]
+  if location == nil then
+    Note("You don't know how to get there from here.")
+    running_to_pursuer = false
+    return
+  end
 
-  return false
+  if location.continent == "sepharia" then
+    if zone == "Alyria" then
+      Send("run wroth")
+    elseif initial then
+      if location.default_gate == nil then
+        Note("Make your way to the gate outside to run to the pursuer.")
+      else
+        Execute("mapper goto " .. location.default_gate)
+      end
+    end
+  elseif location.continent == "beltane" then
+    Note("You can't get to there from Beltane.")
+    running_to_pursuer = false
+  else
+    if zone == "Alyria" then
+      Send("run rune")
+    elseif initial then
+      if location.default_gate == nil then
+        Note("Make your way to the gate outside to run to the pursuer.")
+      else
+        Execute("mapper goto " .. location.default_gate)
+      end
+    end
+  end  
 end
 
 function getPursuerTarget()
@@ -462,23 +500,33 @@ end
 
 function tryRun(dest)
   local directions = { 
-    "w", "west", "e", "east", "n", "north", "s", "south", 
-    "nw", "northwest", "ne", "northeast", "se", "southeast", 
-    "sw", "southwest", "rune" }
-  
-  for _, entry in ipairs(directions) do
-    if dest == entry then
-      Send("run " .. dest)
-      return
-    end
-  end
+    w = true, west = true, e = true, east = true, n = true, north = true, s = true, south = true, 
+    nw = true, northwest = true, ne = true, northeast = true, se = true, southeast = true, sw = true, southwest = true
+  }
 
+  dest = Trim(dest or "")
+
+  if directions[dest] then
+    Send("run " .. dest)
+    return
+  end
+  
   get_gmcp_room()
   local plane = gmcpval("coord.name")
-  local final_destination
+  local final_destination = dest
   
   if plane == "Alyria" then
-    final_dest = determineDestination(alyria_destinations, dest)
+    local zone_key = getZoneKey()
+    if zone_key == nil or locations[zone_key] == nil then
+      local all_continents = {}
+      for k, v in pairs(alyria_destinations.sepharia) do all_continents[k] = v end
+      for k, v in pairs(alyria_destinations.auryn) do all_continents[k] = v end
+      for k, v in pairs(alyria_destinations.beltane) do all_continents[k] = v end
+      for k, v in pairs(alyria_destinations.avros) do all_continents[k] = v end
+      final_dest = determineDestination(all_continents, dest)
+    else
+      final_dest = determineDestination(alyria_destinations[locations[zone_key].continent], dest)
+    end    
   elseif plane == "Alyrian Underworld" then
     final_dest = determineDestination(underground_destinations, dest)
   elseif plane == "Sigil Underground" then
@@ -487,173 +535,40 @@ function tryRun(dest)
 
   if final_dest ~= nil then
     Send("run " .. final_dest)
-  else
-    Send("run " .. dest)
   end
 end
 
 function determineDestination(destinations, input)
   local trimmed = Trim(input:lower())
-  local min_prefix = 3
-  local max_prefix = #trimmed
-  local latest = {}
+  local matches, match, matches_count = {}, "", 0
 
-  for len = min_prefix, max_prefix do
-    local prefix = trimmed:sub(1, len)
-    local matches = {}
+  if destinations[trimmed] ~= nil then
+    return destinations[trimmed]
+  end
 
-    for _, dest in ipairs(destinations) do
-        if dest:sub(1, len) == prefix then
-            table.insert(matches, dest)
+  for shortcut, final_dest in pairs(destinations) do
+    if #shortcut >= #trimmed  then
+      if shortcut:sub(1, #trimmed) == trimmed then
+        if not matches[final_dest] then
+          match = final_dest
+          matches[final_dest] = true
+          matches_count = matches_count + 1
         end
+      end
     end
-
-    if #matches == 1 then
-        return matches[1]
-    elseif #matches == 0 then
-        return input
-    end
-    latest = matches
   end
 
-  if latest ~= nil and #latest > 0 then
-    Tell("Ambiguous destination, choose between: ")
-    for _, amb in ipairs(latest) do
-      Hyperlink("run " .. amb, "[" .. amb .. "]", "", "white", "black", false)
-      Tell(" ")
-    end
-    Note("")
-  end
+  if matches_count == 0 then return trimmed end
+  if matches_count == 1 then return match end
 
+  Tell("Ambiguous destination, choose between: ")
+  for amb in pairs(matches) do
+    Hyperlink("run " .. amb, "[" .. amb .. "]", "", "white", "black", false)
+    Tell(" ")
+  end
+  Note("")
+  
   return nil
-end
-
-function isRune(zone, room)
-    return zone == "Towne of Rune" or 
-           zone == "Runic Castle" or 
-           zone == "Player Homes - Rune" or 
-           zone == "Rune Condominiums" or
-           zone == "Rune Estates" or 
-           zone == "Rune Realty" or 
-           zone == "Temple Crypt" or
-           zone == "Temple of Sumter" or 
-           zone == "Winterborn Mansion" or 
-           zone == "Focault Magic Equipment Company" or 
-           zone == "Focault's Residence" or
-           zone == "Van Pelt's Emporium" or 
-           room == locations["rune"]["south"] or
-           room == locations["rune"]["east"] or
-           room == locations["rune"]["west"]
-end
-
-function isSigil(zone, room)
-    return zone == "Sigil" or 
-           zone == "The Sigilian Stronghold" or
-           zone == "Sigil Castle" or
-           zone == "Player Homes - Sigil" or 
-           zone == "Sigil Condominiums" or 
-           zone == "Sigil Realty" or
-           room == locations["sigil"]["north"] or
-           room == locations["sigil"]["south"]
-end
-
-function isNewRigel(zone, room)
-    return zone == "The Towne of New Rigel" or 
-           zone == "New Rigel Condominiums" or 
-           zone == "New Rigel Gardens" or 
-           zone == "New Rigel Realty" or
-           zone == "Player Homes - New Rigel" or
-           room == locations["newrigel"]["north"] or
-           room == locations["newrigel"]["south"]
-end
-
-function isXaventry(zone, room)
-    return zone == "The Towne of Xaventry" or
-           zone == "The Xaventry Stronghold" or 
-           zone == "Xaventry Condominiums" or 
-           zone == "Xaventry Realty" or 
-           room == locations["xaventry"]["north"] or
-           room == locations["xaventry"]["south"] or
-           room == locations["xaventry"]["east"] or
-           room == locations["xaventry"]["west"]
-end
-
-function isTellerium(zone, room)
-    return zone == "Tellerium" or
-           zone == "Player Homes - Tellerium" or
-           zone == "Tellerium Condominiums" or 
-           zone == "Tellerium Realty" or
-           room == locations["tellerium"]["north"] or
-           room == locations["tellerium"]["south"]
-end
-
-function isTempleton(zone, room)
-    return zone == "Templeton" or
-           zone == "The Templetonian Stronghold" or 
-           room == locations["templeton"]["west"]
-end
-
-function isLowangen(zone, room)
-    return zone == "Lowangen" or 
-           room == locations["lowangen"]["south"]
-end
-
-function isPiratesCove(zone, room)
-    return zone == "Pirate's Cove" or 
-           zone == "Pirate's Cove Realty" or
-           zone == "Player Homes - Pirates Cove" or 
-           room == locations["piratescove"]["north"] or
-           room == locations["piratescove"]["south"] or
-           room == locations["piratescove"]["east"] or
-           room == locations["piratescove"]["west"]
-end
-
-function isVospire(zone, room)
-    return zone == "Vospire" or
-           room == locations["vospire"]["east"] or
-           room == locations["vospire"]["west"]
-end
-
-function isDiocletian(zone, room)
-    return zone == "Palace of Diocletian" or
-           room == locations["diocletian"]["south"]
-end
-
-function isMaldra(zone, room)
-    return zone == "Maldra Keep" or
-           room == locations["maldra"]["south"]
-end
-
-function isDesertThorn(zone, room)
-    return zone == "Desert Thorn" or
-           room == locations["thorn"]["east"] or
-           room == locations["thorn"]["west"]
-end
-
-function isDecara(zone, room)
-    return zone == "Towne of Decara" or 
-           zone == "Decara Condominiums" or 
-           zone == "Decara Realty" or 
-           zone == "Player Homes - Decara" or
-           room == locations["decara"]["east"]
-end
-
-function isVir(zone, room)
-    return zone == "Vir" or 
-           zone == "Vir Condominiums" or
-           room == locations["vir"]["east"]
-end
-
-function isGilvery(zone, room)
-  return zone == "Gilvery" or
-         room == locations["gilvery"]["west"] or
-         room == locations["gilvery"]["east"]
-end
-
-function isDesertThorn(zone, room)
-  return zone == "Desert Thorn" or
-         room == locations["desertthorn"]["west"] or
-         room == locations["desertthorn"]["east"]
 end
 
 function get_gmcp_room()
