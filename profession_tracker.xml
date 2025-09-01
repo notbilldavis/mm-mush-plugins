@@ -127,7 +127,7 @@ end
 require "gmcphelper"
 
 needed_manuals = {
-  "enhanced strength", "refresh", "remove curse", "shield", "acid breath",
+  "enhanced strength", "refresh", "remove curse", "shield", "acid breath", "air invocation",
   "acid blast", "bless", "blindness", "spark", "call lightning", "calm", "cause critical",
   "cause light", "change sex", "chill touch", "color spray", "light", "cure blindness", 
   "cure critical", "cure disease", "cure light", "cure poison", "curse", "cure serious", 
@@ -242,14 +242,20 @@ function setCharacterName(name)
       owned_manuals_set[ability] = true
     end
     
-    for _, ability in ipairs(discovered_manuals) do
-      table.insert(needed_manuals, ability)
-    end    
-
     for _, ability in ipairs(needed_manuals) do
       needed_manuals_set[ability] = true
       if #ability + 2 > longest then
         longest = #ability + 2
+      end
+    end
+
+    for _, ability in ipairs(discovered_manuals) do
+      if not needed_manuals_set[ability] then 
+        table.insert(needed_manuals, ability)
+        needed_manuals_set[ability] = true
+        if #ability + 2 > longest then
+          longest = #ability + 2
+        end
       end
     end
   end
