@@ -161,11 +161,11 @@ Use 'capture update' to check for updates from github.
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) has gained class level (.*?)\, total level (.*?)\!$" regexp="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) gained class level (.*?)\, total level (.*?)\!$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) has gained Archon level (.*?)\:(.*?)\!$" regexp="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) gained Archon level (.*?)\:(.*?)\!$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
 
@@ -177,13 +177,21 @@ Use 'capture update' to check for updates from github.
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^^\[CLAN\] (.*?) has been slain (.*?)\!$" regexp="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) has been slain (.*?)\!$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^^\[CLAN\] (.*?) wins the roll for (.*?)\.$" regexp="y" send_to="14" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) wins the roll for (.*?)\.$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
   </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) is no(.*?) away\.$" regexp="y" send_to="14" sequence="100">
+    <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
+  </trigger>
+  
+  <trigger enabled="y" keep_evaluating="y" match="^\[CLAN\] (.*?) is now away\. Message\: (.*?)$" regexp="y" send_to="14" sequence="100">
+    <send>doCapture(TriggerStyleRuns, "%0", "clan")</send>
+  </trigger>  
 
   <trigger enabled="y" keep_evaluating="y" match="^(.*?) is currently logged in\.$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "notify")</send>
@@ -250,12 +258,6 @@ local capture_installed, capture_window = pcall(require, "tabbed_miniwindow")
 local colors_installed, colors_helper = pcall(require, "colorshelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
 local const_installed, consts = pcall(require, "consthelper")
-
-if can_update and update_helper.version == nil then
-  update_helper.Update({{ local_file = GetInfo(56):gsub("\\", "/") .. "lua/updatehelper.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/updatehelper.lua"}})
-  package.loaded["updatehelper"] = nil
-  can_update, update_helper = pcall(require, "updatehelper")
-end
 
 if can_update then
   if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
