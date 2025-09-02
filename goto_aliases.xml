@@ -424,11 +424,9 @@ function addCustomSend(text)
 end
 
 function doCrystal() -- Crystal Quests
-  get_gmcp_room()
-  local zone = gmcpval("zone")
-  local room = gmcpval("num")
-
-  if isRune(zone, room) then
+  local zone_key, zone, room = getZoneKey()
+  
+  if zone_key == "rune" then
     if room == "10407" then
       Send("shop buy 1")
     else
