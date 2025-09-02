@@ -32,6 +32,8 @@ Go to the next logical city when you are outside an exit:
  * goto next
 
  This is subjective, but mostly obvious. Rune east to New Rigel, west to Xav, etc.
+ You can change these or add new ones by standing in the room and using goto custom <text>
+ Set an empty string in the dialog to clear it.
 
 Go to the quest master if there is one:
 
@@ -55,6 +57,10 @@ Go to the orc pursuer in wroth:
   * goto pursuer
 
   Run to the pursuer if you can, there will be some convenient links to click.
+
+View help and your current custom sends for goto next:
+
+  * goto help
   
 ]]>
 
@@ -85,7 +91,11 @@ Go to the orc pursuer in wroth:
 </alias>
 
 <alias match="^goto[ ]+next$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
-    <send>doNextCity()</send>
+    <send>doCustomSend()</send>
+</alias>
+
+<alias match="^goto custom(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+  <send>addCustomSend("%1")</send>
 </alias>
 
 <alias match="^goto[ ]+qm$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
@@ -109,7 +119,7 @@ Go to the orc pursuer in wroth:
 </alias>
 
 <alias match="^goto[ ]+help$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
-    <send>ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))</send>
+    <send>doHelp()</send>
 </alias>
 
 <alias match="^run (.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
@@ -133,6 +143,7 @@ end
 
 local running_to_pursuer = false
 local locations = {}
+local custom_sends = {}
 
 local alyria_destinations = {
   sepharia = { 
@@ -184,7 +195,7 @@ local zone_key_map = {
   ["The Hamlet of Winton"] = "winton", ["Forst Giant's Keep"] = "frostgiantskeep", ["Dungeon Deceit"] = "deceit", ["Vandemaar's Keep"] = "vandemaar",
   ["Xalt, Unseelie Outpost"] = "xalt", ["The Village of Mulakanathos"] = "mulakanathos", ["Gorth"] = "gorth", ["Traveler's Retreat"] = "travelersretreat",
   ["Tavern of the Boars"] = "tavernoftheboars", ["Inn of the Twin Moons"] = "twinmoons", ["The Lonely Dragon Inn"] = "lonelydragon", 
-  ["The Indestructible Cenotaphy"] = "cenotaphy",
+  ["The Indestructible Cenotaphy"] = "cenotaphy", ["Atlantis"] = "atlantis", ["Naulitas"] = "naulitas"
 }
 
 function OnPluginInstall()
@@ -195,6 +206,7 @@ function OnPluginInstall()
     return
   else
     populateLocations()
+    loadCustomData()
     EnableTriggerGroup("goto_aliases", true)
     EnableAliasGroup("goto_aliases", true)
   end
@@ -258,11 +270,38 @@ function populateLocations()
   setLocation("lonelydragon", "sepharia", nil, "2669134")
   setLocation("teolaven", "auryn", nil, nil, nil, "4058343")
   setLocation("cenotaphy", "beltane", nil, "3916564")
+  setLocation("atlantis", "ocean", "18892")
+  setLocation("naulitas", "ocean", nil, "4137902")
 end
 
 function setLocation(key, continent, north, south, east, west, default_gate, qm, rep)
   if default_gate == nil then default_gate = north or south or east or west end
   locations[key] = { north = north, south = south, east = east, west = west, qm = qm, rep = rep, continent = continent, default_gate = default_gate }
+end
+
+function loadCustomData()
+  default_sends = {}
+  default_sends[locations["rune"]["east"]] = "run newrigel"
+  default_sends[locations["rune"]["west"]] = "run xaventry"
+  default_sends[locations["sigil"]["south"]] = "run diocletian"
+  default_sends[locations["sigil"]["north"]] = "run vospire"
+  default_sends[locations["piratescove"]["west"]] = "run keep"
+  default_sends[locations["piratescove"]["east"]] = "run keep"
+  default_sends[locations["piratescove"]["south"]] = "run keep"
+  default_sends[locations["newrigel"]["south"]] = "run rune"
+  default_sends[locations["xaventry"]["south"]] = "run rune"
+  default_sends[locations["newrigel"]["north"]] = "run wroth"
+  default_sends[locations["tellerium"]["north"]] = "run templeton"
+  default_sends[locations["templeton"]["west"]] = "run tellerium"
+  default_sends[locations["diocletian"]["south"]] = "run sigil"
+  default_sends[locations["vospire"]["east"]] = "run sigil"
+  default_sends[locations["vospire"]["west"]] = "run vesuvius"
+  default_sends[locations["maldra"]["south"]] = "run pc"
+  default_sends[locations["decara"]["east"]] = "run vir"
+  default_sends[locations["vir"]["east"]] = "run decara"
+  default_sends["1960870"] = "run newrigel"
+
+  custom_sends = serialization_helper.GetSerializedVariable("goto_aliases_customs", default_sends)
 end
 
 function getZoneKey()
@@ -351,47 +390,37 @@ function doTownRep() -- Daily Lady
   end
 end
 
-function doNextCity() -- Next City
-    get_gmcp_room()
-    local num = gmcpval("num")
+function doCustomSend() -- Next City
+  get_gmcp_room()
+  local num = gmcpval("num")
+  if custom_sends[num] ~= nil then
+    Send(custom_sends[num])
+  else
+    Tell("This room doesn't have a custom send setup, use ")
+    Hyperlink("!!" .. GetPluginID() .. ":addCustomSend()", "goto custom <text>", "click to add", "white", "black", false)
+    Note(" to set one up.")
+  end
+end
 
-    if num == locations["rune"]["east"] then
-      Send("run newrigel")
-    elseif num == locations["rune"]["west"] then
-      Send("run xaventry")
-    elseif num == locations["sigil"]["south"] then
-      Send("run diocletian")
-    elseif num == locations["sigil"]["north"] then
-      Send("run vospire")
-    elseif num == locations["piratescove"]["west"] or
-           num == locations["piratescove"]["east"] or
-           num == locations["piratescove"]["south"] then
-      Send("run keep")
-    elseif num == locations["newrigel"]["south"] or
-           num == locations["xaventry"]["south"] then
-      Send("run rune")
-    elseif num == locations["newrigel"]["north"] then
-      Send("run wroth")
-    elseif num == locations["tellerium"]["north"] then
-      Send("run templeton")
-    elseif num == locations["templeton"]["west"] then
-      Send("run tellerium")
-    elseif num == locations["diocletian"]["south"] or
-           num == locations["vospire"]["east"] then
-      Send("run sigil")
-    elseif num == locations["vospire"]["west"] then
-      Send("run vesuvius")
-    elseif num == locations["maldra"]["south"] then
-      Send("run pc")
-    elseif num == locations["decara"]["east"] then
-      Send("run vir")
-    elseif num == locations["vir"]["east"] then
-      Send("run decara")
-    elseif num == "1960870" then -- wroth
-      Send("run newrigel")
+function addCustomSend(text)
+  text = Trim(text or "")
+  get_gmcp_room()
+  local num = gmcpval("num")
+
+  if text == "" then
+    text = utils.inputbox("Custom Send for " .. num, "Enter the text to send for this room:", custom_sends[num] or "")
+  end
+
+  if text ~= nil then
+    text = Trim(text)
+    custom_sends[num] = text
+    serialization_helper.SaveSerializedVariable("goto_aliases_customs", custom_sends)
+    if text == "" then
+      Note("The custom send for this room has been cleared.")
     else
-        Note("You are not in an expected room!")
+      Note("Using 'goto next' from this room will send: " .. text)
     end
+  end
 end
 
 function doCrystal() -- Crystal Quests
@@ -569,6 +598,29 @@ function determineDestination(destinations, input)
   Note("")
   
   return nil
+end
+
+function doHelp()
+  showCommand("goto <north|east|south|west|gate>", "auto run to the exit of the city you are in")
+  showCommand("goto next", "send the command set up for this room, see below")
+  showCommand("goto qm", "run to the quest master if one is in your location")
+  showCommand("goto rep", "run to the tourist rep if there is one")
+  showCommand("goto crystal", "run to the crystal quest office in Rune")
+  showCommand("goto pursuer", "run to the orc pursuer, or get a target if you are there")
+  showCommand("goto custom <text>", "set a custom send for your current room, see below")
+  Note("")
+  Note("Current custom sends:")
+  for rm, txt in pairs(custom_sends) do
+    showCommand(rm, txt)
+  end
+  Send("")
+end
+
+function showCommand(cmd, desc)
+  Tell("* ")
+  ColourTell("white", "black", cmd)
+  Tell(" - ")
+  ColourNote("silver", "black", desc)
 end
 
 function get_gmcp_room()
