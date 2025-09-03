@@ -195,7 +195,7 @@ local zone_key_map = {
   ["The Hamlet of Winton"] = "winton", ["Forst Giant's Keep"] = "frostgiantskeep", ["Dungeon Deceit"] = "deceit", ["Vandemaar's Keep"] = "vandemaar",
   ["Xalt, Unseelie Outpost"] = "xalt", ["The Village of Mulakanathos"] = "mulakanathos", ["Gorth"] = "gorth", ["Traveler's Retreat"] = "travelersretreat",
   ["Tavern of the Boars"] = "tavernoftheboars", ["Inn of the Twin Moons"] = "twinmoons", ["The Lonely Dragon Inn"] = "lonelydragon", 
-  ["The Indestructible Cenotaphy"] = "cenotaphy", ["Atlantis"] = "atlantis", ["Naulitas"] = "naulitas"
+  ["The Indestructible Cenotaphy"] = "cenotaphy", ["Atlantis"] = "atlantis", ["Naulitas"] = "naulitas", ["The Mountain Village of Teolaven"] = "teolaven"
 }
 
 function OnPluginInstall()
@@ -268,7 +268,7 @@ function populateLocations()
   setLocation("tavernoftheboars", "sepharia", nil, "2085131")
   setLocation("twinmoons", "sepharia", nil, "1765641")
   setLocation("lonelydragon", "sepharia", nil, "2669134")
-  setLocation("teolaven", "auryn", nil, nil, nil, "4058343")
+  setLocation("teolaven", "auryn", nil, nil, nil, "328834")
   setLocation("cenotaphy", "beltane", nil, "3916564")
   setLocation("atlantis", "ocean", "18892")
   setLocation("naulitas", "ocean", nil, "4137902")
@@ -394,7 +394,7 @@ function doCustomSend() -- Next City
   get_gmcp_room()
   local num = gmcpval("num")
   if custom_sends[num] ~= nil then
-    Send(custom_sends[num])
+    Execute(custom_sends[num])
   else
     Tell("This room doesn't have a custom send setup, use ")
     Hyperlink("!!" .. GetPluginID() .. ":addCustomSend()", "goto custom <text>", "click to add", "white", "black", false)
