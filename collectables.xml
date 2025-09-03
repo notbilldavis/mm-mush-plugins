@@ -246,9 +246,6 @@ function addCollectable(what, owned, possible, collectable, prefix)
     addToTable(owned, found)
   else
     Note("Unknown collectable: " .. prefix .. collectable)
-    if what == "plates" then
-      Note("If this is plate 77 then add it to the wiki and script.")
-    end
   end
 
   SetVariable(character.. "_" .. what .. "_list", Serialize(owned))
@@ -357,9 +354,6 @@ function displayNeededCollectables(what, owned, possible, prefix)
 
   Note("Needed " .. what .. ":")
   for idx, collectable in ipairs(valid) do 
-    if idx == 77 and what == "plates" then
-      collectable["name"] = "Plate 77 is not on the wiki."
-    end
     ColourTell("cyan", "black", " * ")
     Tell("[")
     if collectable["id"] < 10 then
@@ -570,7 +564,7 @@ possiblePlates = {
   "a couple exchanging wedding vows on the resort island Complex d'Amour",
   "the Power of water and moisture, Ithrilis",
   "the Power of air and wind, Dira",
-  "Plate 77 is not on the wiki",
+  "the Power of fire and heat, Gath",
   "the Power of ether and void, Vandyne",
   "the lesser Power of smoke, Vehja",
   "the lesser Power of ice, Graph",
