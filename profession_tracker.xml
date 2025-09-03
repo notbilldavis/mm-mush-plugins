@@ -165,7 +165,7 @@ needed_manuals = {
   "feign knowledge", "regenerate cartilage", "withering touch", "raise hell", "faerie ring",
   "hydroblast", "bubble cluster", "desperation", "aegis", "camouflage", "concentration", "totem",
   "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
-  "strike pain", "one with the forest", "battle caster", "animate weapon"
+  "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation"
 }
 
 owned_manuals = {}
