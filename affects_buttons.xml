@@ -272,8 +272,10 @@ function pluginStop()
   end  
 
   config_window.Hide()
-  buttons_window.Close()
-  badaffects_window.Close()
+  if not GetInfo(106) then -- not disconnected
+    buttons_window.Close()
+    badaffects_window.Close()
+  end
 end
 
 -----------------

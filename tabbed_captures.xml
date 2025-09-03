@@ -39,19 +39,19 @@ Use 'capture update' to check for updates from github.
 </plugin>
 
 <aliases>
-  <alias enabled="y" match="^capture help$" regexp="y" send_to="12" sequence="100">
+  <alias enabled="y" match="^capture help$" regexp="y" send_to="12" sequence="100" group="tabbed_captures">
     <send>doOnHelp()</send>
   </alias>
-  <alias match="^capture[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^capture[ ]+setchar[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="tabbed_captures">
     <send>setCharacterName("%1")</send>
   </alias>
-  <alias enabled="y" match="^capture debug$" regexp="y" send_to="12" sequence="100">
+  <alias enabled="y" match="^capture debug$" regexp="y" send_to="12" sequence="100" group="tabbed_captures">
     <send>doDebug()</send>
   </alias>
-  <alias enabled="y" match="^capture config$" regexp="y" send_to="12" sequence="100">
+  <alias enabled="y" match="^capture config$" regexp="y" send_to="12" sequence="100" group="tabbed_captures">
     <send>configure()</send>
   </alias>
-  <alias match="^capture[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^capture[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100" group="tabbed_captures">
     <send>checkForUpdates()</send>
   </alias>
 </aliases>
@@ -259,6 +259,14 @@ local colors_installed, colors_helper = pcall(require, "colorshelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
 local const_installed, consts = pcall(require, "consthelper")
 
+if can_update and update_helper.UpdateSelf ~= nil then
+  local updater_updated = update_helper.UpdateSelf()
+  if updater_updated then
+    package.loaded["updatehelper"] = nil
+    can_update, update_helper = pcall(require, "updatehelper")
+  end
+end
+
 if can_update then
   if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
   if not capture_installed then capture_installed, capture_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/tabbed_miniwindow.lua") end
@@ -287,9 +295,11 @@ function OnPluginDisconnect() pluginStop() end
 function pluginStart()
   if #missing_required_files > 0 then
     ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
-    EnableTriggerGroup("", false)
-    EnableAliasGroup("", false)
+    EnableAliasGroup("tabbed_captures", false)
+    EnableTrigger("first_prompt", false)
     return
+  else
+    EnableAliasGroup("tabbed_captures", true)
   end
 
   CHARACTER_NAME = nil
@@ -299,7 +309,7 @@ end
 
 function pluginStop()
   if #missing_required_files > 0 then return end
-  capture_window.Close()
+  if not GetInfo(106) then capture_window.Close() end -- not disconnected
   config_window.Hide()
   if can_update and capture_window.IsAutoUpdateEnabled() then
     checkForUpdates()
