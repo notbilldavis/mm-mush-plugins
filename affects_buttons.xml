@@ -166,6 +166,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
   
   <trigger match="^(.*?) knocks (.*?) from your grip\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>DisarmedBroadcast("%2")</send>
+  </trigger>
+
+  <trigger match="(.*?) batters you mercilessly before finally cleaving your (.*?) in twain\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
+    <send>DisarmedBroadcast("%2")</send>
   </trigger> 
 
   <trigger match="^You call your familiar\, and a wary\-looking wolf appears right on cue to join you\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">

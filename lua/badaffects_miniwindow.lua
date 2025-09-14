@@ -81,7 +81,7 @@ load = function()
       "poverty of ether", "immobilize", "damnation", "spider incubator", "entomb", "contagion", "faerie fire", "giant grasping hand", "existential horror", 
       "slurping proboscis", "harrow", "excommunicate", "boreworms disease", "irk", "nightmares", "hotfoot", "burning ember", "cavern sickness disease", 
       "mesmerize", "fatigue", "ash evocation", "evil eye", "hellfire surge", "latent charge", "static field", "weaken", "dead air", "light lungs disease", 
-      "earworm", "poverty of gems", "poverty of ithrilis", "poverty of dira", "poverty of gath"
+      "earworm", "poverty of gems", "poverty of ithrilis", "poverty of dira", "poverty of gath", "lunar eclipse", "plodding fugue", "smoke evocation"
     }
     NEGATIVE_AFFECTS = {}
     for _, aff in ipairs(bad) do
