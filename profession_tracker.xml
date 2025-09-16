@@ -166,11 +166,12 @@ needed_manuals = {
   "hydroblast", "bubble cluster", "desperation", "aegis", "camouflage", "concentration", "totem",
   "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
-  "salt invocation"
+  "salt invocation", "dust invocation"
 }
 
 owned_manuals = {}
 discovered_manuals = {}
+current_request = nil
 
 needed_manuals_set = {}
 owned_manuals_set = {}
@@ -235,6 +236,7 @@ function setCharacterName(name)
     
     owned_manuals = serialization_helper.GetSerializedVariable(character_name .. "_owned_manuals")
     discovered_manuals = serialization_helper.GetSerializedVariable("prof_tracker_discovered_manuals")
+    current_request = serialization_helper.GetSerializedVariable(character_name .. "current_request")
 
     owned_manuals_set = {}
     needed_manuals_set = {}
@@ -265,6 +267,10 @@ end
 function saveData()
   serialization_helper.SaveSerializedVariable(character_name .. "_owned_manuals", owned_manuals)
   serialization_helper.SaveSerializedVariable("prof_tracker_discovered_manuals", discovered_manuals)
+  if current_request ~= nil then
+    SetVariable(character_name .. "current_request", current_request)
+    SaveState()
+  end
 end
 
 function clear()
@@ -330,16 +336,17 @@ end
 
 function ensure(manual)
   manual = manual:lower()
+  current_request = manual
   if not needed_manuals_set[manual] then
     needed_manuals_set[manual] = true
     table.insert(discovered_manuals, manual)
-    saveData()
 
     Note("This manual wasn't in the list of known manuals for the mark, oops!")
     Note("Try to send a tell or mail to Oona so they can add it to the script.")
     Hyperlink("tell oona the manual of " .. manual .. " is needed for the profession mark, add it to the tracker script!", "[click here to try to send such a tell if Oona is online]", "", "silver", "black", false)
     Note("")
   end
+  saveData()
 end
 
 function isManualNeeded(name)
@@ -389,7 +396,12 @@ function showOwned()
   for _, manual in ipairs(owned_manuals) do
     count_skill = count_skill + 1
     Tell("|")
-    ColourTell("white", "black", centerString(manual))
+    if (manual == current_request) then
+      ColourTell("yellow", "black", centerString(manual))
+      current_request = nil
+    else
+      ColourTell("white", "black", centerString(manual))
+    end
 
     if count_skill % 3 == 0 then        
       Note("|")
@@ -421,7 +433,13 @@ function showNeeded()
     if not owned_manuals_set[manual] then
       count_skill = count_skill + 1
       Tell("|")
-      ColourTell("white", "black", centerString(manual))
+
+      if (manual == current_request) then
+        ColourTell("yellow", "black", centerString(manual))
+        current_request = nil
+      else
+        ColourTell("white", "black", centerString(manual))
+      end
 
       if count_skill % 3 == 0 then        
         Note("|")
