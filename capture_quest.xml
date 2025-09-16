@@ -142,8 +142,8 @@
     <send>LocateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^You take a (blood|small) crystal\.$" sequence="100" send_to="12" group="capture_quest">
-    <send>BroadcastPlugin(2)</send>
+  <trigger enabled="y" keep_evaluating="y" match="^You take a (blood|small) crystal\.$" regexp="y" sequence="100" send_to="12" group="capture_quest">
+    <send>GotCrystal()</send>
   </trigger>
 
   <trigger enabled="y" match="^\* You may ask Tadamir for another map at\: (.*?)$" omit_from_output="y" regexp="y" send_to="14" sequence="100" group="capture_quest">
@@ -265,11 +265,22 @@ function StartCapturingQuest(num, name)
   addToLine(name, "springgreen", "black", "quest" .. num, true)
   addNewLine("quest" .. num, true)
 
-  if quest.num ~= num then
+  if quest.num ~= num and quest_window.IsAutoLookupEnabled() then
     quest.num = num
     quest.name = name
     quest.phases, quest.annwn_id = searcher.GetQuestInfo(num, name)
   end
+
+  if not quest_window.IsAutoLookupEnabled() then
+    Hyperlink("!!" .. GetPluginID() .. ":LookupQuestOnAnnwn(" .. num .. ", " .. name .. ")", "[Lookup on Annwn.info]", "Lookup", "white", "black", false)
+  end
+end
+
+function LookupQuestOnAnnwn(num, name)
+  quest.num = num
+  quest.name = name
+  quest.phases, quest.annwn_id = searcher.GetQuestInfo(num, name)
+  quest_window.SetQuestInfo(quest.num, quest.name, quest.annwn_id)
 end
 
 function CaptureLine(line)
@@ -356,6 +367,7 @@ function FinishQuest()
 end
 
 function FinishCrystal()
+  BroadcastPlugin(2, "on")
   quest_window.Clear("crystal")
   quest_window.SetCrystalTime()
 end
@@ -469,6 +481,11 @@ function ShowPursuerOptions()
 end
 
 function LocateCrystal(location)
+  if not quest_window.IsLookupCrystalEnabled() then
+    Note("Crystal lookup is disabled in the configuration, skipping crystal location lookup.")
+    return
+  end
+  
   local crystal = searcher.LocateCrystal(location)
   if crystal == nil then
     Note("The crystal could not be found!")
@@ -480,21 +497,39 @@ function LocateCrystal(location)
   EnableTrigger("findcrystal", false)
 end
 
+function GotCrystal()
+  BroadcastPlugin(2, "off")
+  quest_window.SetHasCrystal(true)
+end
+
 function ReplaceCrystalTime(trigger_style_runs, line, time_str)
   local converted_time, year, month, day, hour, minute, second = consts.convertToTime(time_str)
-  local details = consts.getTimeDiffInMinutes(converted_time)
   local formatted_date = consts.getFormattedDateTime(year, month, day, hour, minute, second)
+  replaceTime(trigger_style_runs, converted_time, formatted_date, "You may ask Tadamir for another map")
+
+  -- also do orc pursuer i guess
+  local pursuer_time = quest_window.GetPursuerTime()
+  if pursuer_time ~= nil then
+    local t = os.date("*t", timestamp)
+    formatted_date = consts.getFormattedDateTime(t.year, t.month, t.day, t.hour, t.min, t.sec)
+    replaceTime(trigger_style_runs, pursuer_time, formatted_date, "You may ask the orc pursuer for another target")
+  end
+end
+
+function replaceTime(trigger_style_runs, converted_time, formatted_date, prefix_text)
+  local details = consts.getTimeDiffInMinutes(converted_time)  
   local fgcol = RGBColourToName(trigger_style_runs[1].textcolour)
   local bgcol = RGBColourToName(trigger_style_runs[1].backcolour)
   ColourTell(fgcol, bgcol, "* ")
   if #trigger_style_runs > 1 then
     fgcol = RGBColourToName(trigger_style_runs[2].textcolour)
   end
-  ColourTell(fgcol, bgcol, "You may ask Tadamir for another map ")
+  prefix_text = Trim(prefix_text or "")
+  ColourTell(fgcol, bgcol, prefix_text .. " ")
   ColourTell("white", "black", details)
   ColourTell(fgcol, bgcol, " (")
   ColourTell("white", "black", formatted_date)
-  ColourNote(fgcol, bgcol, ")")  
+  ColourNote(fgcol, bgcol, ")")
 end
 
 function ReplaceQuestTime(trigger_style_runs, line)

@@ -4,7 +4,8 @@ local const_installed, consts = pcall(require, "consthelper")
 
 local initialize, clear, close, save, getConfiguration, onConfigureDone, setQuestInfo, addLine, 
   setPursuerTarget, setCrystalTarget, checkBodyPartDrop, showTimes, setQuestTime, setPursuerTime,
-  setCrystalTime, showPursuerOptions, isSilentRefreshEnabled, isAutoUpdateEnabled, getQuestTime
+  setCrystalTime, showPursuerOptions, isSilentRefreshEnabled, isAutoUpdateEnabled, getQuestTime,
+  isAutoLookupEnabled, getPursuerTime, isLookupCrystalEnabled, setHasCrystal
 local load, create, draw, setSizeAndPositionToContent, drawToggleButton, drawQuestWindows, drawQuestText,
   drawCollapseText, adjustAnchor, doTimeString, getTimerColorAndString, getExpandPhasesText
 
@@ -33,6 +34,7 @@ local CURRENT_INFO = nil
 local PURSUER_TARGET = nil
 local CRYSTAL_TARGET = nil
 local COLLECTED_PART = nil
+local HAS_CRYSTAL = false
 
 local SERIALIZE_TAGS = { CONFIG = "quest_config", POSITION = "quest_position" }
 local EXPAND_DIRECTION_LIST = { "Up/Left", "Up/Right", "Down/Left", "Down/Right" }
@@ -73,6 +75,8 @@ load = function()
   CONFIG.TRACK_CRYSTAL = serialization_helper.GetValueOrDefault(CONFIG.TRACK_CRYSTAL, true)
   CONFIG.EXPAND_PHASES = serialization_helper.GetValueOrDefault(CONFIG.EXPAND_PHASES, 2)
   CONFIG.TIMES = serialization_helper.GetValueOrDefault(CONFIG.TIMES, { QUEST_TIME = 0, PURSUER_TIME = 0, CRYSTAL_TIME = 0 })
+  CONFIG.AUTO_LOOKUP = serialization_helper.GetValueOrDefault(CONFIG.AUTO_LOOKUP, true)
+  CONFIG.LOOKUP_CRYSTAL = serialization_helper.GetValueOrDefault(CONFIG.LOOKUP_CRYSTAL, true)
 
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRight() - CONFIG.BUTTON_WIDTH - 10)
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottom() - CONFIG.BUTTON_HEIGHT - 10)
@@ -125,19 +129,6 @@ setSizeAndPositionToContent = function()
 
   if TEXT_BUFFER == nil then
     TEXT_BUFFER = { }
-  end
-
-  if CONFIG.EXPAND_PHASES == 2 then
-    for _, line in ipairs(TEXT_BUFFER) do
-      if line.segments[1].text:sub(1, 5) == "Phase" and line.segments[2].textcolour ~= consts.dimgray then
-        SECTION_STATUS[line.section] = true
-        break
-      end
-    end
-  elseif CONFIG.EXPAND_PHASES == 3 then
-    for sec, _ in pairs(SECTION_STATUS) do
-      SECTION_STATUS[sec] = true
-    end
   end
 
   CURRENT_BUTTON_COLOR = CONFIG.ACTIVE_BUTTON_COLOR
@@ -423,20 +414,36 @@ drawQuestText = function()
     if CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil and CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, consts.silver)
-      WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      if (COLLECTED_PART ~= nil) then
+        WindowText(WIN, QUESTFONT_STRIKE, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.dimgray)
+      else
+        WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      end
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
       y = y + 3
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y + LINE_HEIGHT, 0, 0, consts.silver)
-      WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, consts.white)
+      if HAS_CRYSTAL then
+        WindowText(WIN, QUESTFONT_STRIKE, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, consts.dimgray)
+      else
+        WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y + LINE_HEIGHT, 0, 0, consts.white)
+      end
     elseif CONFIG.TRACK_PURSUER and PURSUER_TARGET ~= nil then
       if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Orc Pursuer: ", 6, y, 0, 0, consts.silver)
-      WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      if (COLLECTED_PART ~= nil) then
+        WindowText(WIN, QUESTFONT_STRIKE, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.dimgray)
+      else
+        WindowText(WIN, QUESTFONT, PURSUER_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      end
     elseif CONFIG.TRACK_CRYSTAL and CRYSTAL_TARGET ~= nil then
       prefix_length = WindowTextWidth(WIN, QUESTFONT, "Crystal: ")
       if y > 4 + CONFIG.BUTTON_HEIGHT then y = y + 3 else y = y + 1 end
       WindowText(WIN, QUESTFONT, "Crystal: ", 6, y, 0, 0, consts.silver)
-      WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      if HAS_CRYSTAL then
+        WindowText(WIN, QUESTFONT_STRIKE, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, consts.dimgray)
+      else
+        WindowText(WIN, QUESTFONT, CRYSTAL_TARGET, 6 + prefix_length, y, 0, 0, consts.white)
+      end
     end
   end
 end
@@ -481,6 +488,19 @@ addLine = function(segments, section, is_header)
   
   table.insert(TEXT_BUFFER, { segments = segments, section = section, is_header = is_header })
 
+  if CONFIG.EXPAND_PHASES == 2 then
+    for _, line in ipairs(TEXT_BUFFER) do
+      if line.segments[1].text:sub(1, 5) == "Phase" and line.segments[2].textcolour ~= consts.dimgray then
+        SECTION_STATUS[line.section] = true
+        break
+      end
+    end
+  elseif CONFIG.EXPAND_PHASES == 3 then
+    for sec, _ in pairs(SECTION_STATUS) do
+      SECTION_STATUS[sec] = true
+    end
+  end
+
   draw()
 end
 
@@ -496,6 +516,7 @@ end
 setCrystalTarget = function(target)
   if CONFIG.TRACK_CRYSTAL then
     CRYSTAL_TARGET = target
+    HAS_CRYSTAL = false
     if CRYSTAL_TARGET ~= nil then EXPANDED = true end
     draw()
   end
@@ -506,6 +527,7 @@ checkBodyPartDrop = function(part, victim)
     Send("get '" .. part .. "'")
     COLLECTED_PART = part
     BroadcastPlugin(3, "off")
+    draw()
   end
 end
 
@@ -589,6 +611,7 @@ clear = function(what)
     PURSUER_TARGET = nil
   elseif what == "crystal" then
     CRYSTAL_TARGET = nil
+    HAS_CRYSTAL = false
   end
   
   WindowDeleteAllHotspots(WIN)
@@ -615,6 +638,13 @@ end
 getQuestTime = function()
   if CONFIG ~= nil and CONFIG.TIMES ~= nil and CONFIG.TIMES.QUEST_TIME ~= nil then
     return CONFIG.TIMES.QUEST_TIME
+  end
+  return nil
+end
+
+getPursuerTime = function()
+  if CONFIG ~= nil and CONFIG.TIMES ~= nil and CONFIG.TIMES.PURSUER_TIME ~= nil then
+    return CONFIG.TIMES.PURSUER_TIME
   end
   return nil
 end
@@ -711,13 +741,17 @@ getExpandPhasesText = function(opt)
   end
 end
 
-
+setHasCrystal = function(has)
+  HAS_CRYSTAL = has
+end
 
 getConfiguration = function()
   local expand_direction = (CONFIG.EXPAND_DOWN and "Down" or "Up") .. "/" .. (CONFIG.EXPAND_RIGHT and "Right" or "Left")
   
   return {
     OPTIONS = {
+      AUTO_LOOKUP = config_window.CreateBoolOption(-1, "Auto-Lookup", CONFIG.AUTO_LOOKUP, "Look up the quest on annwn when you get it, could have a lag if you would rather do it manually."),
+      LOOKUP_CRYSTAL = config_window.CreateBoolOption(0, "Lookup Crystal", CONFIG.LOOKUP_CRYSTAL, "Look up the crystal map on OOC when you look at the map, could have a lag if you would rather do it manually."),
       HIDE_EMPTY = config_window.CreateBoolOption(1, "Hide Inactive", CONFIG.ENABLED, "Will hide the button entirely if there is nothing to show."),
       LOCK_POSITION = config_window.CreateBoolOption(2, "Lock Position", CONFIG.LOCK_POSITION, "Disable dragging to move the panel."),
       EXPAND = config_window.CreateListOption(3, "Expand Direction", expand_direction, EXPAND_DIRECTION_LIST, "Set the direction the window will expand from the button."),
@@ -833,6 +867,14 @@ isAutoUpdateEnabled = function()
   return CONFIG.AUTOUPDATE
 end
 
+isAutoLookupEnabled = function()
+  return CONFIG.AUTO_LOOKUP
+end
+
+isLookupCrystalEnabled = function()
+  return CONFIG.LOOKUP_CRYSTAL
+end
+
 return {
   Initialize = initialize, 
   Clear = clear, 
@@ -852,5 +894,9 @@ return {
   ShowPursuerOptions = showPursuerOptions, 
   IsSilentRefreshEnabled = isSilentRefreshEnabled, 
   IsAutoUpdateEnabled = isAutoUpdateEnabled,
-  GetQuestTime = getQuestTime
+  GetQuestTime = getQuestTime,
+  GetPursuerTime = getPursuerTime,
+  IsAutoLookupEnabled = isAutoLookupEnabled,
+  IsLookupCrystalEnabled = isLookupCrystalEnabled,
+  SetHasCrystal = setHasCrystal
 }
