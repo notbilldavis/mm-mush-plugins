@@ -166,7 +166,7 @@ needed_manuals = {
   "hydroblast", "bubble cluster", "desperation", "aegis", "camouflage", "concentration", "totem",
   "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
-  "salt invocation", "dust invocation"
+  "salt invocation", "dust invocation", "ash invocation"
 }
 
 owned_manuals = {}
