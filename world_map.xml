@@ -38,45 +38,81 @@ Coming soon:
   <alias match="^worldmap[ ]+crystal[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
     <send>setCrystal("%1")</send>
   </alias>
+
+  <alias match="^worldmap[ ]+dest(?:ination)?[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>setDestination("%1")</send>
+  </alias>
+
+  <alias match="^worldmap[ ]+config$" enabled="y" regexp="y" send_to="12" sequence="100">
+    <send>configure()</send>
+  </alias>
 </aliases>
 <script>
 
 <![CDATA[
 
+local missing_required_files = {}
+local can_update, update_helper = pcall(require, "updatehelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local worldmap_installed, worldmap_window = pcall(require, "worldmap_miniwindow")
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local const_installed, consts = pcall(require, "consthelper")
+
+if can_update then
+  if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
+  if not worldmap_installed then worldmap_installed, worldmap_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/worldmap_miniwindow.lua") end
+  if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
+  if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
+end
+
+if not config_installed then table.insert(missing_required_files, "lua/configuration_miniwindow.lua") end
+if not worldmap_installed then table.insert(missing_required_files, "lua/worldmap_miniwindow.lua") end
+if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
+if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
+
 require "gmcphelper"
-require "worldmap_miniwindow"
 
-function OnPluginInstall()
-  InitializeMiniWindow()
+function OnPluginInstall() pluginStart() end
+function OnPluginEnable() pluginStart() end
+function OnPluginConnect() pluginStart() end
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
+
+function pluginStart()
+  if #missing_required_files > 0 then
+    ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
+    EnableAliasGroup("world_map", false)
+    return
+  else
+    EnableAliasGroup("world_map", true)
+  end
+
+  worldmap_window.Initialize()
 end
 
-function OnPluginConnect()
-  Execute("sendgmcp room.info")
-end
-
-function OnPluginClose()
-  SaveState()
-  HideWindow()
-end
-
-function OnPluginDisable()
-  SaveState()
-  HideWindow()
-end
-
-function OnPluginDisconnect()
-  checkForUpdates()
+function pluginStop()
+  if #missing_required_files > 0 then return end
+  if not GetInfo(106) then worldmap_window.HideWindow() end -- not disconnected
+  config_window.Hide()
+  if can_update and worldmap_window.IsAutoUpdateEnabled() then
+    checkForUpdates()
+  else
+    Note("Auto-update for '" .. GetPluginName() .. "' is disabled. Enable it in the plugin configuration to receive updates.")
+  end  
 end
 
 function OnPluginBroadcast(msg, id, name, text)
   if (id =="f67c4339ed0591a5b010d05b") then
     if (text == "room.info") then
       local res, room_info = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
-      SetCoords(room_info)
+      worldmap_window.SetCoords(room_info)
     end
   elseif (id == "892911b648d09c18e1ecd4e6") then
     if (msg == 1) then
       setCrystal(text)
+    elseif msg == 2 then
+      worldmap_window.SetCrystalCoords(nil, nil)
     end
   end
 end
@@ -85,26 +121,56 @@ function setCrystal(crystal)
   local coords = utils.split(crystal, ",")
   if #coords == 1 then coords = utils.split(crystal, " ") end
   if #coords == 2 then
-    SetCrystalCoords(coords[1], coords[2])
+    worldmap_window.SetCrystalCoords(coords[1], coords[2])
   else
-    SetCrystalCoords(nil, nil)
+    worldmap_window.SetCrystalCoords(nil, nil)
   end
 end
 
-function checkForUpdates()
-  local updater_installed, updater = pcall(require, "updatehelper")
+function setDestination(args)
+  local split_args = utils.split(args, ",")
+  split_args = utils.split(args, " ")
+  local dest_icon, dest_x, dest_y = 1, nil, nil
+  if #split_args == 3 then 
+    dest_icon = tonumber(split_args[1]) or 1 
+    dest_x, dest_y = tonumber(split_args[2]), tonumber(split_args[3])
+  elseif #split_args == 2 then
+    dest_x, dest_y = tonumber(split_args[1]), tonumber(split_args[2])
+  else
+    if Trim(args) == "" then
+      -- show current dests
+    elseif Trim(args) == "clear" then
+      
+    end
+  end
 
-  if updater_installed then
-    updater.Update({
-      { local_file = GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/world_map.xml" },
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/worldmap_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/worldmap_miniwindow.lua"},
-      { local_file = GetInfo(56):gsub("\\", "/") .. "lua/configuration_miniwindow.lua", remote_file = "https://raw.githubusercontent.com/notbilldavis/mm-mush-plugins/refs/heads/main/lua/configuration_miniwindow.lua" },
-    })
+  if dest_icon == nil or dest_x == nil or dest_y == nil then
+    Note("invalid parameters")
+  else
+    worldmap_window.SetDestinationCoords(dest_icon, dest_x, dest_y)
+    Note("The " .. dest_icon .. " marker is set to " .. dest_x .. ", " .. dest_y .. ".")
+  end
+end
+
+function offerDestination(x, y)
+  local opts = "worldmap destination|worldmap destination 1 " .. x .. "," .. y .. "|worldmap destination 2 " .. x .. "," .. y .. "|worldmap destination 3 " .. x .. "," .. y
+  local tips = "Show on map|Set as destination 1|Set as destination 2|Set as destination 3"
+  Hyperlink(opts, "[" .. x .. ", " .. y .. "]", tips, "white", "black", false)
+end
+
+function checkForUpdates()
+  if can_update then
+    update_helper.Update(GetPluginInfo(GetPluginID(), 6):gsub("\\", "/"), "world_map.xml")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/worldmap_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua")
+    update_helper.Update(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua")
+  else
+    ColourNote("red", "black", GetPluginName() .. ": UpdateHelper was not found. Make sure updatehelper.lua is in your lua folder.")
   end
 end
 
 ]]>
 
 </script>
-
 </muclient>

@@ -1,25 +1,38 @@
-local CONFIG_WINDOW = require "configuration_miniwindow"
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
+local const_installed, consts = pcall(require, "consthelper")
+
 local WIN = GetPluginID()
 local INFOFONT = WIN .. "_info_font"
+
+local initialize, setCoords, setCrystalCoords, setDestinationCoords
+local drawMiniWindow, showWindow, hideWindow, loadIcons, loadSavedData, createWindowAndFont,
+  isAutoUpdateEnabled, loadIcon, getDefaultOffsets, saveMiniWindow, drawTile, getMapTile,
+  drawDebugLabel, tryShowCrystalMarker, tryShowDestinationMarkers, configure, configureDone
+
 local CONFIG = nil
 local LINE_HEIGHT = nil
-local BORDER_WIDTH = 3
-local COORD_X = -1
-local COORD_Y = -1
+local ICON_CACHE = {}
+local TILE_CACHE = {}
+local CACHE_ORDER = {}
+
+local IS_RESIZING = false
+local IS_DRAGGING = false
+local RESIZE_DRAG_X = nil
+local RESIZE_DRAG_Y = nil
+local START_DRAG_Y = 0
+local START_DRAG_OFFSET = 0
+
+local COORD_X = nil
+local COORD_Y = nil
 local ZOOM_LEVEL = {}
 local CURRENT_PLANE = "alyria"
-local VISIBLE_TILES = {}
 local MARKERS = {
   crystal = nil,
   one = nil,
   two = nil,
   three = nil,
 }
-
-local MM_PATH = GetPluginInfo(GetPluginID(), 20):gsub("\\", "/") .. "/WorldMap/"
-local ICON_CACHE = {}
-local TILE_CACHE = {}
-local CACHE_ORDER = {}
 
 local PLANE_DETAILS = { 
   alyria = { x = 2299, y = 1499, z = 4, l = true },
@@ -41,15 +54,15 @@ local PLANE_MAP = {
     ["Verity Isle"] = "verity",
   }
 
-function InitializeMiniWindow()
-  loadIcons()
+initialize = function()
   loadSavedData()
+  loadIcons()
   createWindowAndFont()
   drawMiniWindow()
 end
 
-function SetCoords(serialized_room_info)
-  local room_info = Deserialize(serialized_room_info)
+setCoords = function(serialized_room_info)
+  local room_info = serialization_helper.Deserialize(serialized_room_info)
   local x, y, plane = room_info.coord.x, room_info.coord.y, room_info.coord.name
   plane = PLANE_MAP[plane]
   if COORD_X ~= x or COORD_Y ~= y or CURRENT_PLANE ~= plane then
@@ -61,83 +74,89 @@ function SetCoords(serialized_room_info)
 
   if CONFIG.HIDE_WILDS then
     if room_info.coord.code == nil then
-      HideWindow()
+      hideWindow()
     else
-      ShowWindow()
+      showWindow()
     end
   end
 end
 
-function SetCrystalCoords(x, y)
+setCrystalCoords = function(x, y)
   MARKERS.crystal = { x = x, y = y }
   drawMiniWindow()
 end
 
-function IsAutoUpdateEnabled()
+setDestinationCoords = function(i, x, y)
+  if i == 1 then
+    MARKERS.one = { x = x, y = y }
+  elseif i == 2 then
+    MARKERS.two = { x = x, y = y }
+  elseif i == 3 then
+    MARKERS.three = { x = x, y = y }
+  end
+  drawMiniWindow()
+end
+
+isAutoUpdateEnabled = function()
   if CONFIG == nil then return false end
   return CONFIG.AUTOUPDATE or false
 end
 
-function ShowWindow()
+showWindow = function()
   WindowShow(WIN, true)
 end
 
-function HideWindow()
-  CONFIG_WINDOW.Hide()
+hideWindow = function()
+  config_window.Hide()
   WindowShow(WIN, false)
 end
 
-function loadIcons()
-  ICON_CACHE.location = loadIcon(MM_PATH .. "location.png")
-  ICON_CACHE.crystal = loadIcon(MM_PATH .. "crystal.png")
-  ICON_CACHE.one = loadIcon(MM_PATH .. "one.png")
-  ICON_CACHE.two = loadIcon(MM_PATH .. "two.png")
-  ICON_CACHE.three = loadIcon(MM_PATH .. "three.png")
+loadIcons = function()
+  ICON_CACHE.location = loadIcon(CONFIG.IMAGES_PATH .. "location.png")
+  ICON_CACHE.crystal = loadIcon(CONFIG.IMAGES_PATH .. "crystal.png")
+  ICON_CACHE.one = loadIcon(CONFIG.IMAGES_PATH .. "one.png")
+  ICON_CACHE.two = loadIcon(CONFIG.IMAGES_PATH .. "two.png")
+  ICON_CACHE.three = loadIcon(CONFIG.IMAGES_PATH .. "three.png")
 end
 
-function loadIcon(icon_path)
+loadIcon = function(icon_path)
   local f = assert(io.open(icon_path, "rb"))
   local img = f:read("*a")
   f:close()
   return img
 end
 
-function loadSavedData()
-  local serialized_config = GetVariable("worldmap_config") or ""
-  if serialized_config == "" then
-    CONFIG = {}
-  else
-    CONFIG = Deserialize(serialized_config)
-  end
+loadSavedData = function()
+  CONFIG = serialization_helper.GetSerializedVariable("worldmap_config")
+  
+  CONFIG.FONT = serialization_helper.GetValueOrDefault(CONFIG.BUTTON_FONT, { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 })
+  CONFIG.BORDER_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BORDER_COLOR, 12632256)
+  CONFIG.WINDOW_LEFT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_LEFT, GetInfo(274) + GetInfo(276) + GetInfo(277))
+  CONFIG.WINDOW_TOP = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_TOP, GetInfo(273) + GetInfo(276) + GetInfo(277))
+  CONFIG.WINDOW_WIDTH = serialization_helper.GetValueOrDefault(math.max(CONFIG.WINDOW_WIDTH, 100), 500)
+  CONFIG.WINDOW_HEIGHT = serialization_helper.GetValueOrDefault(CONFIG.WINDOW_HEIGHT, 750 * (CONFIG.WINDOW_WIDTH / 1150))
+  CONFIG.MAX_CACHE_SIZE = serialization_helper.GetValueOrDefault(CONFIG.MAX_CACHE_SIZE, 16)
+  CONFIG.HIDE_WILDS = serialization_helper.GetValueOrDefault(CONFIG.HIDE_WILDS, true)
+  CONFIG.OFFSETS = serialization_helper.GetValueOrDefault(CONFIG.OFFSETS, getDefaultOffsets())
+  CONFIG.AUTOUPDATE = serialization_helper.GetValueOrDefault(CONFIG.AUTUPDATE, true)
+  CONFIG.CIRCLE = serialization_helper.GetValueOrDefault(CONFIG.CIRCLE, false)
+  CONFIG.OPACITY = serialization_helper.GetValueOrDefault(CONFIG.OPACITY, 80)
+  CONFIG.STRETCH = serialization_helper.GetValueOrDefault(CONFIG.STRETCH, true)
+  CONFIG.DRAW_DEBUG = serialization_helper.GetValueOrDefault(CONFIG.DRAW_DEBUG, false)
+  CONFIG.IMAGES_PATH = serialization_helper.GetValueOrDefault(CONFIG.IMAGES_PATH, GetPluginInfo(GetPluginID(), 20):gsub("\\", "/") .. "/WorldMap/")
+  
+  ZOOM_LEVEL = serialization_helper.GetSerializedVariable("worldmap_zoom")
 
-  CONFIG.FONT = getValueOrDefault(CONFIG.BUTTON_FONT, { name = "Lucida Console", size = 9, colour = 16777215, bold = 0, italic = 0, underline = 0, strikeout = 0 })
-  CONFIG.BORDER_COLOR = getValueOrDefault(CONFIG.BORDER_COLOR, 12632256)
-  CONFIG.WINDOW_LEFT = getValueOrDefault(CONFIG.WINDOW_LEFT, GetInfo(274) + GetInfo(276) + GetInfo(277))
-  CONFIG.WINDOW_TOP = getValueOrDefault(CONFIG.WINDOW_TOP, GetInfo(273) + GetInfo(276) + GetInfo(277))
-  CONFIG.WINDOW_WIDTH = getValueOrDefault(math.max(CONFIG.WINDOW_WIDTH, 100), 500)
-  CONFIG.WINDOW_HEIGHT = getValueOrDefault(CONFIG.WINDOW_HEIGHT, 750 * (CONFIG.WINDOW_WIDTH / 1150))
-  CONFIG.MAX_CACHE_SIZE = getValueOrDefault(CONFIG.MAX_CACHE_SIZE, 16)
-  CONFIG.HIDE_WILDS = getValueOrDefault(CONFIG.HIDE_WILDS, true)
-  CONFIG.OFFSETS = getValueOrDefault(CONFIG.OFFSETS, getDefaultOffsets())
-  CONFIG.AUTOUPDATE = getValueOrDefault(CONFIG.AUTUPDATE, true)
-
-  local serialized_zoom_level = GetVariable("worldmap_zoom") or ""
-  if serialized_zoom_level == "" then
-    ZOOM_LEVEL = {}
-  else
-    ZOOM_LEVEL = Deserialize(serialized_zoom_level)
-  end
-
-  ZOOM_LEVEL.alyria = getValueOrDefault(ZOOM_LEVEL.alyria, 0)
-  ZOOM_LEVEL.underground = getValueOrDefault(ZOOM_LEVEL.underground, 0)
-  ZOOM_LEVEL.sigil = getValueOrDefault(ZOOM_LEVEL.sigil, 0)
-  ZOOM_LEVEL.faerie = getValueOrDefault(ZOOM_LEVEL.faerie, 0)
-  ZOOM_LEVEL.lasler = getValueOrDefault(ZOOM_LEVEL.lasler, 0)
-  ZOOM_LEVEL.verity = getValueOrDefault(ZOOM_LEVEL.verity, 0)
-  ZOOM_LEVEL.social = getValueOrDefault(ZOOM_LEVEL.social, 0)
+  ZOOM_LEVEL.alyria = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.alyria, 0)
+  ZOOM_LEVEL.underground = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.underground, 0)
+  ZOOM_LEVEL.sigil = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.sigil, 0)
+  ZOOM_LEVEL.faerie = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.faerie, 0)
+  ZOOM_LEVEL.lasler = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.lasler, 0)
+  ZOOM_LEVEL.verity = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.verity, 0)
+  ZOOM_LEVEL.social = serialization_helper.GetValueOrDefault(ZOOM_LEVEL.social, 0)
 end
 
-function getDefaultOffsets()
+getDefaultOffsets = function()
   local planes = { 
     alyria = {}, underground = {}, sigil = {}, faerie = {}, lasler = {}, verity = {}, social = {}
   }
@@ -170,40 +189,42 @@ function getDefaultOffsets()
   return planes
 end
 
-function createWindowAndFont()
+createWindowAndFont = function()
   if CONFIG == nil then return end
 
   local font = CONFIG["FONT"]
-  
-  WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
+  local flags = 2
+
+  if CONFIG.CIRCLE then 
+    flags = 6 
+  end
+
+  WindowCreate(WIN, CONFIG.WINDOW_LEFT, CONFIG.WINDOW_TOP, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0, flags, 11766186)
   
   WindowFont(WIN, INFOFONT, font.name, font.size,
-    convertToBool(font.bold), 
-    convertToBool(font.italic), 
-    convertToBool(font.underline), 
-    convertToBool(font.strikeout))
+    serialization_helper.ConvertToBool(font.bold), 
+    serialization_helper.ConvertToBool(font.italic), 
+    serialization_helper.ConvertToBool(font.underline), 
+    serialization_helper.ConvertToBool(font.strikeout))
 
   LINE_HEIGHT = WindowFontInfo(WIN, INFOFONT, 1) - WindowFontInfo(WIN, INFOFONT, 4) + 2
-  BORDER_WIDTH = GetInfo(277)
  
-  WindowPosition(WIN, CONFIG.WINDOW_LEFT, CONFIG.WINDOW_TOP, 4, 2)
-  WindowResize(WIN, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0)
-
   saveMiniWindow()
 end
 
-function drawMiniWindow()
+drawMiniWindow = function()
   if CONFIG ~= nil and COORD_X ~= nil and COORD_Y ~= nil then
     WindowShow(WIN, false)
 
+    WindowRectOp(WIN, miniwin.rect_fill, 0, 0, 0, 0, ColourNameToRGB("black"))
+
     if CURRENT_PLANE == nil then 
-      --Note("Unknown plane!")
       return
     end
 
-    local width, height = WindowInfo(WIN, 3), WindowInfo(WIN, 4)
-    WindowRectOp(WIN, miniwin.rect_fill, 0, 0, width, height, 0)
+    local printable_area = { x = (CONFIG.WINDOW_WIDTH - consts.GetBorderWidth() * 2), y = (CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth() * 2) }
 
+    local width, height = printable_area.x, printable_area.y --WindowInfo(WIN, 3), WindowInfo(WIN, 4)
     local num_of_tiles = (2^ZOOM_LEVEL[CURRENT_PLANE])
     local max_x = 1150 * num_of_tiles
     local max_y = 750 * num_of_tiles
@@ -217,42 +238,71 @@ function drawMiniWindow()
     local offset_y = local_y - height / 2
     local debug_boxes = {}
 
-    VISIBLE_TILES = {}
-    offset_x = offset_x + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x
-    offset_y = offset_y + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y
+    offset_x = -1 * (offset_x + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x + consts.GetBorderWidth())
+    offset_y = -1 * (offset_y + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y + consts.GetBorderWidth())
     
-    table.insert(debug_boxes, drawTile(tile_x, tile_y, offset_x, offset_y, "main", 32768))
+    local window_name = WIN
+    if CONFIG.CIRCLE then
+      window_name = WIN .. "_mask"
+      WindowCreate(window_name, 0, 0, 0, 0, 0, 2, 0)
+      WindowResize(window_name, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0)
+      WindowRectOp(window_name, 2, 0, 0, 0, 0, ColourNameToRGB("white"))
+      WindowImageFromWindow(window_name, "alpha", window_name)
+    end    
 
-    if offset_x > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y, offset_x - 1151, offset_y, "left", 255)) end
-    if offset_x < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y, offset_x + 1151, offset_y, "right", 255)) end
-    if offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y + 1, offset_x, offset_y - 751, "up", ColourNameToRGB("blue"))) end
-    if offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x, tile_y - 1, offset_x, offset_y + 751, "down", ColourNameToRGB("blue"))) end
-      
-    if offset_x > 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y + 1, offset_x - 1151, offset_y - 751, "left-up", ColourNameToRGB("yellow"))) end
-    if offset_x < 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y - 1, offset_x + 1151, offset_y + 751, "right-down", ColourNameToRGB("cyan"))) end
-    if offset_x > 0 and offset_y < 0 then table.insert(debug_boxes, drawTile(tile_x + 1, tile_y - 1, offset_x - 1151, offset_y + 751, "left-down", ColourNameToRGB("yellow"))) end
-    if offset_x < 0 and offset_y > 0 then table.insert(debug_boxes, drawTile(tile_x - 1, tile_y + 1, offset_x + 1151, offset_y - 751, "right-up", ColourNameToRGB("cyan"))) end
-        
-    for i = 0, BORDER_WIDTH - 1 do
-      WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, width - i, height - i, CONFIG.BORDER_COLOR)
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y, offset_x, offset_y, "main", 32768))  
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y, offset_x + 1150, offset_y, "right", ColourNameToRGB("red")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y, offset_x - 1151, offset_y, "left", ColourNameToRGB("tomato")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y + 1, offset_x, offset_y + 750, "down", ColourNameToRGB("blue")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y - 1, offset_x, offset_y - 751, "up", ColourNameToRGB("deepskyblue")))      
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y + 1, offset_x + 1150, offset_y + 750, "right-down", ColourNameToRGB("yellow")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y - 1, offset_x - 1151, offset_y - 751, "left-up", ColourNameToRGB("cyan")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y - 1, offset_x + 1150, offset_y - 751, "right-up", ColourNameToRGB("orange")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y + 1, offset_x - 1151, offset_y + 750, "left-down", ColourNameToRGB("purple")))
+    
+    if CONFIG.DRAW_DEBUG then
+      for _, box in ipairs(debug_boxes) do
+        if box ~= nil then
+          for i = 0, consts.GetBorderWidth() - 1 do
+            WindowRectOp(WIN, miniwin.rect_frame, box.left + i, box.top + i, box.right - i, box.bottom - i, box.color)
+          end
+
+          drawDebugLabel(box)
+        end
+      end
     end
 
-    -- for _, box in ipairs(debug_boxes) do
-    --   for i = 0, BORDER_WIDTH - 1 do
-    --     WindowRectOp(WIN, miniwin.rect_frame, box.left + i, box.top + i, box.right - i, box.bottom - i, box.color)
-    --   end
-    -- end
+    -- TODO: these marks don't show on map wrapping
+    tryShowCrystalMarker(window_name, max_x, max_y, scaled_x, scaled_y)
+    tryShowDestinationMarkers(window_name, max_x, max_y, scaled_x, scaled_y)
 
-    tryShowCrystalMarker(max_x, max_y, scaled_x, scaled_y)
+    WindowLoadImageMemory(window_name, "location_icon", ICON_CACHE.location)
+    local icon_point_x = WindowImageInfo(window_name, "location_icon", 2) * -1/2
+    local icon_point_y = WindowImageInfo(window_name, "location_icon", 3) * -1
+    WindowDrawImageAlpha(window_name, "location_icon", width / 2 + icon_point_x, height / 2 + icon_point_y, 0, 0, CONFIG.OPACITY / 100)
 
-    WindowLoadImageMemory(WIN, "location_icon", ICON_CACHE.location)
-    local icon_point_x = WindowImageInfo(WIN, "location_icon", 2) * -1/2
-    local icon_point_y = WindowImageInfo(WIN, "location_icon", 3) * -1
-    WindowDrawImageAlpha(WIN, "location_icon", width / 2 + icon_point_x, height / 2 + icon_point_y, 0, 0, .8) -- TODO: configurable alpha
-
-
+    if CONFIG.CIRCLE then
+      WindowCircleOp(WIN, miniwin.circle_ellipse, consts.GetBorderWidth(), consts.GetBorderWidth(), CONFIG.WINDOW_WIDTH - consts.GetBorderWidth(), CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth(), ColourNameToRGB("black"), 	miniwin.pen_inside_frame, 1, ColourNameToRGB("black"), miniwin.brush_solid)
+      WindowImageFromWindow(window_name, "image", window_name)
+      WindowRectOp(window_name, miniwin.rect_fill, 0, 0, 0, 0, ColourNameToRGB("black"))
+      WindowCircleOp(window_name, miniwin.circle_ellipse, consts.GetBorderWidth(), consts.GetBorderWidth(), CONFIG.WINDOW_WIDTH - consts.GetBorderWidth(), CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth(), ColourNameToRGB("white"), miniwin.pen_inside_frame, consts.GetBorderWidth(), ColourNameToRGB("white"), miniwin.brush_solid)
+      WindowImageFromWindow(window_name, "mask", window_name)
+      WindowRectOp(window_name, 2, 0, 0, 0, 0, ColourNameToRGB("black"))
+      WindowMergeImageAlpha(window_name, "alpha", "mask", 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+      WindowImageFromWindow(window_name, "alpha", window_name)      
+      WindowImageFromWindow(window_name, "target", WIN)
+      WindowDrawImage(window_name, "target", 0, 0, 0, 0, 1, 0, 0, 0, 0)
+      WindowMergeImageAlpha(window_name, "image", "alpha", 0, 0, 0, 0, 1, 1, 0, 0, 0, 0)
+      WindowImageFromWindow(WIN, "image", window_name)
+      WindowDrawImage(WIN, "image", 0, 0, 0, 0, miniwin.image_transparent_copy, 0, 0, 0, 0)
+      WindowCircleOp(WIN, miniwin.circle_ellipse, 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, CONFIG.BORDER_COLOR, miniwin.pen_solid, consts.GetBorderWidth(), 0, miniwin.brush_null)
+    else
+      for i = 0, consts.GetBorderWidth() + 1 do
+        WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, WindowInfo(WIN, 3) - i, WindowInfo(WIN, 4) - i, CONFIG.BORDER_COLOR)
+      end
+    end
     
-    WindowAddHotspot(WIN, "world_map_hotspot", BORDER_WIDTH, BORDER_WIDTH, width - BORDER_WIDTH, height - BORDER_WIDTH, "", "", "", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)  
+    WindowAddHotspot(WIN, "world_map_hotspot", consts.GetBorderWidth(), consts.GetBorderWidth(), width - consts.GetBorderWidth(), height - consts.GetBorderWidth(), "", "", "", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)  
     WindowScrollwheelHandler(WIN, "world_map_hotspot", "OnWheel")  
     
     WindowSetZOrder(WIN, 9999)
@@ -261,7 +311,23 @@ function drawMiniWindow()
   end
 end
 
-function tryShowCrystalMarker(max_x, max_y, center_x, center_y)
+drawDebugLabel = function(box)
+  local label_width = WindowTextWidth(WIN, INFOFONT, box.label)
+  local top, left = box.top, box.left
+
+  if box.top < consts.GetBorderWidth() then
+    top = box.bottom - LINE_HEIGHT
+  end
+
+  if box.left < consts.GetBorderWidth() then
+    left = box.right - label_width - 16
+  end
+
+  WindowRectOp(WIN, miniwin.rect_fill, left, top, left + label_width + 16, top + LINE_HEIGHT, box.color)
+  WindowText(WIN, INFOFONT, box.label, left + 8, top + 2, left + label_width + 16, top + LINE_HEIGHT, 0)  
+end
+
+tryShowCrystalMarker = function(window_name, max_x, max_y, center_x, center_y)
   if MARKERS.crystal == nil or MARKERS.crystal.x == nil or MARKERS.crystal.y == nil then return end
   if CURRENT_PLANE ~= "alyria" and CURRENT_PLANE ~= "underground" then return end
 
@@ -270,56 +336,89 @@ function tryShowCrystalMarker(max_x, max_y, center_x, center_y)
   local crystal_offset_x = crystal_x - center_x
   local crystal_offset_y = crystal_y - center_y
 
-  WindowLoadImageMemory(WIN, "crystal_icon", ICON_CACHE.crystal)
-  local icon_point_x = WindowImageInfo(WIN, "crystal_icon", 2) * -1/2
-  local icon_point_y = WindowImageInfo(WIN, "crystal_icon", 3) * -1
+  WindowLoadImageMemory(window_name, "crystal_icon", ICON_CACHE.crystal)
+  local icon_point_x = WindowImageInfo(window_name, "crystal_icon", 2) * -1/2
+  local icon_point_y = WindowImageInfo(window_name, "crystal_icon", 3) * -1
 
-  local width, height = WindowInfo(WIN, 3), WindowInfo(WIN, 4)
+  local width, height = WindowInfo(window_name, 3), WindowInfo(window_name, 4)
   local draw_x = width / 2 + crystal_offset_x + icon_point_x
   local draw_y = height / 2 + crystal_offset_y + icon_point_y
 
-  if draw_x < BORDER_WIDTH or draw_x > (width - BORDER_WIDTH) or 
-    draw_y < BORDER_WIDTH or draw_y > (height - BORDER_WIDTH) then
+  if draw_x < consts.GetBorderWidth() or draw_x > (width - consts.GetBorderWidth()) or 
+    draw_y < consts.GetBorderWidth() or draw_y > (height - consts.GetBorderWidth()) then
    return
   end
 
   WindowDrawImageAlpha(WIN, "crystal_icon", draw_x, draw_y, 0, 0, .8)
 end
 
-function drawTile(tile_x, tile_y, offset_x, offset_y, debug, color)
-  --if debug then Note(debug) end
+tryShowDestinationMarkers = function(window_name, max_x, max_y, center_x, center_y)
+  local markers = { "one", "two", "three" }
+  for _, marker in ipairs(markers) do
+    if MARKERS[marker] == nil or MARKERS[marker].x == nil or MARKERS[marker].y == nil then return end
 
-  if not PLANE_DETAILS[CURRENT_PLANE].l then
-    if tile_x < 0 or tile_x > (2^ZOOM_LEVEL[CURRENT_PLANE]) or 
-       tile_y < 0 or tile_y > (2^ZOOM_LEVEL[CURRENT_PLANE]) then
-      return nil
+    local marker_x = MARKERS[marker].x / PLANE_DETAILS[CURRENT_PLANE].x * max_x
+    local marker_y = MARKERS[marker].y / PLANE_DETAILS[CURRENT_PLANE].y * max_y
+    local marker_offset_x = marker_x - center_x
+    local marker_offset_y = marker_y - center_y
+
+    WindowLoadImageMemory(window_name, marker .. "_icon", ICON_CACHE[marker])
+    local icon_point_x = WindowImageInfo(window_name, marker .. "_icon", 2) * -1/2
+    local icon_point_y = WindowImageInfo(window_name, marker.."_icon", 3) * -1
+
+    local width, height = WindowInfo(window_name, 3), WindowInfo(window_name, 4)
+    local draw_x = width / 2 + marker_offset_x + icon_point_x
+    local draw_y = height / 2 + marker_offset_y + icon_point_y
+
+    if draw_x < consts.GetBorderWidth() or draw_x > (width - consts.GetBorderWidth()) or 
+      draw_y < consts.GetBorderWidth() or draw_y > (height - consts.GetBorderWidth()) then
+    return
     end
-  end 
 
-  local tile = getMapTile(tile_x % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_y % (2^ZOOM_LEVEL[CURRENT_PLANE]))
+    WindowDrawImageAlpha(WIN, marker .. "_icon", draw_x, draw_y, 0, 0, .8)
+  end
+end
 
-  WindowDrawImage(WIN, tile, 
-    BORDER_WIDTH - offset_x, 
-    BORDER_WIDTH - offset_y, 
-    1150 + BORDER_WIDTH - offset_x, 
-    750 + BORDER_WIDTH - offset_y, 
-    miniwin.image_copy)--miniwin.image_stretch)
+drawTile = function(window_name, tile_x, tile_y, offset_x, offset_y, debug, color)
+  if (offset_x > CONFIG.WINDOW_WIDTH - consts.GetBorderWidth()) or (offset_x + 1150 < consts.GetBorderWidth()) or
+     (offset_y > CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth()) or (offset_y + 750 < consts.GetBorderWidth()) then
+    return nil
+  end
+
+  local tile = getMapTile(window_name, tile_x % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_y % (2^ZOOM_LEVEL[CURRENT_PLANE]))
+  local flag = (CONFIG.STRETCH and miniwin.image_stretch) or miniwin.image_copy
+
+  if tile == nil then
+    return nil
+  end
+
+  WindowDrawImage(window_name, tile, 
+    offset_x, 
+    offset_y, 
+    offset_x + 1150, 
+    offset_y + 750, 
+    flag)--miniwin.image_copy)--miniwin.image_stretch)
 
   return { 
-    left = BORDER_WIDTH - offset_x, 
-    top = BORDER_WIDTH - offset_y, 
-    right = 1150 + BORDER_WIDTH - offset_x, 
-    bottom = 750 + BORDER_WIDTH - offset_y,
-    color = color
+    left = offset_x, 
+    top = offset_y, 
+    right = offset_x + 1150, 
+    bottom = offset_y + 750,
+    color = color,
+    label = debug
   }
 end
 
-function getMapTile(x, y)
-  table.insert(VISIBLE_TILES, { x = x, y = y })
-  local filename = string.format("x%03dy%03d.png", x, y)
-  local filepath = MM_PATH .. CURRENT_PLANE .. "/" .. ZOOM_LEVEL[CURRENT_PLANE] .. "/" .. filename
+getMapTile = function(window_name, x, y, ox, oy)
+  if not PLANE_DETAILS[CURRENT_PLANE].l then
+    -- no looping planes
+    if (x < ox or (x == 0 and ox ~= 0)) or (y < oy or (y == 0 and oy ~= 0)) then
+      return nil
+    end
+  end
 
-  --Note(filepath)
+  local filename = string.format("x%03dy%03d.png", x, y)
+  local filepath = CONFIG.IMAGES_PATH .. CURRENT_PLANE .. "/" .. ZOOM_LEVEL[CURRENT_PLANE] .. "/" .. filename
 
   if TILE_CACHE[filepath] then
     for i, name in ipairs(CACHE_ORDER) do
@@ -332,7 +431,7 @@ function getMapTile(x, y)
     return TILE_CACHE[filepath]
   end
 
-  local ok = WindowLoadImage(WIN, filepath, filepath)
+  local ok = WindowLoadImage(window_name, filepath, filepath)
   if not ok then return nil end
 
   TILE_CACHE[filepath] = filepath
@@ -364,52 +463,52 @@ function OnWheel(flags, hotspot_id)
     ZOOM_LEVEL[CURRENT_PLANE] = math.min(ZOOM_LEVEL[CURRENT_PLANE] + 1, PLANE_DETAILS[CURRENT_PLANE].z)
   end
 
-  SetVariable("worldmap_zoom", Serialize(ZOOM_LEVEL))
-  SaveState()
-
+  saveMiniWindow()
   drawMiniWindow()
 end
 
-function saveMiniWindow()
-  local sticky_options = { 
-    left = WindowInfo(WIN, 10), top = WindowInfo(WIN, 11), 
-    width = WindowInfo(WIN, 3), height = WindowInfo(WIN, 4), 
-    border = CONFIG.BORDER_COLOR,
-  }
-
-  SetVariable("worldmap_config", Serialize(CONFIG))
-  SetVariable("worldmap_zoom", Serialize(ZOOM_LEVEL))
-  SaveState()
+saveMiniWindow = function()
+  serialization_helper.SaveSerializedVariable("worldmap_config", CONFIG)
+  serialization_helper.SaveSerializedVariable("worldmap_zoom", ZOOM_LEVEL)
 end
 
-function configure()
+configure = function()
   local config = {
     Map = {
-      --FONT = { type = "font", value = CONFIG.FONT.name .. " (" .. CONFIG.FONT.size .. ")", raw_value = CONFIG.FONT },
+      IMAGES_PATH = { sort = -1, label = "Images Path", type = "string", raw_value = CONFIG.IMAGES_PATH },
+      STRETCH = { sort = 0, label = "Stretch Image", type = "bool", raw_value = CONFIG.STRETCH },
       BORDER_COLOR = { sort = 1, type = "color", raw_value = CONFIG.BORDER_COLOR },
       HIDE_WILDS = { sort = 2, label = "Hide When Inside", type = "bool", raw_value = CONFIG.HIDE_WILDS },
       MAX_CACHE_SIZE = { sort = 3, type = "number", raw_value = CONFIG.MAX_CACHE_SIZE, min = 0, max = 200 },
-      AUTOUPDATE = { sort = 4, label = "Auto Update", type = "bool", raw_value = CONFIG.AUTOUPDATE },
+      CIRCLE = { sort = 4, label = "Circular Map", type = "bool", raw_value = CONFIG.CIRCLE },
+      OPACITY = { sort = 5, label = "Map Opacity", type = "number", raw_value = CONFIG.OPACITY, min = 10, max = 100 },
+      FONT = { sort = 6, type = "font", value = CONFIG.FONT.name .. " (" .. CONFIG.FONT.size .. ")", raw_value = CONFIG.FONT },
+      AUTOUPDATE = { sort = 7, label = "Auto Update", type = "bool", raw_value = CONFIG.AUTOUPDATE },
+      DRAW_DEBUG = { sort = 8, label = "Draw Debug", type = "bool", raw_value = CONFIG.DRAW_DEBUG },
     },
     Position = {
       WINDOW_LEFT = { sort = 1, type = "number", raw_value = CONFIG.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
       WINDOW_TOP = { sort = 2, type = "number", raw_value = CONFIG.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
       WINDOW_WIDTH = { sort = 3, type = "number", raw_value = CONFIG.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
       WINDOW_HEIGHT = { sort = 4, type = "number", raw_value = CONFIG.WINDOW_HEIGHT, min = 50, max = GetInfo(280) },
-    }    
+    },
+    Offsets = { }
   }
 
-  for i = 1, PLANE_DETAILS[CURRENT_PLANE].z do
-    config["Offset_" .. i .. "_(" .. CURRENT_PLANE .. ")"] = {
-      X = { sort = 1, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][i].x, min = -1000, max = 1000 },
-      Y = { sort = 2, type = "number", raw_value = CONFIG.OFFSETS[CURRENT_PLANE][i].y, min = -1000, max = 1000 },
-    }
+  for k, v in pairs(PLANE_DETAILS) do
+    config.Offsets[k] = {}
+    for i = 1, PLANE_DETAILS[k].z + 1 do
+      config.Offsets[k]["Zoom_Level_" .. i] = {
+        X = { sort = 1, type = "number", raw_value = CONFIG.OFFSETS[k][i].x, min = -1000, max = 1000 },
+        Y = { sort = 2, type = "number", raw_value = CONFIG.OFFSETS[k][i].y, min = -1000, max = 1000 },
+      }
+    end    
   end
   
-  CONFIG_WINDOW.Show(config, configureDone)
+  config_window.Show(config, configureDone)
 end
 
-function configureDone(group_id, option_id, config)
+configureDone = function(group_id, option_id, config)
   local pattern = "^Offset_(%d)_%(([%w_]+)%)$"
   local zoom_level, plane = group_id:match(pattern)
   if zoom_level and plane then
@@ -420,65 +519,20 @@ function configureDone(group_id, option_id, config)
     end
   else
     CONFIG[option_id] = config.raw_value
-
-    -- if option_id == "WINDOW_WIDTH" then
-    --   CONFIG.WINDOW_HEIGHT = 750 * (CONFIG.WINDOW_WIDTH / 1150)
-    -- end
   end
   
+  if option_id == "CIRCLE" then TILE_CACHE = {} end
+
   saveMiniWindow()
   createWindowAndFont()
   drawMiniWindow()
 end
 
-function getValueOrDefault(value, default)
-  if value == nil then
-    return default
-  end
-
-  return value
-end
-
-function convertToBool(bool_value, def_value)
-  if bool_value == 0 or bool_value == "0" then
-    return false
-  elseif bool_value == 1 or bool_value == "1" then
-    return true
-  end
-
-  return def_value
-end
-
-function Serialize(table)
-  local function serializeValue(value)
-    if type(value) == "table" then
-      return Serialize(value)
-    elseif type(value) == "string" then
-      return string.format("%q", value)
-    else
-      return tostring(value)
-    end
-  end
-
-  local result = "{"
-  for k, v in pairs(table) do
-    local key
-    if type(k) == "string" and k:match("^%a[%w_]*$") then
-      key = k
-    else
-      key = "[" .. serializeValue(k) .. "]"
-    end
-    result = result .. key .. "=" .. serializeValue(v) .. ","
-  end
-  result = result .. "}"
-  return result
-end
-
-function Deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
-  if func then
-    return func()
-  else
-    return nil, "Failed to load string"
-  end
-end
+return {
+  Initialize = initialize,
+  SetCoords = setCoords,
+  SetCrystalCoords = setCrystalCoords,
+  SetDestinationCoords = setDestinationCoords,
+  IsAutoUpdateEnabled = isAutoUpdateEnabled,
+  HideWindow = hideWindow
+}
