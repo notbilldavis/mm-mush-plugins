@@ -605,6 +605,7 @@ end
 function showExpiringAltars()
   show_all = false
   EnableTriggerGroup("get_curios", true)
+  altars = {}
   Send("curio")
 end
 
