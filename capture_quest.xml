@@ -367,7 +367,7 @@ function FinishQuest()
 end
 
 function FinishCrystal()
-  BroadcastPlugin(2, "on")
+  BroadcastPlugin(2, "off")
   quest_window.Clear("crystal")
   quest_window.SetCrystalTime()
 end
@@ -490,11 +490,19 @@ function LocateCrystal(location)
   if crystal == nil then
     Note("The crystal could not be found!")
   else
+    crystal = adjustCrystal(crystal)
     Note("The crystal is located at ".. crystal)
     quest_window.SetCrystalTarget(crystal) 
     BroadcastPlugin(1, crystal)
   end
   EnableTrigger("findcrystal", false)
+end
+
+function adjustCrystal(crystal)
+  local split_crystal = utils.split(crystal, ",")
+  local dest_x, dest_y = tonumber(split_crystal[1]), tonumber(split_crystal[2])
+  if dest_x > 0 then dest_x = dest_x - 1 end
+  return dest_x .. ", " .. dest_y
 end
 
 function GotCrystal()
