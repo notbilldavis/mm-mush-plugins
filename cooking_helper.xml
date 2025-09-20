@@ -158,10 +158,6 @@ Commands:
     <send>EndCooking()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^With care and precision, you practice your craft, creating a powerful work of art: (.*?)\.$" regexp="y" send_to="12" sequence="100" group="cooking_helper">
-    <send>HandleMealCooked("%1")</send>
-  </trigger>
-
   <trigger enabled="n" keep_evaluating="y" match="^When you look inside\, you see\:$" group="cleaning_ingredients" regexp="y" omit_from_output="n" send_to="12" sequence="100">
     <send>startCleanCapture()</send>
   </trigger>
@@ -397,12 +393,14 @@ function showEaten(eaten)
   local total_eaten = 0
   if type(eaten) == "table" then
     for _, consumer in pairs(eaten) do
-      if consumer.name and consumer.name ~= "" then
-        total_eaten = total_eaten + 1
-        local formatted_name = consumer.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)
-        ColourTell("magenta", "black", "  - ")
-        ColourTell("white", "black", formatted_name)
-        ColourNote("yellow", "black", " (" .. consumer.date .. ")")
+      if type(consumer) == "table" then
+        if consumer.name and consumer.name ~= "" then
+          total_eaten = total_eaten + 1
+          local formatted_name = consumer.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)
+          ColourTell("magenta", "black", "  - ")
+          ColourTell("white", "black", formatted_name)
+          ColourNote("yellow", "black", " (" .. consumer.date .. ")")
+        end
       end
     end
   end
@@ -687,6 +685,7 @@ end
 function doFinalCook()
   if cooking then
     SendNoEcho("cook " .. current_recipe.name)
+    SendNoEcho("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
     cooking_amount = cooking_amount - 1
     if cooking_amount ~= 0 then
       GetAll()
@@ -1108,12 +1107,6 @@ function EndCooking()
   if cooking then
     cooking = false
     Note("An ingredient you need to cook " .. current_recipe.name .. " was not found in " .. config.storage_container .. ".")
-  end
-end
-
-function HandleMealCooked(meal)
-  if cooking then
-    Send("put \"" .. Trim(meal) .. "\" " .. config.storage_container)
   end
 end
 
