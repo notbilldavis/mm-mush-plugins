@@ -272,6 +272,8 @@ function populateLocations()
   setLocation("cenotaphy", "beltane", nil, "3916564")
   setLocation("atlantis", "ocean", "18892")
   setLocation("naulitas", "ocean", nil, "4137902")
+  setLocation("cogworkcity", "sug", "17452076")
+  setLocation("renn", "sug", "17150349")
 end
 
 function setLocation(key, continent, north, south, east, west, default_gate, qm, rep)
