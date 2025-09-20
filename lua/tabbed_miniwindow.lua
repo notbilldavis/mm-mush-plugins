@@ -261,6 +261,7 @@ load = function()
   ALL_TABS[1] = serialization_helper.GetValueOrDefault(ALL_TABS[1], default_tab)
   CURRENT_TAB_NAME = ALL_TABS[1]["name"] or ""
 
+  POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + 10 + CONFIG.WINDOW_LINES * 10
   POSITION.WINDOW_WIDTH = serialization_helper.GetValueOrDefault(POSITION.WINDOW_WIDTH, consts.GetClientWidth() - consts.GetOutputRightOutside())
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRightOutside())
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT)
