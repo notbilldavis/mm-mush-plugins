@@ -385,7 +385,7 @@ drawTile = function(window_name, tile_x, tile_y, offset_x, offset_y, debug, colo
     return nil
   end
 
-  local tile = getMapTile(window_name, tile_x % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_y % (2^ZOOM_LEVEL[CURRENT_PLANE]))
+  local tile = getMapTile(window_name, tile_x % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_y % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_x, tile_y, debug == "main")
   local flag = (CONFIG.STRETCH and miniwin.image_stretch) or miniwin.image_copy
 
   if tile == nil then
@@ -409,10 +409,10 @@ drawTile = function(window_name, tile_x, tile_y, offset_x, offset_y, debug, colo
   }
 end
 
-getMapTile = function(window_name, x, y, ox, oy)
-  if not PLANE_DETAILS[CURRENT_PLANE].l then
+getMapTile = function(window_name, x, y, ox, oy, is_main)
+  if not PLANE_DETAILS[CURRENT_PLANE].l and not is_main then
     -- no looping planes
-    if (x < ox or (x == 0 and ox ~= 0)) or (y < oy or (y == 0 and oy ~= 0)) then
+    if (ox == nil or x < ox or (x == 0 and ox ~= 0)) or (oy == nil or y < oy or (y == 0 and oy ~= 0)) then
       return nil
     end
   end
@@ -534,5 +534,6 @@ return {
   SetCrystalCoords = setCrystalCoords,
   SetDestinationCoords = setDestinationCoords,
   IsAutoUpdateEnabled = isAutoUpdateEnabled,
-  HideWindow = hideWindow
+  HideWindow = hideWindow,
+  Configure = configure,
 }
