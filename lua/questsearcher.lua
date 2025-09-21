@@ -350,11 +350,11 @@ locateCrystal = function(location)
       return string.sub(page, coords_start + 1, coords_end - 1)     
     else
       local map_tab = splitByNewLine(location)
-      if #map_tab < 2 then
+      if #map_tab < 1 then
         Note("Ran out attempts: " .. page)
       else
         local map_next = table.concat(map_tab, "\r\n", 2, #map_tab - 1)
-        locateCrystal(map_next)
+        return locateCrystal(map_next)
       end
     end
 
