@@ -68,7 +68,7 @@ findQuestLink = function(quest_number, quest_name)
       if bracket_num and tonumber(bracket_num) == tonumber(quest_number) then
         return "/quest/" .. quest_id, quest_id
       elseif not bracket_num and not fallback_id then
-        fallback_id = "/quest/" .. quest_id
+        fallback_id = quest_id
       end
     end
   end
@@ -90,7 +90,7 @@ fetchHtml = function(path)
   }
 
   if status ~= 200 then
-    Note("Failed to fetch quest page (status: " .. tostring(status) .. ")")
+    Note("Failed to fetch quest page (status: " .. tostring(status) .. ") - " .. url)
     return nil
   end
 
