@@ -29,7 +29,6 @@ require "json"
 
 local https = require("ssl.https")
 local ltn12 = require("ltn12")
-local http = require("socket.http")
 
 local hangman_word = ""
 local possible_guesses = {}
@@ -61,8 +60,8 @@ function solveHangman(wrong_guesses)
   elseif hangman_word == "empt_" then
     Send("hangman y")
   else
-    local baseUrl = "www.hangman-solver.com/.netlify/functions/answers?word=" .. hangman_word .. "&guesses=" .. string.gsub(wrong_guesses, " ", "")
-    local url = "https://" .. baseUrl
+    local url = "https://www.hangman-solver.com/.netlify/functions/answers?word=" .. hangman_word .. "&guesses=" .. string.gsub(wrong_guesses, " ", "")
+
     local response = {}
     local _, status = https.request{
         url = url,
@@ -73,18 +72,7 @@ function solveHangman(wrong_guesses)
       possible_guesses = extractWords(table.concat(response))
       Note("Possible guesses: " .. table.concat(possible_guesses, ", "))
     else
-      url = "http://" .. baseUrl
-      response = {}
-      local _, http_status = http.request{
-          url = url,
-          sink = ltn12.sink.table(response)
-      }
-      if (http_status == 200) then
-        possible_guesses = extractWords(table.concat(response))
-        Note("Possible guesses: " .. table.concat(possible_guesses, ", "))
-      else
-        Note("error accessing solver - code: " .. http_status)
-      end
+      Note("error accessing solver - code: " .. status)
     end
   end
 end
