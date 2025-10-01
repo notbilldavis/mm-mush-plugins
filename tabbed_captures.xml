@@ -366,7 +366,7 @@ function captureAffects(text)
 end
 
 function captureGlobalEcho()
-  local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification").name)
+  local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification").gecho_msg or "")
   if msg ~= nil and msg ~= "" then
 
     local aux = strip_crlfs(msg)
