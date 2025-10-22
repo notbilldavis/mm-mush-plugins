@@ -90,11 +90,11 @@ Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
     <send>startCount()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a gold-leaf binder of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100" group="profession_tracker">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a gold-leaf binder of manuals \(new\)$" regexp="y" omit_from_output="n" send_to="14" sequence="100" group="profession_tracker">
     <send>addBinders("%1")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a silver-bound folio of manuals \(new\)$" regexp="y" omit_from_output="y" send_to="14" sequence="100" group="profession_tracker">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) a silver-bound folio of manuals \(new\)$" regexp="y" omit_from_output="n" send_to="14" sequence="100" group="profession_tracker">
     <send>addFolios("%1")</send>
   </trigger>
 
@@ -166,7 +166,8 @@ needed_manuals = {
   "hydroblast", "bubble cluster", "desperation", "aegis", "camouflage", "concentration", "totem",
   "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
-  "salt invocation", "dust invocation", "ash invocation", "water evocation"
+  "salt invocation", "dust invocation", "ash invocation", "water evocation", "ice evocation",
+  "lightning evocation"
 }
 
 owned_manuals = {}
