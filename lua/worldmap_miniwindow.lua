@@ -138,12 +138,13 @@ loadSavedData = function()
   CONFIG.MAX_CACHE_SIZE = serialization_helper.GetValueOrDefault(CONFIG.MAX_CACHE_SIZE, 16)
   CONFIG.HIDE_WILDS = serialization_helper.GetValueOrDefault(CONFIG.HIDE_WILDS, true)
   CONFIG.OFFSETS = serialization_helper.GetValueOrDefault(CONFIG.OFFSETS, getDefaultOffsets())
-  CONFIG.AUTOUPDATE = serialization_helper.GetValueOrDefault(CONFIG.AUTUPDATE, true)
+  CONFIG.AUTOUPDATE = serialization_helper.GetValueOrDefault(CONFIG.AUTOUPDATE, true)
   CONFIG.CIRCLE = serialization_helper.GetValueOrDefault(CONFIG.CIRCLE, false)
   CONFIG.OPACITY = serialization_helper.GetValueOrDefault(CONFIG.OPACITY, 80)
   CONFIG.STRETCH = serialization_helper.GetValueOrDefault(CONFIG.STRETCH, true)
   CONFIG.DRAW_DEBUG = serialization_helper.GetValueOrDefault(CONFIG.DRAW_DEBUG, false)
   CONFIG.IMAGES_PATH = serialization_helper.GetValueOrDefault(CONFIG.IMAGES_PATH, GetPluginInfo(GetPluginID(), 20):gsub("\\", "/") .. "/WorldMap/")
+  CONFIG.AUTO_ADJUST_SIZE = serialization_helper.GetValueOrDefault(CONFIG.AUTO_ADJUST_SIZE, true)
   
   ZOOM_LEVEL = serialization_helper.GetSerializedVariable("worldmap_zoom")
 
@@ -199,6 +200,16 @@ createWindowAndFont = function()
     flags = 6 
   end
 
+  if CONFIG.AUTO_ADJUST_SIZE then
+    local top = CONFIG.WINDOW_TOP
+    local left = CONFIG.WINDOW_LEFT
+    local right = GetInfo(281)
+    local bottom = GetInfo(280)
+
+    CONFIG.WINDOW_WIDTH = right - left
+    CONFIG.WINDOW_HEIGHT = bottom - top
+  end
+
   WindowCreate(WIN, CONFIG.WINDOW_LEFT, CONFIG.WINDOW_TOP, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0, flags, 11766186)
   
   WindowFont(WIN, INFOFONT, font.name, font.size,
@@ -215,6 +226,19 @@ end
 drawMiniWindow = function()
   if CONFIG ~= nil and COORD_X ~= nil and COORD_Y ~= nil then
     WindowShow(WIN, false)
+
+    if CONFIG.AUTO_ADJUST_SIZE then
+      local top = CONFIG.WINDOW_TOP
+      local left = CONFIG.WINDOW_LEFT
+      local right = GetInfo(281)
+      local bottom = GetInfo(280)
+
+      if CONFIG.WINDOW_WIDTH ~= right - left or CONFIG.WINDOW_HEIGHT ~= bottom - top then
+        CONFIG.WINDOW_WIDTH = right - left
+        CONFIG.WINDOW_HEIGHT = bottom - top
+        WindowResize(WIN, right - left, bottom - top, 0)
+      end
+    end
 
     WindowRectOp(WIN, miniwin.rect_fill, 0, 0, 0, 0, ColourNameToRGB("black"))
 
@@ -487,6 +511,7 @@ configure = function()
       DRAW_DEBUG = { sort = 8, label = "Draw Debug", type = "bool", raw_value = CONFIG.DRAW_DEBUG },
     },
     Position = {
+      AUTO_ADJUST_SIZE = { sort = 0, label = "Fit Screen", type = "bool", raw_value = CONFIG.AUTO_ADJUST_SIZE },
       WINDOW_LEFT = { sort = 1, type = "number", raw_value = CONFIG.WINDOW_LEFT, min = 0, max = GetInfo(281) - 50 },
       WINDOW_TOP = { sort = 2, type = "number", raw_value = CONFIG.WINDOW_TOP, min = 0, max = GetInfo(280) - 50 },
       WINDOW_WIDTH = { sort = 3, type = "number", raw_value = CONFIG.WINDOW_WIDTH, min = 50, max = GetInfo(281) },
