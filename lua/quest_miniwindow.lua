@@ -78,6 +78,8 @@ load = function()
   CONFIG.AUTO_LOOKUP = serialization_helper.GetValueOrDefault(CONFIG.AUTO_LOOKUP, true)
   CONFIG.LOOKUP_CRYSTAL = serialization_helper.GetValueOrDefault(CONFIG.LOOKUP_CRYSTAL, true)
 
+  PURSUER_TARGET = serialization_helper.GetValueOrDefault(CONFIG.PURSUER_TARGET, nil)
+
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRight() - CONFIG.BUTTON_WIDTH - 10)
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottom() - CONFIG.BUTTON_HEIGHT - 10)
   POSITION.Z_POSITION = serialization_helper.GetValueOrDefault(POSITION.Z_POSITION, 1000)
@@ -507,9 +509,11 @@ end
 setPursuerTarget = function(target)
   if CONFIG.TRACK_PURSUER then
     PURSUER_TARGET = target
+    CONFIG.PURSUER_TARGET = target
     COLLECTED_PART = nil
     if PURSUER_TARGET ~= nil then EXPANDED = true end
     draw()
+    save()
   end
 end
 
@@ -524,6 +528,7 @@ end
 
 checkBodyPartDrop = function(part, victim)
   if PURSUER_TARGET ~= nil and PURSUER_TARGET:lower():find(Trim(victim:lower())) ~= nil then
+    part = part:match("^[^%-]+") or part
     Send("get '" .. part .. "'")
     COLLECTED_PART = part
     BroadcastPlugin(3, "off")
@@ -609,6 +614,8 @@ clear = function(what)
     FORMATTED_LINES = {}
   elseif what == "pursuer" then
     PURSUER_TARGET = nil
+    CONFIG.PURSUER_TARGET = nil
+    save()
   elseif what == "crystal" then
     CRYSTAL_TARGET = nil
     HAS_CRYSTAL = false

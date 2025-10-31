@@ -137,6 +137,10 @@
     <send>ShowPursuerOptions()</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" match="^\* You are tasked with bringing back a limb from (.*?) from the area (.*?) for the orc pursuer\. $" regexp="y" send_to="12" sequence="100" group="capture_quest">
+    <send>SetPursuerTarget("%1 (%2)")</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" multi_line="y" lines_to_match="23" regexp="y" send_to="12" sequence="100" group="capture_quest"
     match="It looks like this map depicts(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n">
     <send>LocateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
