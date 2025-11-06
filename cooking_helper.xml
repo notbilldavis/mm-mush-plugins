@@ -99,6 +99,10 @@ Commands:
     <send>OnFirstPrompt()</send>
   </trigger>
 
+  <trigger enabled="y" name="other_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="cooking_helper">
+    <send>OnAnyPrompt()</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="cooking_helper" match="^(.*?) hungrily gobbles (.*?) down\.$">
     <send>AddNpcTracking("%1", "%2")</send>
   </trigger>
@@ -116,6 +120,10 @@ Commands:
   </trigger>
 
   <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^cooking recipe that you do not already have the mark for\.  $">
+    <send>EndRecipeCapture()</send>
+  </trigger>
+
+  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^You have (.*?) experience for the mark of (.*?)\.$">
     <send>EndRecipeCapture()</send>
   </trigger>
 
@@ -168,6 +176,10 @@ Commands:
 
   <trigger enabled="n" keep_evaluating="y" match="^(.*?)$" group="cleaning_ingredients" regexp="y" omit_from_output="y" send_to="14" sequence="100">
     <send>cleanCapture("%0")</send>
+  </trigger>
+
+  <trigger group="quick_cooking" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?)$">
+    <send>CheckIfIngredient("%1")</send>
   </trigger>
 </triggers>
 
@@ -224,6 +236,8 @@ local clean_started = false
 local clean_captured = {}
 local automation_temp_off = false
 local triggered_while_off = false
+local checking_ingredients = false
+local quick_cooking_count = { }
 
 local db = nil
 
@@ -314,6 +328,11 @@ end
 function OnFirstPrompt()
   EnableTrigger("first_prompt", false)
   Execute("sendgmcp char.base")
+end
+
+function OnAnyPrompt()
+  EnableTriggerGroup("quick_cooking", false)
+
 end
 
 function SetCharacterName(name)
@@ -645,11 +664,9 @@ function SearchCurrentRecipe()
   search_found = { }
   if not cooking then
     Note("Searching for ingredients to cook " .. current_recipe.name .. ", please wait...")
-  end
-
-  EnableTriggerGroup("search_recipe", true)
-  for _, i in ipairs(current_recipe.ingredients) do
-    SendNoEcho("inventory search \"" .. i .. "\"")
+  else
+    EnableTriggerGroup("quick_cooking", true)
+    StartQuickCookingSearch()
   end
 end
 
@@ -662,19 +679,13 @@ function GetAll(container)
   if container == nil or container == "" then
     container = Trim(config.storage_container)
   end
-
-  if not cooking then
-    Note("Getting all ingredients for " .. current_recipe.name .. " from " .. container .. "...")
-  end
-
+  
+  Note("Getting all ingredients for " .. current_recipe.name .. " from " .. container .. "...")
+  
   local wait_time = .5
   for _, i in ipairs(current_recipe.ingredients) do
     DoAfterSpecial(wait_time, "getIngredient(\"" .. i .. "\", \"" .. container .. "\")", sendto.script)
     wait_time = wait_time + .5
-  end
-
-  if cooking then
-    DoAfterSpecial(wait_time, "doFinalCook()", sendto.script)
   end
 end
 
@@ -686,16 +697,6 @@ function doFinalCook()
   if cooking then
     SendNoEcho("cook " .. current_recipe.name)
     SendNoEcho("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
-    cooking_amount = cooking_amount - 1
-    if cooking_amount ~= 0 then
-      GetAll()
-    else
-      if cooking_infinite then
-        SearchCurrentRecipe()
-      else
-        cooking = false
-      end
-    end
   end
 end
 
@@ -824,7 +825,65 @@ function endCleanCapture()
   end  
 end
 
+function StartQuickCookingSearch()
+  quick_cooking_ingredients = {}
+  checking_ingredients = true
+  EnableTriggerGroup("quick_cooking", true)
+  SendNoEcho("look '" .. config.storage_container .. "'")
+  DoAfterSpecial(.2, "EndQuickCookingSearch()", sendto.script)
+end
 
+function EndQuickCookingSearch()
+  checking_ingredients = false
+  EnableTriggerGroup("quick_cooking", false)
+  local cooking_total = 0
+  for _, i in ipairs(current_recipe.ingredients) do
+    local ing = Trim(i:lower())
+    if quick_cooking_ingredients[ing] then
+      local available = quick_cooking_ingredients[ing]
+      if cooking_total == 0 or available < cooking_total then
+        cooking_total = available
+      end
+    else
+      cooking_total = -1
+      Note("You need " .. ing .. " in order to cook " .. current_recipe.name .. ".")
+    end
+  end
+
+  if cooking_total > 0 then
+    if (cooking_infinite) or (cooking_total < cooking_amount) then
+      cooking_amount = cooking_total
+      if cooking_infinite then
+        cooking_infinite = false
+      end
+    end
+
+    ColourNote("white", "black", "Cooking " .. current_recipe.name .. " " .. cooking_amount .. " times. (" .. cooking_total .. " possible with your current ingredients)")
+    
+    local wait_time = .3
+    for t = 1, cooking_amount do
+      for _, i in ipairs(current_recipe.ingredients) do
+        DoAfterSpecial(wait_time, "getIngredient(\"" .. i .. "\", \"" .. config.storage_container .. "\")", sendto.script)
+        wait_time = wait_time + .3
+      end
+      DoAfterSpecial(wait_time, "doFinalCook()", sendto.script)
+    end
+
+    DoAfterSpecial(wait_time + .3, "endCook()", sendto.script)
+  end
+end
+
+function CheckIfIngredient(line)
+  if checking_ingredients then
+    local cnt, ing, fresh = line:match("^%s*%(?(%d*)%)?%s*([^%(%)]+)%s*%(?([^%)]*)%)?%s*$")
+    if not ing then return end
+    cnt = tonumber(cnt) or 1
+    ing = Trim(ing:lower())
+    quick_cooking_ingredients[ing] = cnt
+  else
+    EnableTriggerGroup("quick_cooking", false)
+  end
+end
 
 function CookRecipe(times)
   if current_recipe == nil or current_recipe.name == nil or #current_recipe.name == 0 then
@@ -836,19 +895,20 @@ function CookRecipe(times)
 
   if cooking_amount <= 0 then 
     cooking_infinite = true 
-    cooking_amount = 10
   else
     cooking_infinite = false
   end
 
   cooking = true
-  Tell("Cooking " .. current_recipe.name .. " ")
-  if not cooking_infinite and cooking_amount > 0 then
-    Note(cooking_amount .. " time(s). Please wait...")
-  else
-    Note("as many times as possible. Please wait...")
-  end
+  
   SearchCurrentRecipe()
+end
+
+function endCook()
+  cooking = false
+  cooking_amount = 0
+  cooking_infinite = false
+  Note("Cooking process complete.")
 end
 
 --------------
