@@ -178,8 +178,48 @@ Commands:
     <send>cleanCapture("%0")</send>
   </trigger>
 
-  <trigger group="quick_cooking" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?)$">
+  <trigger enabled="n" group="quick_cooking" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?)$">
     <send>CheckIfIngredient("%1")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^\[Trainer\] Friedburg is showing his sneaky ways to future thieves here\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Friedburg")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^\[Shop\] Flam the dracon bartender is here\, sharpening his claws\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Flam")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^\[Shop\] Finn the bartender leans against the bar awaiting your order\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Finn")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^\[Shop\] A one\-horned minotaur tends the bar with a smile\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Bovel, the barkeep")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^\[Shop\] A wild\-eyed troll dodges fists while tending to his rowdy clientele\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Urkfet, the bartender")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="\[Shop\] Wiping the already clean bar\, Faltel chats with his customers\." regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Faltel")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="\[Shop\] Shady stands behind the bar looking around with trepidation\." regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Shady")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="\[Shop\] Grundel stands here telling stories and serving drinks\." regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Grundel")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="\[Shop\] The bartender\, Miller\, leans gently on the counter\." regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Miller the bartender")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="\[Shop\] A fat\, jovial bartender stands behind the bar\." regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Grundy the Bartender")</send>
   </trigger>
 </triggers>
 
@@ -298,6 +338,7 @@ function PluginStart()
   end
   EnableTrigger("first_prompt", true)
   EnableTriggerGroup("cooking_open_pouch", false)
+  EnableTriggerGroup("quick_cooking", false)
   character_name = nil
   for _, npc in ipairs(npcs) do
     npc_names[npc.name:lower()] = true
@@ -505,6 +546,28 @@ function CleanRecipe(args)
   else
     serialization_helper.SaveSerializedVariable(character_name .. "_cooking recipes", tracked_recipes)
   end
+end
+
+function CheckNpcProgress(npc_name)
+  if npc_names[npc_name:lower()] then
+    for _, recipe in pairs(tracked_recipes) do
+      if not recipe.eaten[npc_name:upper()] then
+        ColourTell("yellow", "black", npc_name .. " has not yet eaten your " .. recipe.name .. "! [")
+        Hyperlink("!!" .. GetPluginID() .. ":TryFeedNpc(" .. recipe.name .. "," .. npc_name .. ")", "FEED", "try to feed " .. Trim(recipe.name) .. " to " .. npc_name, "white", "black", false)
+        ColourNote("yellow", "black", "]")
+      end
+    end
+  end
+end
+
+function TryFeedNpc(feed)
+  local recipe_name, npc_name = feed:match("^(.-),(.+)$")
+  if not recipe_name or not npc_name then
+    Note("Invalid feed command.")
+    return
+  end
+  Execute("get '" .. recipe_name .. "' " .. config.storage_container)
+  Execute("give '" .. recipe_name .. "' '" .. npc_name .. "'")
 end
 
 function ShowNpcs(filter)
@@ -858,7 +921,11 @@ function EndQuickCookingSearch()
       end
     end
 
-    ColourNote("white", "black", "Cooking " .. current_recipe.name .. " " .. cooking_amount .. " times. (" .. cooking_total .. " possible with your current ingredients)")
+    if cooking_amount < cooking_total then
+      ColourNote("white", "black", "Cooking " .. current_recipe.name .. " " .. cooking_amount .. " times. (" .. cooking_total .. " possible with your current ingredients)")
+    else
+      ColourNote("white", "black", "Cooking " .. current_recipe.name .. " " .. cooking_amount .. " times.")
+    end
     
     local wait_time = .3
     for t = 1, cooking_amount do
@@ -875,7 +942,7 @@ end
 
 function CheckIfIngredient(line)
   if checking_ingredients then
-    local cnt, ing, fresh = line:match("^%s*%(?(%d*)%)?%s*([^%(%)]+)%s*%(?([^%)]*)%)?%s*$")
+    local cnt, ing, fresh = line:match("^%s*%(?%s*(%d*)%s*%)?%s*([^%(%)]+)%s*%(?([^%)]*)%)?%s*$")
     if not ing then return end
     cnt = tonumber(cnt) or 1
     ing = Trim(ing:lower())
