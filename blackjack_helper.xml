@@ -71,6 +71,10 @@
     <send>help()</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) blackjack dealer gives you (.*?) gold coins\.$" regexp="y" send_to="12" sequence="100">
+    <send>track("%2")</send>
+  </trigger>
+
   <trigger enabled="y" name="bj_auto_disable" keep_evaluating="y" match="^You do not have an item called \'voucher\'\.$" regexp="y" send_to="12" sequence="100">
     <send>setDisabled()</send>
   </trigger>
@@ -87,6 +91,7 @@ local current_total = 0
 local dealer_card = 0
 local is_soft = false
 local first_move = true
+local profit = 0
 
 function OnPluginInstall()
   Note("-- " .. GetPluginInfo(GetPluginID(), 1) .. ": installed --")
@@ -107,6 +112,7 @@ end
 function setEnabled()
   is_enabled = true
   EnableTrigger("bj_auto_disable", true)
+  profit = 0
   Note("Blackjack helper is now ENABLED!")
 end
 
@@ -114,6 +120,11 @@ function setDisabled()
   is_enabled = false
   Note("Blackjack helper is now disabled.")
   EnableTrigger("bj_auto_disable", false)
+  if profit > 0 then
+    Tell("You made ")
+    ColourTell("yellow", "black", tostring(profit):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
+    Note(" gold!")
+  end
 end
 
 function help()
@@ -229,6 +240,15 @@ function getPlayerValue(total_str)
     end
 
     return total, is_soft
+end
+
+function track(gold)
+  gold = Trim(gold or "")
+  if trim == "" or not is_enabled then return end
+
+  local gold_parsed = gold:gsub(",", "")
+  local gold_num = tonumber(gold_parsed)
+  profit = profit + gold_num
 end
 
 ]]>
