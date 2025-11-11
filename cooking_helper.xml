@@ -131,6 +131,10 @@ Commands:
     <send>EndRecipeCapture()</send>
   </trigger>
 
+  <trigger group="get_recipe" keep_evaluating="y" regexp="y" send_to="12" sequence="100" multi_line="y" lines_to_match="2" match="\+\+\+ a recipe book will\, when USEd \<culinary mark you possess\>\, display the\nrecipe associated with that mark(.*?)\Z">
+    <send>EndRecipeCapture()</send>
+  </trigger>
+
   <trigger group="search_recipe" keep_evaluating="n" regexp="y" send_to="14" omit_from_output="y" sequence="100" match="^(.*?) found in(.*?)$">
     <send>SearchFoundIngredient("%1", "%2")</send>
   </trigger>
@@ -418,6 +422,11 @@ function SetCharacterName(name)
     config.tracked_ingredients = serialization_helper.GetValueOrDefault(config.tracked_ingredients, {})
     config.automate_pouch = serialization_helper.GetValueOrDefault(config.automate_pouch, false)
     config.autoupdate = serialization_helper.GetValueOrDefault(config.autoupdate, true)
+    config.enableonstart = serialization_helper.GetValueOrDefault(config.enableonstart, true)
+
+    if config.enableonstart then
+      config.automate_pouch = true
+    end
     
     DoAfterSpecial(1, "notifyPouchStatus()", sendto.script)
   end
@@ -665,7 +674,8 @@ function Configure(args)
         storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
         tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
         automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
-        autoupdate = { sort = 4, type = "bool", label = "Auto-Update on Close", raw_value = true },
+        enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = true },
+        autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = true },
       }
     }
 
@@ -739,7 +749,8 @@ function configureDone(group_id, option_id, config_changed)
       storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
       tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
       automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
-      autoupdate = { sort = 4, type = "bool", label = "Auto-Update on Close", raw_value = true },
+      enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = true },
+      autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = true },
     }
   }
 
