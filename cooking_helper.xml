@@ -150,19 +150,19 @@ Commands:
     <send>DisplayPouchStatus(TriggerStyleRuns, "%0")</send>
   </trigger>
 
-  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^Your a pouch of plenitude glows white as it accumulates possessions from the ether\.$" regexp="y" send_to="12" sequence="100">
-    <send>LootPouch()</send>
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^Your (.*?) glows white as it accumulates possessions from the ether\.$" regexp="y" send_to="12" sequence="100">
+    <send>LootPouch("%1")</send>
   </trigger>
 
-  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You open a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
-    <send>StartPouchAutomation()</send>
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You open (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>StartPouchAutomation("%1")</send>
   </trigger>
 
-  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You close a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
-    <send>StopPouchAutomation()</send>
+  <trigger enabled="y" group="cooking_pouch" keep_evaluating="y" match="^You close (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>StopPouchAutomation("%1")</send>
   </trigger>
 
-  <trigger group="cooking_open_pouch" keep_evaluating="y" match="^You take (\d+ of )?(.*?) from a pouch of plenitude\.$" regexp="y" send_to="12" sequence="100">
+  <trigger group="cooking_open_pouch" keep_evaluating="y" match="^You take (\d+ of )?(.*?) from (.*?)\.$" regexp="y" send_to="12" sequence="100">
     <send>HandlePouchIngredient("%2")</send>
   </trigger>
 
@@ -423,6 +423,7 @@ function SetCharacterName(name)
     config.automate_pouch = serialization_helper.GetValueOrDefault(config.automate_pouch, false)
     config.autoupdate = serialization_helper.GetValueOrDefault(config.autoupdate, true)
     config.enableonstart = serialization_helper.GetValueOrDefault(config.enableonstart, true)
+    config.pouchname = serialization_helper.GetValueOrDefault(config.pouchname, "a pouch of plenitude")
 
     if config.enableonstart then
       config.automate_pouch = true
@@ -671,6 +672,7 @@ function Configure(args)
 
     local config_options = {
       Options = {
+        pouchname = { sort = 0, type = "text", label = "Pouch Name", value = config.pouchname, raw_value = config.pouchname },
         storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
         tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
         automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
@@ -689,6 +691,11 @@ function Configure(args)
         value = utils.inputbox("Container", "Enter the name of the container you store your ingredients in:", config.storage_container) 
       end
       if value ~= nil then configureDone("Options", "storage_container", { label = "Container", raw_value = value }) end
+    elseif option == "pouchname" then
+      if Trim(value) == "" then 
+        value = utils.inputbox("Pouch Name", "Enter the name of your pouch of plenitude:", config.pouchname) 
+      end
+      if value ~= nil then configureDone("Options", "pouchname", { label = "Pouch Name", raw_value = value }) end
     elseif option == "ingredients" then
       if Trim(value) == "" then 
         value = utils.inputbox("Track Ingredients", "Enter a comma-separated list of ingredients to save when automating the pouch of plenitude:", table.concat(config.tracked_ingredients, ", ")) 
@@ -708,6 +715,13 @@ function Configure(args)
         value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
       end
       if value ~= nil then configureDone("Options", "autoupdate", { label = "Auto-Update on Close", raw_value = value }) end
+    elseif option == "enableonstart" then
+      if Trim(value) == "" then
+        value = not config.enableonstart
+      else
+        value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
+      end
+      if value ~= nil then configureDone("Options", "enableonstart", { label = "Enable on Start", raw_value = value }) end
     else
       Note("Unknown configuration option: " .. option)
       Note("Available options: container, ingredients, automate, autoupdate")
@@ -746,6 +760,7 @@ function configureDone(group_id, option_id, config_changed)
 
   local config_options = {
     Options = {
+      pouchname = { sort = 0, type = "text", label = "Pouch Name", value = config.pouchname, raw_value = config.pouchname },
       storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
       tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
       automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
@@ -1214,8 +1229,10 @@ function DisplayPouchStatus(trigger_style_runs, line)
   ColourNote(fgcol, bgcol, "]")
 end
 
-function LootPouch()
-  if config.automate_pouch then
+function LootPouch(obj)
+  obj = Trim(obj or ""):lower()
+  local pouchname = Trim(config.pouchname or "a pouch of plenitude"):lower()
+  if obj == pouchname and config.automate_pouch then
     if automation_temp_off then
       triggered_while_off = true
     else
@@ -1279,15 +1296,23 @@ function EndCooking()
   end
 end
 
-function StartPouchAutomation()
-  EnableTriggerGroup("cooking_open_pouch", true)
+function StartPouchAutomation(obj)
+  obj = Trim(obj or ""):lower()
+  local pouchname = Trim(config.pouchname or "a pouch of plenitude"):lower()
+  if obj == pouchname then
+    EnableTriggerGroup("cooking_open_pouch", true)
+  end
 end
 
-function StopPouchAutomation()
-  EnableTriggerGroup("cooking_open_pouch", false)
-  if pulled_food then
-    SendNoEcho("drop all.food")
-    pulled_food = false
+function StopPouchAutomation(obj)
+  obj = Trim(obj or ""):lower()
+  local pouchname = Trim(config.pouchname or "a pouch of plenitude"):lower()
+  if obj == pouchname then
+    EnableTriggerGroup("cooking_open_pouch", false)
+    if pulled_food then
+      SendNoEcho("drop all.food")
+      pulled_food = false
+    end
   end
 end
 
