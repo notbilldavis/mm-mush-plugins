@@ -1035,7 +1035,9 @@ function RemoveLastNpc(npc)
       local eaten = tracked_recipes[last_npc_food:upper()].eaten
       if eaten[Trim(npc:upper())] then
         eaten[Trim(npc:upper())] = nil
-        Note("Consumer '" .. npc .. "' has been removed from the '" .. last_npc_food .. "' list of consumers.")
+        Tell("Consumer '" .. npc .. "' has been removed from the '" .. last_npc_food .. "' list of consumers. [")
+        Hyperlink("!!" .. GetPluginID() .. ":TryFeedNpc(" .. last_npc_food .. "," .. npc .. ")", "try again", "try to feed " .. Trim(last_npc_food) .. " to " .. npc, "white", "black", false)
+        Note("]")
       end
       break
     end
