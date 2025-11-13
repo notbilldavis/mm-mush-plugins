@@ -620,7 +620,7 @@ clear = function(what)
     FORMATTED_LINES = {}
   elseif what == "pursuer" then
     if PURSUER_TARGET ~= nil then
-      CallPlugin("697bd90f4f6ee5ac1493050c", "del_highlight", PURSUER_TARGET)
+      CallPlugin("697bd90f4f6ee5ac1493050c", "del_highlight", PURSUER_TARGET:gsub("%s?%(.-%)", ""))
     end
     PURSUER_TARGET = nil
     CONFIG.PURSUER_TARGET = nil
