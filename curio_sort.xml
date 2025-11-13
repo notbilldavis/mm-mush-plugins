@@ -47,7 +47,7 @@ The location links will "run" or "mapper goto" where appropriate.
   </alias>
 
   <alias match="^curio[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
-    <send>setOffset("%1")</send>
+    <send>setOffset("%1", false)</send>
   </alias>
 
   <alias match="^curio[ ]+ignore[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
@@ -87,6 +87,14 @@ The location links will "run" or "mapper goto" where appropriate.
   <trigger enabled="y" name="first_prompt" keep_evaluating="y" match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)) $" regexp="y" send_to="12" sequence="100" group="curio_sort">
     <send>OnFirstPrompt()</send>
   </trigger>
+
+  <trigger enabled="y" name="capture_time_offset" match="^The current system time is\: (.*?)\.$" regexp="y" send_to="12" sequence="100">
+    <send>SetOffset("%1", true)</send>
+  </trigger>
+
+  <trigger enabled="y" match="^\s*(A|An) (.+?) altar (.*)\.$" regexp="y" send_to="12" sequence="100">
+    <send>displayAltarInfo("%2")</send>
+  </trigger>
 </triggers>
 
 <script>
@@ -116,6 +124,7 @@ require "gmcphelper"
 
 local saved_data = nil
 local altars = {}
+local altars_set = {}
 local longest = {}
 local hour_offset = nil
 local show_all = true
@@ -235,6 +244,11 @@ function tryGetOffset()
   end    
 end
 
+function SetOffset(time_str, convert)
+  EnableTrigger("capture_time_offset", false)
+  hour_offset = serialization_helper.SetOffset(time_str, convert)
+end
+
 function SetCharacterName(name)
   if name == nil or name == "" then
     Note("Unknown character name, set with 'curio setchar <name>'") 
@@ -265,13 +279,6 @@ function saveData()
   end
 end
 
-function setOffset(offset)
-  Note("Changing hour offset from " .. (hour_offset or "unset") .. " to " .. (offset or "unset") .. ".")
-  hour_offset = tonumber(offset)
-  SetVariable("hour_offset", hour_offset)
-  SaveState()  
-end
-
 function beginCurioSort(args)
   if saved_data == nil then
     Note("The plugin 'curio_sort' is not ready, try again in a few seconds.")
@@ -288,6 +295,7 @@ function beginCurioSort(args)
 
   EnableTriggerGroup("get_curios", true)
   altars = {}
+  altars_set = {}
   Send("curio")
 end
 
@@ -347,6 +355,7 @@ function addToAltar(name, affect, expiration)
     calculateLongest(altar_name, affect, parsed_expiration)
 
     table.insert(altars, { name = altar_name, affect = affect, expiration = parsed_expiration })
+    altars_set[altar_name] = { affect = affect, expiration = parsed_expiration }
   end
 end
 
@@ -861,6 +870,34 @@ function displayFooter(total, ignored, expiring, expired)
   Tell(".")
   Tell(string.rep("-", total_width))
   Note(".")
+end
+
+function displayAltarInfo(altar)
+  altar = altar .. " Altar"
+  local proper_name = altar:gsub("%w+", function(word)
+    return word:sub(1, 1):upper() .. word:sub(2):lower()
+  end)
+
+  if altars ~= nil and altars_set[proper_name] ~= nil then
+    local altar = altars_set[proper_name]
+    local color, timer_string = getTimerColorAndString(altar.expiration, "show")
+    local affect = Trim(altar.affect or "- not active")
+    if (affect == "" or affect == "- not active") and saved_data.affects[proper_name] ~= nil then
+      affect = Trim(saved_data.affects[proper_name] or "- not active")
+    end
+
+    if color == "red" then
+      if affect == "- not active" then
+        ColourNote("red", "black", "This altar isn't active, you should buy an option.")
+      else
+        ColourNote("red", "black", "This altar isn't active, you previously bought " .. affect .. ".")
+      end
+    else
+      ColourNote(color, "black", "This altar providing " .. affect .. " will expire in " .. timer_string)
+    end
+  else
+    Note("Couldn't find: " .. proper_name)
+  end
 end
 
 function centerString(str, total_length)
