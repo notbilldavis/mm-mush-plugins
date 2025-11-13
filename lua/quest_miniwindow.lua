@@ -5,7 +5,7 @@ local const_installed, consts = pcall(require, "consthelper")
 local initialize, clear, close, save, getConfiguration, onConfigureDone, setQuestInfo, addLine, 
   setPursuerTarget, setCrystalTarget, checkBodyPartDrop, showTimes, setQuestTime, setPursuerTime,
   setCrystalTime, showPursuerOptions, isSilentRefreshEnabled, isAutoUpdateEnabled, getQuestTime,
-  isAutoLookupEnabled, getPursuerTime, isLookupCrystalEnabled, setHasCrystal
+  isAutoLookupEnabled, getPursuerTime, isLookupCrystalEnabled, setHasCrystal, showCrystalOptions
 local load, create, draw, setSizeAndPositionToContent, drawToggleButton, drawQuestWindows, drawQuestText,
   drawCollapseText, adjustAnchor, doTimeString, getTimerColorAndString, getExpandPhasesText
 
@@ -79,6 +79,9 @@ load = function()
   CONFIG.LOOKUP_CRYSTAL = serialization_helper.GetValueOrDefault(CONFIG.LOOKUP_CRYSTAL, true)
 
   PURSUER_TARGET = serialization_helper.GetValueOrDefault(CONFIG.PURSUER_TARGET, nil)
+  if PURSUER_TARGET ~= nil and PURSUER_TARGET ~= "" then
+    CallPlugin("697bd90f4f6ee5ac1493050c", "add_highlight", PURSUER_TARGET:gsub("%s?%(.-%)", ""))
+  end
 
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRight() - CONFIG.BUTTON_WIDTH - 10)
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputBottom() - CONFIG.BUTTON_HEIGHT - 10)
@@ -511,7 +514,10 @@ setPursuerTarget = function(target)
     PURSUER_TARGET = target
     CONFIG.PURSUER_TARGET = target
     COLLECTED_PART = nil
-    if PURSUER_TARGET ~= nil then EXPANDED = true end
+    if PURSUER_TARGET ~= nil then 
+      EXPANDED = true 
+      CallPlugin("697bd90f4f6ee5ac1493050c", "add_highlight", target:gsub("%s?%(.-%)", ""))
+    end
     draw()
     save()
   end
@@ -613,6 +619,9 @@ clear = function(what)
     TEXT_BUFFER = {}
     FORMATTED_LINES = {}
   elseif what == "pursuer" then
+    if PURSUER_TARGET ~= nil then
+      CallPlugin("697bd90f4f6ee5ac1493050c", "del_highlight", PURSUER_TARGET)
+    end
     PURSUER_TARGET = nil
     CONFIG.PURSUER_TARGET = nil
     save()
@@ -670,8 +679,12 @@ setPursuerTime = function()
   save()
 end
 
-setCrystalTime = function()
-  CONFIG.TIMES.CRYSTAL_TIME = os.time() + 60 * 120
+setCrystalTime = function(server_time)
+  if server_time ~= nil then
+    CONFIG.TIMES.CRYSTAL_TIME = server_time
+  else
+    CONFIG.TIMES.CRYSTAL_TIME = os.time() + 60 * 120
+  end
   save()
 end
 
@@ -695,6 +708,23 @@ end
 function getPursuerTarget()
   Send("sayto orc yes")
   Send("nod orc")
+end
+
+showCrystalOptions = function()
+  if Trim(CRYSTAL_TARGET or "") ~= "" then
+    if HAS_CRYSTAL then
+      Send("give tadamir tadamir")
+    else
+      Note("You are still looking for a crystal at " .. CRYSTAL_TARGET)
+    end
+  else
+    local color, timer_string = getTimerColorAndString(CONFIG.TIMES.CRYSTAL_TIME)
+    Tell("You can ")
+    Hyperlink("shop buy 1", "[get a map]", "", "silver", "black", false)
+    Tell(" from Tadamir")
+    ColourTell(color, "black", timer_string)
+    Note(".")
+  end
 end
 
 doTimeString = function(time, text)
@@ -750,6 +780,7 @@ end
 
 setHasCrystal = function(has)
   HAS_CRYSTAL = has
+  draw()
 end
 
 getConfiguration = function()
@@ -905,5 +936,6 @@ return {
   GetPursuerTime = getPursuerTime,
   IsAutoLookupEnabled = isAutoLookupEnabled,
   IsLookupCrystalEnabled = isLookupCrystalEnabled,
-  SetHasCrystal = setHasCrystal
+  SetHasCrystal = setHasCrystal,
+  ShowCrystalOptions = showCrystalOptions
 }

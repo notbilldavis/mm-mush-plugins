@@ -137,6 +137,10 @@
     <send>ShowPursuerOptions()</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" match="^(.*?)The head of the Crystal Guild stands behind the counter\, carefully studying his newest treasure\.$" group="capture_quest">
+  <send>ShowCrystalOptions()</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" match="^\* You are tasked with bringing back a limb from (.*?) from the area (.*?) for the orc pursuer\. $" regexp="y" send_to="12" sequence="100" group="capture_quest">
     <send>SetPursuerTarget("%1 (%2)")</send>
   </trigger>
@@ -144,6 +148,10 @@
   <trigger enabled="y" keep_evaluating="y" multi_line="y" lines_to_match="23" regexp="y" send_to="12" sequence="100" group="capture_quest"
     match="It looks like this map depicts(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n(.*?)\n">
     <send>LocateCrystal("%2\\r\\n%3\\r\\n%4\\r\\n%5\\r\\n%6\\r\\n%7\\r\\n%8\\r\\n%9\\r\\n%&lt;10&gt;\\r\\n%&lt;11&gt;\\r\\n%&lt;12&gt;\\r\\n%&lt;13&gt;\\r\\n%&lt;14&gt;\\r\\n%&lt;15&gt;\\r\\n%&lt;16&gt;\\r\\n%&lt;17&gt;\\r\\n%&lt;18&gt;\\r\\n%&lt;19&gt;\\r\\n%&lt;20&gt;\\r\\n%&lt;21&gt;\\r\\n%&lt;22&gt;")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" match="^The map includes the coordinates of the displayed area\: (.*?), (.*?)\.$" regexp="y" sequence="100" send_to="12" group="capture_quest">
+    <send>SetCrystalTarget("%1, %2")</send>
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" match="^You take a (blood|small) crystal\.$" regexp="y" sequence="100" send_to="12" group="capture_quest">
@@ -484,6 +492,10 @@ function ShowPursuerOptions()
   quest_window.ShowPursuerOptions()
 end
 
+function ShowCrystalOptions()
+  quest_window.ShowCrystalOptions()
+end
+
 function LocateCrystal(location)
   if not quest_window.IsLookupCrystalEnabled() then
     Note("Crystal lookup is disabled in the configuration, skipping crystal location lookup.")
@@ -499,7 +511,11 @@ function LocateCrystal(location)
     quest_window.SetCrystalTarget(crystal) 
     BroadcastPlugin(1, crystal)
   end
-  EnableTrigger("findcrystal", false)
+end
+
+function SetCrystalTarget(target)
+  quest_window.SetCrystalTarget(target) 
+  BroadcastPlugin(1, target)
 end
 
 function adjustCrystal(crystal)
@@ -518,6 +534,8 @@ function ReplaceCrystalTime(trigger_style_runs, line, time_str)
   local converted_time, year, month, day, hour, minute, second = consts.convertToTime(time_str)
   local formatted_date = consts.getFormattedDateTime(year, month, day, hour, minute, second)
   replaceTime(trigger_style_runs, converted_time, formatted_date, "You may ask Tadamir for another map")
+
+  quest_window.SetCrystalTime(converted_time)
 
   -- also do orc pursuer i guess
   local pursuer_time = quest_window.GetPursuerTime()
