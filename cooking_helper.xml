@@ -1232,6 +1232,7 @@ end
 function LootPouch(obj)
   obj = Trim(obj or ""):lower()
   local pouchname = Trim(config.pouchname or "a pouch of plenitude"):lower()
+  if obj == "" then obj = pouchname end
   if obj == pouchname and config.automate_pouch then
     if automation_temp_off then
       triggered_while_off = true
