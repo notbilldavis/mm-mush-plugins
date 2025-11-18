@@ -167,7 +167,7 @@ needed_manuals = {
   "phalanx", "lay out", "strike a match", "strike at the heart", "strike blow", "strike down",
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
   "salt invocation", "dust invocation", "ash invocation", "water evocation", "ice evocation",
-  "lightning evocation", "steam evocation", "salt evocation"
+  "lightning evocation", "steam evocation", "salt evocation", "polearm"
 }
 
 owned_manuals = {}
