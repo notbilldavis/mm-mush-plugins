@@ -26,9 +26,8 @@ Right click the tabs to get a menu for just about anything you need.
 Note that there is an "affects" channel that can be used if you have my affects_buttons plugin.
 It will capture when you gain or lose an affect you've marked to be broadcasted.
 
-Make sure you have the configuration_minimindow.lua, tabbed_miniwindow.lua, colorshelper.lua,
-and tablehelper.lua files in your lua directory or this wont work. gmcphelper.lua too but you 
-probably have that already.
+Make sure you have the configuration_minimindow.lua, tabbed_miniwindow.lua, and tablehelper.lua 
+files in your lua directory or this wont work. gmcphelper.lua too but you probably have that already.
 
 Use 'capture update' to check for updates from github.
 
@@ -255,7 +254,6 @@ local missing_required_files = {}
 local can_update, update_helper = pcall(require, "updatehelper")
 local config_installed, config_window = pcall(require, "configuration_miniwindow")
 local capture_installed, capture_window = pcall(require, "tabbed_miniwindow")
-local colors_installed, colors_helper = pcall(require, "colorshelper")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
 local const_installed, consts = pcall(require, "consthelper")
 
@@ -270,14 +268,12 @@ end
 if can_update then
   if not config_installed then config_installed, config_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/configuration_miniwindow.lua") end
   if not capture_installed then capture_installed, capture_window = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/tabbed_miniwindow.lua") end
-  if not colors_installed then colors_installed, colors_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/colorshelper.lua") end
   if not serializer_installed then serializer_installed, serialization_helper = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/serializationhelper.lua") end
   if not const_installed then const_installed, consts = update_helper.UpdateAndRequire(GetInfo(56):gsub("\\", "/"), "lua/consthelper.lua") end
 end
 
 if not config_installed then table.insert(missing_required_files, "lua/configuration_miniwindow.lua") end
 if not capture_installed then table.insert(missing_required_files, "lua/tabbed_miniwindow.lua") end
-if not colors_installed then table.insert(missing_required_files, "lua/colorshelper.lua") end
 if not serializer_installed then table.insert(missing_required_files, "lua/serializationhelper.lua") end
 if not const_installed then table.insert(missing_required_files, "lua/consthelper.lua") end
 
@@ -368,27 +364,34 @@ end
 function captureGlobalEcho()
   local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification").gecho_msg or "")
   if msg ~= nil and msg ~= "" then
-
+    local cap = false
     local aux = strip_crlfs(msg)
     local fg, bg, col, txt = "silver", "black", nil, nil
     
     for x in aux:gmatch("|[^|]*") do
       fg, bg, col, txt = colorizeGlobalEcho(x, fg, bg, col, txt)
-
-      if txt then
+      txt = Trim(txt or "")
+      if txt ~= "" then
         if txt:find("|") then
           for line in txt:gmatch("[^|]*|") do
-            line = line:match("(.+)|")
             line = Trim(line or "")
-
+            line = line:match("(.+)|")
             if (line ~= "") then
-              capture_window.Capture({ text = line, textcolour = fg, backcolour = bg }, txt, "announce")
+              capture_window.Capture({ text = line, textcolour = fg, backcolour = bg }, line, "announce")
+              cap = true
             end
           end
-
         else
           capture_window.Capture({ text = txt, textcolour = fg, backcolour = bg }, txt, "announce")
+          cap = true          
         end
+      end
+    end
+
+    if (not cap) then
+      local fallback = Trim(aux or "")
+      if (fallback ~= "") then
+        capture_window.Capture({ text = fallback, textcolour = "white", backcolour = "black" }, fallback, "announce")
       end
     end
   end
@@ -450,6 +453,120 @@ end
 
 function doDebug()
   capture_window.DoDebug()
+end
+
+function strip_colors(msg)
+  local res = ""
+
+  res = string.gsub(msg, "|[xz]%d%d%d", "")
+  res = string.gsub(res, "|[%d%a]", "")
+  res = Trim(res)
+
+  return res, white
+end
+
+function strip_crlfs(msg)
+  msg = string.gsub(msg, "\r", "|")
+  msg = string.gsub(msg, "\n", "|")
+  msg = msg .. "|"
+
+  while (string.find(msg, "||")) do
+    msg = string.gsub(msg, "||", "|")
+  end
+
+  return msg
+end
+
+local code_to_name = {
+  ["1"] = "maroon",
+  ["2"] = "green",
+  ["3"] = "olive",
+  ["4"] = "navy",
+  ["5"] = "purple",
+  ["6"] = "teal",
+  ["7"] = "silver",
+  ["B"] = "blue",
+  ["R"] = "red",
+  ["C"] = "cyan",
+  ["M"] = "magenta",
+  ["Y"] = "yellow",
+  ["W"] = "white",
+  ["G"] = "lime",
+  ["b"] = "navy",
+  ["r"] = "maroon",
+  ["c"] = "teal",
+  ["m"] = "purple",
+  ["y"] = "olive",
+  ["w"] = "silver",
+  ["g"] = "green",
+  ["D"] = "gray",
+}
+
+function fg_mm_to_name(color)
+  local res = code_to_name[color]
+
+  return res
+end
+
+function bg_mm_to_name(color)
+  local res = code_to_name[color]
+
+  return res
+end
+
+local compatibility_16_to_rgb = {
+  [0] = 0, -- black
+  [1] = 128, -- maroon
+  [2] = 32768, -- green
+  [3] = 32896, -- olive
+  [4] = 8388608, -- navy
+  [5] = 8388736, -- purple
+  [6] = 8421376, -- teal
+  [7] = 12632256, -- silver
+  [8] = 8421504, -- gray
+  [9] = 255, -- red
+  [10] = 65280, -- lime
+  [11] = 65535, -- yellow
+  [12] = 16711680, -- blue
+  [13] = 16711935, -- magenta
+  [14] = 16776960, -- cyan
+  [15] = 16777215, -- white
+}
+
+function x256_to_rgb(x256)
+  local r, g, b, rgb
+
+  if (x256 >= 0) and (x256 <= 15) then
+    -- compatibility 16
+    rgb = compatibility_16_to_rgb[x256]
+
+  elseif (x256 >= 16) and (x256 <= 231) then
+    -- cube
+    x256 = x256 - 16
+
+    r = math.floor(x256 / 6 / 6)
+    x256 = x256 - (r * 6 * 6)
+    g = math.floor(x256 / 6)
+    b = x256 - (g * 6)
+
+    rgb = (256 * 256 * to255(b)) + (256 * to255(g)) + to255(r)
+
+  elseif (x256 >= 232) and (x256 <= 255) then
+    -- grayscale
+    x256 = x256 - 232
+
+    rgb = (256 * 256 * to255gray(x256)) + (256 * to255gray(x256)) + to255gray(x256)
+  end
+
+  return rgb
+end
+
+function to255(num)
+  return num * 51
+end
+
+function to255gray(num)
+  return 8 + (num * 10)
 end
 
 ]]>
