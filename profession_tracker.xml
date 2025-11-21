@@ -399,7 +399,6 @@ function showOwned()
     Tell("|")
     if (manual == current_request) then
       ColourTell("yellow", "black", centerString(manual))
-      current_request = nil
     else
       ColourTell("white", "black", centerString(manual))
     end
@@ -437,7 +436,6 @@ function showNeeded()
 
       if (manual == current_request) then
         ColourTell("yellow", "black", centerString(manual))
-        current_request = nil
       else
         ColourTell("white", "black", centerString(manual))
       end
