@@ -241,6 +241,14 @@ Commands:
   <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] Cortez\, the sagacious faerie bartender hands out drinks\.$" regexp="y" send_to="12" sequence="100">
     <send>CheckNpcProgress("Cortez, the bartender")</send>
   </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] A busy bartender stands behind the bar\, longing for a break\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("a busy bartender")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] An orc with a shaved head jiggles seductively as she maintains the bar\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("a bartender with a low-cut top")</send>
+  </trigger>
   
 </triggers>
 
@@ -539,6 +547,8 @@ function TrackRecipe(args)
       tracked_recipes[recipe_name:upper()].eaten[consumer:upper()] = { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') }
       Note("Consumer '" .. consumer .. "' has been recorded as having eaten '" .. recipe_name .. "'")
     end
+  else
+    Note("Started tracking '" .. recipe_name .. "'")
   end
 
   serialization_helper.SaveSerializedVariable(character_name .. "_cooking_recipes", tracked_recipes)
