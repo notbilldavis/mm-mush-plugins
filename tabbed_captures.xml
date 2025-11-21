@@ -362,7 +362,7 @@ function captureAffects(text)
 end
 
 function captureGlobalEcho()
-  local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification").gecho_msg or "")
+  local msg = Trim(serialization_helper.GetGmcpValue("char.gecho_notification")["gecho_msg"] or "")
   if msg ~= nil and msg ~= "" then
     local cap = false
     local aux = strip_crlfs(msg)
@@ -377,12 +377,12 @@ function captureGlobalEcho()
             line = Trim(line or "")
             line = line:match("(.+)|")
             if (line ~= "") then
-              capture_window.Capture({ text = line, textcolour = fg, backcolour = bg }, line, "announce")
+              capture_window.Capture({ {text = line, textcolour = fg, backcolour = bg} }, line, "announce")
               cap = true
             end
           end
         else
-          capture_window.Capture({ text = txt, textcolour = fg, backcolour = bg }, txt, "announce")
+          capture_window.Capture({{ text = txt, textcolour = fg, backcolour = bg }}, txt, "announce")
           cap = true          
         end
       end
@@ -391,7 +391,7 @@ function captureGlobalEcho()
     if (not cap) then
       local fallback = Trim(aux or "")
       if (fallback ~= "") then
-        capture_window.Capture({ text = fallback, textcolour = "white", backcolour = "black" }, fallback, "announce")
+        capture_window.Capture({{ text = fallback, textcolour = "white", backcolour = "black" }}, fallback, "announce")
       end
     end
   end
@@ -453,6 +453,7 @@ end
 
 function doDebug()
   capture_window.DoDebug()
+  captureGlobalEcho()
 end
 
 function strip_colors(msg)
