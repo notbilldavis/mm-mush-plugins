@@ -251,7 +251,7 @@ drawAffect = function(affect, title, command, top_pos, favorite)
   local tooltip = getTooltip(expires_in) or title
   WindowText(WIN, BUTTONFONT, title, middle_pos, middle_y, 0, 0, CONFIG.BUTTON_FONT.colour, true)
   WindowRectOp(WIN, miniwin.rect_frame, left, top, right, bottom, CONFIG.BUTTON_BORDER_COLOR)
-  WindowAddHotspot(WIN, title .. "~" .. command .. "~" .. (affect or ""), left, top, right, bottom, "", "", "affectsbuttons_buttonMouseDown", "affectsbuttons_buttonMouseCancel", "affectsbuttons_buttonMouseUp", tooltip, 1, 0)
+  WindowAddHotspot(WIN, (title or "") .. "~" .. (command or "") .. "~" .. (affect or ""), left, top, right, bottom, "", "", "affectsbuttons_buttonMouseDown", "affectsbuttons_buttonMouseCancel", "affectsbuttons_buttonMouseUp", tooltip, 1, 0)
 
   if expires_in ~= nil and expires_in > 0 and expires_in ~= 666666666 then
     HAS_ACTIVE_AFFECTS = true
@@ -393,7 +393,7 @@ setAffect = function(affect, time, notify, refresh)
         EnableTimer("affects_timer", true)
       end
       local previous_temp = CURRENT_AFFECTS[affect] or 0
-      CURRENT_AFFECTS[affect] = os.time() + (time / 4 * 60)
+      CURRENT_AFFECTS[affect] = os.time() + (time / 4 * 60) + 5 -- add a 5 second buffer
 
       checkDuration(affect)
       checkForNotifyAdd(notify, affect, previous_temp)
@@ -647,7 +647,7 @@ function affectsbuttons_buttonMouseUp(flags, hs_id)
       elseif result == "Configure" then
         config_window.Show(getConfiguration(), onConfigureDone)
       elseif result == "Set Favorite" then
-        setFavorite(split[1])
+        toggleFavorite(split[1])
       end
     end
   end
