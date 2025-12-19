@@ -54,7 +54,7 @@ Commands:
   </alias>
 
   <alias match="^cooking[ ]+clear(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
-    <send>ClearRecipe("%1")</send>
+    <send>ClearRecipe("%1", true)</send>
   </alias>
 
   <alias match="^cooking[ ]+clean(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
@@ -91,6 +91,10 @@ Commands:
 
   <alias match="^cooking[ ]+cook(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
     <send>CookRecipe("%1")</send>
+  </alias>
+
+  <alias match="^cooking[ ]+recipe$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
+    <send>ShowRecipe()</send>
   </alias>
 
   <alias match="^cooking[ ]+update$" enabled="y" regexp="y" send_to="12" sequence="100" group="cooking_helper">
@@ -432,6 +436,7 @@ function SetCharacterName(name)
     config.autoupdate = serialization_helper.GetValueOrDefault(config.autoupdate, true)
     config.enableonstart = serialization_helper.GetValueOrDefault(config.enableonstart, true)
     config.pouchname = serialization_helper.GetValueOrDefault(config.pouchname, "a pouch of plenitude")
+    config.logging = serialization_helper.GetValueOrDefault(config.logging, false)
 
     if config.enableonstart then
       config.automate_pouch = true
@@ -470,7 +475,10 @@ function ShowCooking()
       Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(" .. recipe.name .. ")", "n", "Show NPCs that will eat this", "silver", "black", false)
       ColourTell("gray", "black", "]")
       ColourTell("gray", "black", " [")
-      Hyperlink("!!" .. GetPluginID() .. ":ClearRecipe(" .. recipe.name .. ")", "X", "Clear", "red", "black", false)
+      Hyperlink("!!" .. GetPluginID() .. ":DoClearRecipe(" .. recipe.name .. ")", "c", "Clear", "silver", "black", false)
+      ColourTell("gray", "black", "]")
+      ColourTell("gray", "black", " [")
+      Hyperlink("!!" .. GetPluginID() .. ":DoRemoveRecipe(" .. recipe.name .. ")", "X", "Delete", "red", "black", false)
       ColourNote("gray", "black", "]")
       showEaten(recipe.eaten)
     end
@@ -554,15 +562,35 @@ function TrackRecipe(args)
   serialization_helper.SaveSerializedVariable(character_name .. "_cooking_recipes", tracked_recipes)
 end
 
-function ClearRecipe(args)
+function DoClearRecipe(args)
+  ClearRecipe(args, false)
+end
+
+function DoRemoveRecipe(args)
+  ClearRecipe(args, true)
+end
+
+function ClearRecipe(args, delete)
   if Trim(args) == "" then
-    tracked_recipes = { }
-    Note("All tracked recipes have been cleared.")
+    for _, r in ipairs(tracked_recipes) do
+      if delete then
+        tracked_recipes[r.name:upper()] = nil
+        Note("All tracked recipes have been removed from tracking.")
+      else
+        tracked_recipes[r.name:upper()].eaten = {}
+        Note("All tracked recipes have been cleared of all consumers.")
+      end
+    end
   else
     local recipe_name = Trim(args)
     if tracked_recipes[recipe_name:upper()] then
-      tracked_recipes[recipe_name:upper()] = nil
-      Note("Recipe '" .. recipe_name .. "' has been removed from tracking.")
+      if delete then
+        tracked_recipes[recipe_name:upper()] = nil
+        Note("Recipe '" .. recipe_name .. "' has been removed from tracking.")
+      else
+        tracked_recipes[recipe_name:upper()].eaten = {}
+        Note("Recipe '" .. recipe_name .. "' has been cleared of all consumers.")
+      end
     else
       Note("Recipe '" .. recipe_name .. "' is not being tracked.")
     end
@@ -685,9 +713,10 @@ function Configure(args)
         pouchname = { sort = 0, type = "text", label = "Pouch Name", value = config.pouchname, raw_value = config.pouchname },
         storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
         tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
-        automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
-        enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = true },
-        autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = true },
+        automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = config.automate_pouch },
+        enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = config.enableonstart },
+        autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = config.autoupdate },
+        logging = { sort = 6, type = "bool", label = "Verbose Logging", raw_value = config.logging },
       }
     }
 
@@ -732,6 +761,13 @@ function Configure(args)
         value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
       end
       if value ~= nil then configureDone("Options", "enableonstart", { label = "Enable on Start", raw_value = value }) end
+    elseif option == "logging" then
+      if Trim(value) == "" then
+        value = not config.logging
+      else
+        value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
+      end
+      if value ~= nil then configureDone("Options", "logging", { label = "Verbose Logging", raw_value = value }) end
     else
       Note("Unknown configuration option: " .. option)
       Note("Available options: container, ingredients, automate, autoupdate")
@@ -773,9 +809,10 @@ function configureDone(group_id, option_id, config_changed)
       pouchname = { sort = 0, type = "text", label = "Pouch Name", value = config.pouchname, raw_value = config.pouchname },
       storage_container = { sort = 1, type = "text", label = "Container", value = config.storage_container, raw_value = config.storage_container },
       tracked_ingredients = { sort = 2, type = "text", label = "Ingredients (comma-separated)", value = ingredients_text_display, raw_value = ingredients_text },
-      automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = true },
-      enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = true },
-      autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = true },
+      automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = config.automate_pouch },
+      enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = config.enableonstart },
+      autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = config.autoupdate },
+      logging = { sort = 6, type = "bool", label = "Verbose Logging", raw_value = config.logging },
     }
   }
 
@@ -818,13 +855,22 @@ function GetAll(container)
 end
 
 function getIngredient(ingredient, container)
-  SendNoEcho("get \"" .. ingredient .. "\" " .. container)
+  if config.logging then
+    Send("get \"" .. ingredient .. "\" " .. container)
+  else
+    SendNoEcho("get \"" .. ingredient .. "\" " .. container)
+  end
 end
 
 function doFinalCook()
   if cooking then
-    SendNoEcho("cook " .. current_recipe.name)
-    SendNoEcho("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
+    if config.logging then
+      Send("cook " .. current_recipe.name)
+      Send("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
+    else
+      SendNoEcho("cook " .. current_recipe.name)
+      SendNoEcho("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
+    end
   end
 end
 
@@ -1034,6 +1080,18 @@ function CookRecipe(times)
   cooking = true
   
   SearchCurrentRecipe()
+end
+
+function ShowRecipe()
+  if current_recipe == nil then
+    Note("Look at an index card first!")
+  else
+    Note("The recipe for " .. current_recipe.name .. " is: ")
+    for _, i in ipairs(current_recipe.ingredients) do
+      local ing = Trim(i:lower())
+      Note(" - " .. ing)
+    end
+  end
 end
 
 function endCook()
