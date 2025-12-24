@@ -168,7 +168,7 @@ needed_manuals = {
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
   "salt invocation", "dust invocation", "ash invocation", "water evocation", "ice evocation",
   "lightning evocation", "steam evocation", "salt evocation", "polearm", "hand to hand", "resurrect",
-  "throwing"
+  "throwing", "peek"
 }
 
 owned_manuals = {}
