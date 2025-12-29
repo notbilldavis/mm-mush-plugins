@@ -360,6 +360,67 @@ local non_food_items = {
   ["a faerie rum blend"] = true,
 }
 
+local requires_oven = {
+  ["a pan of brownies"] = true,
+  ["a bagel"] = true,
+  ["bagel chips"] = true,
+  ["a yule buche"] = true,
+  ["a carrot cake"] = true,
+  ["a cheese souffle"] = true,
+  ["an entire chocolate cake"] = true,
+  ["Heirloom Gingerbread"] = true,
+  ["oatmeal chocolate chip cookies"] = true,
+  ["Bernadette's peanut butter cookies"] = true,
+  ["a savory crimini pastry"] = true,
+  ["a strawberry shortcake"] = true,
+}
+
+local requires_griddle = {
+  ["an everything breakfast bagel"] = true,
+  ["a breakfast omelette"] = true,
+  ["a breakfast taco"] = true,
+  ["some buche syrup"] = true,
+  ["a chile relleno burrito"] = true,
+  ["a bag of corn tortillas"] = true,
+  ["a plate of huevos rancheros"] = true,
+  ["a light breakfast"] = true,
+  ["a tub of mirepoix"] = true,
+  ["raised waffles"] = true,
+  ["a stack of sourdough pancakes"] = true,
+  ["steak and potatoes"] = true,
+  ["some soft toffee crunch"] = true,
+  ["a crunchy tostada"] = true,
+}
+
+local requires_mixing_bowl = {
+  ["garden delight salad"] = true,
+  ["spaghetti and pesto"] = true,
+  ["a dollop of sour cream"] = true,
+  ["yeast starter"] = true,
+  ["a jar of enchilada sauce"] = true,
+  ["a jar of hot fudge sauce"] = true,
+  ["a ramekin of pico de gallo"] = true,
+  ["an arranged cheese plate"] = true,
+  ["a ramekin of salsa roja"] = true,
+  ["olive tapenade"] = true,
+  ["a dollop of whipped cream"] = true,
+  ["some yogurt"] = true,
+}
+
+local requires_cauldron = {
+  ["a pot of savo beans borracho"] = true,
+  ["some buche cream"] = true,
+  ["a chile relleno"] = true,
+  ["scorpion soup"] = true,
+  ["a pot of winterroot soup"] = true,
+}
+
+local requires_icebox = {
+  ["a brick of cream cheese"] = true,
+  ["a piping tube of cream cheese frosting"] = true,
+  ["a bag of theater popcorn"] = true,
+}
+
 function PluginStart()
   if #missing_required_files > 0 then
     ColourNote("black", "red", GetPluginName() .. ": You are missing the following required file(s): " .. table.concat(missing_required_files, ", "))
@@ -437,6 +498,7 @@ function SetCharacterName(name)
     config.enableonstart = serialization_helper.GetValueOrDefault(config.enableonstart, true)
     config.pouchname = serialization_helper.GetValueOrDefault(config.pouchname, "a pouch of plenitude")
     config.logging = serialization_helper.GetValueOrDefault(config.logging, false)
+    config.show_grid = serialization_helper.GetValueOrDefault(config.show_grid, true)
 
     if config.enableonstart then
       config.automate_pouch = true
@@ -462,6 +524,322 @@ function notifyPouchStatus()
 end
 
 function ShowCooking()
+  if config.show_grid then
+    showCookingAsGrid()
+  else
+    showCookingAsList()
+  end
+end
+
+function showCookingAsGrid()
+  local longest_name = getLongestName()
+  local total_recipes = 0
+  if longest_name <= 0 then
+    longest_name = 12
+    Note("." .. string.rep("-", 36) .. ".")
+    Tell("| ")
+    ColourNote("magenta", "black", "There are no recipes being tracked")
+    Note(" |")
+    Note("." .. string.rep("-", 36) .. ".")
+  else
+    Note("." .. string.rep("-", longest_name + 24) .. ".")
+    for _, recipe in pairs(tracked_recipes) do
+      if recipe and recipe.name and #recipe.name > 0 then
+        total_recipes = total_recipes + 1
+        showRecipeAsGrid(recipe.name, longest_name)
+        showEatenAsGrid(recipe.eaten, longest_name)
+      end
+    end
+  end
+
+  local line_options = { "Add Recipe" }
+  local options = { "Add Consumer", "All NPCs", "Tracked Ingredients" }
+  for i, opt in ipairs(options) do
+    local new_line_content = table.concat(line_options, " ") .. " " .. opt
+    if #new_line_content < longest_name + 24 then
+      table.insert(line_options, opt)
+    else
+      showOptions(line_options, longest_name + 24)
+      line_options = {}
+      table.insert(line_options, opt)
+    end
+  end
+
+  if line_options and #line_options > 0 then
+    showOptions(line_options, longest_name + 24)
+  end
+
+  Note("." .. string.rep("-", longest_name + 24) .. ".")
+  SendNoEcho("")
+end
+
+function showRecipeAsGrid(recipe_name, longest_name)
+  Tell("| " .. recipe_name:upper() .. string.rep(" ", longest_name - #recipe_name) .. " |  ")
+  Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(" .. recipe_name .. ")", "npcs", "Show NPCs that will eat this", "green", "black", false)
+  Tell(" ")
+  Hyperlink("!!" .. GetPluginID() .. ":DoClearRecipe(" .. recipe_name .. ")", "clear", "Clear", "orange", "black", false)
+  Tell(" ")
+  Hyperlink("!!" .. GetPluginID() .. ":DoRemoveRecipe(" .. recipe_name .. ")", "delete", "Delete", "red", "black", false)
+  Note("  |")
+  Tell("." .. string.rep("-", longest_name + 2) .. ".")
+  Note(string.rep("-", 21) .. ".")
+end
+
+function showEatenAsGrid(eaten, longest_name)
+  local total_eaten = 0
+  if eaten and type(eaten) == "table" then
+    table.sort(eaten, function(a, b) return b.date < a.date end)
+    for _, consumer in pairs(eaten) do
+      if consumer and consumer.name and consumer.name ~= "" then
+        total_eaten = total_eaten + 1
+        local formatted_name = consumer.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)
+        Tell("| ")
+        ColourTell("white", "black", formatted_name .. string.rep(" ", longest_name - #formatted_name + 1))
+        Tell("| ")
+        ColourTell("yellow", "black", consumer.date .. " ")
+        Note("|")
+      end
+    end
+  end
+  if total_eaten == 0 then
+    Tell("| ")
+    ColourTell("magenta", "black", "No one has eaten this yet." .. string.rep(" ", longest_name - 3))
+    Note("|")
+    Note("." .. string.rep("-", longest_name + 2) .. "." .. string.rep("-", 21) .. ".")
+  else
+    Note("." .. string.rep("-", longest_name + 24) .. ".")
+  end
+end
+
+function getLongestName()
+  local longest_name = 0
+  for _, recipe in pairs(tracked_recipes) do
+    if recipe.name and #recipe.name > longest_name then
+      longest_name = #recipe.name
+    end
+    if recipe.eaten then
+      for _, consumer in pairs(recipe.eaten) do
+        if consumer.name and #consumer.name > longest_name then
+          longest_name = #consumer.name
+        end
+      end
+    end
+  end
+  return longest_name
+end
+
+function showOptions(options, total_length)
+  local line = table.concat(options, " ")
+  if total_length <= #line then
+    line = line:sub(1, total_length)
+  end
+
+  local padding = total_length - #line
+  local left_padding = math.floor(padding / 2)
+  local right_padding = padding - left_padding
+
+  Tell("|" .. string.rep(" ", left_padding))
+  for _, opt in ipairs(options) do
+    if opt == "Add Recipe" then
+      Hyperlink("!!" .. GetPluginID() .. ":ClickAddRecipe()", opt, "", "white", "black", false)
+    elseif opt == "Add Consumer" then
+      Hyperlink("!!" .. GetPluginID() .. ":ClickAddConsumer()", opt, "", "white", "black", false)
+    elseif opt == "All NPCs" then
+      Hyperlink("!!" .. GetPluginID() .. ":ClickShowNpcs()", opt, "", "white", "black", false)
+    elseif opt == "Tracked Ingredients" then
+      Hyperlink("!!" .. GetPluginID() .. ":ClickTrackedIngredients()", opt, "", "white", "black", false)
+    end
+    Tell(" ")
+  end
+  Note(string.rep(" ", right_padding - 1) .. "|")
+end
+
+function ClickAddRecipe()
+  local recipe_name = utils.inputbox("What is the name of the final food product of the new recipe?", "Add new recipe", "")
+  if recipe_name ~= nil and #recipe_name > 0 then
+    addRecipe(recipe_name)
+  end
+end
+
+function addRecipe(recipe_name)
+  recipe_name = Trim(recipe_name)
+  if not tracked_recipes[recipe_name:upper()] then
+    local found = false
+    for _, recipe in pairs(tracked_recipes) do
+      if string.find(recipe.name:upper(), recipe_name:upper()) ~= nil then
+        recipe_name = recipe.name
+        found = true
+        break
+      end
+    end
+    if not found then tracked_recipes[recipe_name:upper()] = { name = recipe_name, eaten = { } } end
+    ColourNote("cyan", "black", "Now tracking: " .. recipe_name)
+  else
+    Tell("This recipe is already being tracked. Add a consumer with: ")
+    ColourTell("white", "black", "cooking track ")
+    ColourTell("cyan", "black", recipe_name)
+    ColourTell("white", "black", " c:")
+    ColourNote("cyan", "black", "<consumer name>")
+  end
+
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_recipes", tracked_recipes)
+end
+
+function ClickAddConsumer()
+  if tracked_recipes == nil then tracked_recipes = {} end
+  local choices = {}
+  for _, recipe in pairs(tracked_recipes) do
+    table.insert(choices, recipe.name)
+  end
+  if #choices > 0 then
+    local recipe_choice = 1
+    if #choices > 1 then
+      recipe_choice = utils.choose("Which tracked recipe are you adding to?", "Add a consumer", choices)
+      if recipe_choice ~= nil then
+        addConsumerToRecipe(choices[recipe_choice])
+      end
+    end
+  else
+    ColourNote("cyan", "black", "You aren't tracking any recipes to add a consumer to yet.")
+  end
+end
+
+function addConsumerToRecipe(recipe_name)
+  local consumer_name = utils.inputbox("What is the name of the person who ate this recipe?", "Add new consumer", "")
+  recipe_name = Trim(recipe_name)
+  if consumer_name ~= nil and Trim(consumer_name) ~= "" then
+    consumer_name = Trim(consumer_name)
+    if tracked_recipes[recipe_name:upper()].eaten[consumer_name:upper()] then
+      Note("Consumer '" .. consumer_name .. "' has already eaten '" .. recipe_name .. "'")
+    else
+      tracked_recipes[recipe_name:upper()].eaten[consumer:upper()] = { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') }
+      Note("Consumer '" .. consumer_name .. "' has been recorded as having eaten '" .. recipe_name .. "'")
+    end
+  end
+
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_recipes", tracked_recipes)
+end
+
+function ClickShowNpcs()
+  showSpecificNpcs(npcs)
+end
+
+function showSpecificNpcs(filtered_npcs)
+  local name_len, area_len, room_len, num_len, race_len = 32, 21, 35, 8, 11
+  local total_len = name_len + area_len + room_len + num_len + race_len + 4
+  Note("." .. string.rep("-", total_len) .. ".")
+  Note("| NPC Name" .. string.rep(" ", name_len - 9) .. "| Area" .. string.rep(" ", area_len - 5) .. "| Room" .. string.rep(" ", room_len - 5) .. "| GMCP" .. string.rep(" ", num_len - 5) .. "| Race" .. string.rep(" ", race_len - 5) .. "|")
+  Note("|" .. string.rep("-", name_len) .. "." .. string.rep("-", area_len) .. "." .. string.rep("-", room_len) .. "." .. string.rep("-", num_len) .. "." .. string.rep("-", race_len) .. "|")
+  for _, npc in ipairs(filtered_npcs) do
+    Tell("| ")
+    local formatted_name = npc.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)    
+    ColourTell("white", "black", formatted_name .. string.rep(" ", name_len - #formatted_name - 1))
+    Tell("| ")
+    ColourTell("yellow", "black", npc.area .. string.rep(" ", area_len - #npc.area - 1))
+    Tell("| ")
+    if npc.room ~= nil and npc.room ~= "" then
+      if npc.num ~= nil and npc.num ~= "" then
+        Hyperlink("mapper goto " .. npc.num, npc.room, "", "silver", "black", false)
+      else
+        ColourTell("silver", "black", npc.room)
+      end
+      Tell(string.rep(" ", room_len - #npc.room - 1))
+    else
+      Tell(string.rep(" ", room_len - 1))
+    end
+    Tell("| ")
+    if npc.num ~= nil and npc.num ~= "" then
+      ColourTell("cyan", "black", npc.num .. string.rep(" ", num_len - #npc.num - 1))
+    else
+      Tell(string.rep(" ", num_len - 1))
+    end
+    Tell("| ")
+    if npc.race ~= nil and npc.race ~= "" then
+      ColourTell("green", "black", npc.race .. string.rep(" ", race_len - #npc.race - 1))
+    else
+      Tell(string.rep(" ", race_len - 1))
+    end
+    Note("|")
+  end
+
+  if #filtered_npcs <= 0 then
+    local no_npcs = "You can't feed that recipe to any NPCs right now!"
+    Tell("| ")
+    ColourTell("cyan", "black", no_npcs .. string.rep(" ", total_len - #no_npcs - 1))
+    Note("|")
+  end
+
+  Note("." .. string.rep("-", total_len) .. ".")
+  SendNoEcho("")
+end
+
+function ClickTrackedIngredients()
+  local longest = getLongestIngredientName(config.tracked_ingredients)
+  local total_len = longest + 18
+  if longest > 0 then
+    Note("." .. string.rep("-", total_len) .. ".")
+    Note("| Ingredient" .. string.rep(" ", longest - 9) .. "| Find | Delete |")
+    Note("." .. string.rep("-", longest + 2) .. ".------.--------.")
+    for ing, t in pairs(config.tracked_ingredients) do
+      ing = Trim(ing:lower())
+      Tell("| ")
+      ColourTell("white", "black", ing .. string.rep(" ", longest - #ing))
+      Tell(" | ")
+      Hyperlink("!!" .. GetPluginID() .. ":FindIngredient(" .. ing .. ")", "find", "Find ingredient", "cyan", "black", false)
+      Tell(" | ")
+      Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ing .. ")", "delete", "Stop tracking this ingredient", "red", "black", false)
+      Note(" |")
+    end
+  else
+    local none_message = "No ingredients are currently being tracked in the pouch of plenitude."
+    longest = #none_message
+    total_len = longest
+    Note("." .. string.rep("-", total_len) .. ".")
+    Tell("| ")
+    ColourTell("white", "black", none_message)
+    Tell(" |")
+  end
+
+  Note("." .. string.rep("-", total_len) .. ".")
+  local line = "Track New Ingredient"
+  local padding = total_len - #line
+  local left_padding = math.floor(padding / 2)
+  local right_padding = padding - left_padding
+
+  Tell("|" .. string.rep(" ", left_padding))
+  Hyperlink("!!" .. GetPluginID() .. ":ClickTrackIngredient()", line, "", "white", "black", false)
+  Note(string.rep(" ", right_padding - 1) .. " |")
+  Note("." .. string.rep("-", total_len) .. ".")
+  SendNoEcho("")
+end
+
+function getLongestIngredientName(ingredients)
+  local longest_name = 0
+  if ingredients ~= nil and type(ingredients) == "table" then
+    for ingredient, tracked in pairs(ingredients) do
+      if tracked and ingredient and #ingredient > longest_name then
+        longest_name = #ingredient
+      end
+    end
+  end
+  return longest_name
+end
+
+function ClickTrackIngredient()
+  local ingredient = utils.inputbox("What is the exact name of the ingredient?", "Track new ingredient", "")
+  if ingredient ~= nil and Trim(ingredient) ~= 0 then
+    ingredient = Trim(ingredient)
+    config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
+    if config.tracked_ingredients[ingredient] then
+      ColourNote("green", "black", "Tracking " .. ingredient .. " in pouch of plenitude.")
+    else
+      ColourNote("red", "black", "Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+    end
+    serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
+  end
+end
+
+function showCookingAsList()
   local total_tracked = 0
   for _, recipe in pairs(tracked_recipes) do
     if total_tracked == 0 then
@@ -472,10 +850,10 @@ function ShowCooking()
       ColourTell("cyan", "black", " * ")
       ColourTell("white", "black", recipe.name:upper())
       ColourTell("gray", "black", " [")
-      Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(" .. recipe.name .. ")", "n", "Show NPCs that will eat this", "silver", "black", false)
+      Hyperlink("!!" .. GetPluginID() .. ":ShowNpcs(" .. recipe.name .. ")", "npcs", "Show NPCs that will eat this", "green", "black", false)
       ColourTell("gray", "black", "]")
       ColourTell("gray", "black", " [")
-      Hyperlink("!!" .. GetPluginID() .. ":DoClearRecipe(" .. recipe.name .. ")", "c", "Clear", "silver", "black", false)
+      Hyperlink("!!" .. GetPluginID() .. ":DoClearRecipe(" .. recipe.name .. ")", "clear", "Clear", "orange", "black", false)
       ColourTell("gray", "black", "]")
       ColourTell("gray", "black", " [")
       Hyperlink("!!" .. GetPluginID() .. ":DoRemoveRecipe(" .. recipe.name .. ")", "X", "Delete", "red", "black", false)
@@ -648,52 +1026,23 @@ function TryFeedNpc(feed)
 end
 
 function ShowNpcs(filter)
-  if Trim(filter) ~= "" then
-    local found = false
-    local found_recipe = nil
+  local filtered_npcs = {}
+  if filter == nil or Trim(filter) == "" then
+    filtered_npcs = npcs
+  else
     for _, recipe in pairs(tracked_recipes) do
-      if string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
-        filter = recipe.name
-        found_recipe = recipe
-        found = true
+      if recipe ~= nil and string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
+        for _, npc in ipairs(npcs) do
+          if not recipe.eaten[npc.name:upper()] then
+            table.insert(filtered_npcs, npc)
+          end
+        end
         break
       end
     end
-    if not found then 
-      Note("You aren't tracking a recipe called " .. filter .. "!")
-    else
-      local feed_count = 0
-      for _, npc in ipairs(npcs) do
-        if not found_recipe.eaten[npc.name:upper()] then
-          if feed_count == 0 then 
-            Note("You can still feed " .. filter .. " to the following npcs:")
-          end
-          feed_count = feed_count + 1
-          showNpcDetails(npc.name, npc.area, npc.room, npc.num, npc.race)
-        end
-      end
-    end
-  else
-    Note("NPCs that will eat your food:")
-    for _, npc in ipairs(npcs) do
-      showNpcDetails(npc.name, npc.area, npc.room, npc.num, npc.race)
-    end
   end
-  SendNoEcho("")
-end
 
-function showNpcDetails(name, town, room, num, race)
-  ColourTell("cyan", "black", " * ")
-  ColourTell("white", "black", name)
-  ColourTell("yellow", "black", " (" .. town .. ") ")
-  if room ~= nil and room ~= "" and num ~= nil and num ~= "" then
-    Hyperlink("mapper goto " .. num, "[" .. room .. "]", "", "silver", "black", false)
-  end
-  if race ~= nil and race ~= "" then
-    ColourNote("green", "black", " - " .. race)
-  else
-    Note("")
-  end
+  showSpecificNpcs(filtered_npcs)
 end
 
 function Configure(args)
@@ -716,7 +1065,8 @@ function Configure(args)
         automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = config.automate_pouch },
         enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = config.enableonstart },
         autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = config.autoupdate },
-        logging = { sort = 6, type = "bool", label = "Verbose Logging", raw_value = config.logging },
+        show_grid = { sort = 6, type = "bool", label = "Show as Grid", raw_value = config.show_grid },
+        logging = { sort = 7, type = "bool", label = "Verbose Logging", raw_value = config.logging },        
       }
     }
 
@@ -768,9 +1118,16 @@ function Configure(args)
         value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
       end
       if value ~= nil then configureDone("Options", "logging", { label = "Verbose Logging", raw_value = value }) end
+    elseif option == "showgrid" or option == "grid" then
+      if Trim(value) == "" then
+        value = not config.show_grid
+      else
+        value = (value:lower() == "true" or value:lower() == "yes" or value:lower() == "on")
+      end
+      if value ~= nil then configureDone("Options", "show_grid", { label = "Show as Grid", raw_value = value }) end
     else
       Note("Unknown configuration option: " .. option)
-      Note("Available options: container, ingredients, automate, autoupdate")
+      Note("Available options: container, ingredients, automate, autoupdate, showgrid, logging")
       Note("Use 'cooking config' to see and change all settings.")
     end
   end  
@@ -812,7 +1169,8 @@ function configureDone(group_id, option_id, config_changed)
       automate_pouch = { sort = 3, type = "bool", label = "Automate (open, loot, close)", raw_value = config.automate_pouch },
       enableonstart = { sort = 4, type = "bool", label = "Enable on Start", raw_value = config.enableonstart },
       autoupdate = { sort = 5, type = "bool", label = "Auto-Update on Close", raw_value = config.autoupdate },
-      logging = { sort = 6, type = "bool", label = "Verbose Logging", raw_value = config.logging },
+      show_grid = { sort = 6, type = "bool", label = "Show as Grid", raw_value = config.show_grid },
+      logging = { sort = 7, type = "bool", label = "Verbose Logging", raw_value = config.logging },
     }
   }
 
@@ -829,10 +1187,10 @@ function SearchCurrentRecipe()
   search_found = { }
   if not cooking then
     Note("Searching for ingredients to cook " .. current_recipe.name .. ", please wait...")
-  else
-    EnableTriggerGroup("quick_cooking", true)
-    StartQuickCookingSearch()
   end
+  
+  EnableTriggerGroup("quick_cooking", true)
+  StartQuickCookingSearch()
 end
 
 function GetAll(container)
@@ -928,7 +1286,8 @@ function TrackPouchIngredient(ingredient)
   if ingredient and Trim(ingredient) ~= "" then
     ingredient = Trim(ingredient:lower())
     if ingredient == "clear" then
-      config.tracked_ingredients = {}      
+      config.tracked_ingredients = {}
+      Note("Cleared all ingredients from being tracked.")
     elseif ingredient == "clean" then
       cleanContainerOfIngredients()
     else
@@ -1018,11 +1377,34 @@ function EndQuickCookingSearch()
       if cooking_total == 0 or available < cooking_total then
         cooking_total = available
       end
+      if not cooking then 
+        Tell("[")
+        Hyperlink("!!" .. GetPluginID() .. ":FindIngredient(" .. ing .. ")", "?", "Find", "cyan", "black", false)
+        Tell("] ")
+        ColourTell("lightgray", "black", "Found ")
+        ColourTell("white", "black", available)
+        ColourTell("lightgray", "black", " matches for ")
+        ColourTell("silver", "black", ing)
+        ColourNote("lightgray", "black", ".")
+      end
     else
       cooking_total = -1
-      Note("You need " .. ing .. " in order to cook " .. current_recipe.name .. ".")
+      if not cooking then 
+        Tell("[")
+        Hyperlink("!!" .. GetPluginID() .. ":FindIngredient(" .. ing .. ")", "?", "Find", "cyan", "black", false)
+        Tell("] ")
+        ColourTell("lightgray", "black", "Found ")
+        ColourTell("red", "black", "0")
+        ColourTell("lightgray", "black", " matches for ")
+        ColourTell("silver", "black", ing)
+        ColourNote("lightgray", "black", ". ")
+      else
+        Note("You need " .. ing .. " in order to cook " .. current_recipe.name .. ".")
+      end
     end
   end
+
+  if not cooking then return end
 
   if cooking_total > 0 then
     if (cooking_infinite) or (cooking_total < cooking_amount) then
@@ -1057,7 +1439,8 @@ function CheckIfIngredient(line)
     if not ing then return end
     cnt = tonumber(cnt) or 1
     ing = Trim(ing:lower())
-    quick_cooking_ingredients[ing] = cnt
+    local cur = quick_cooking_ingredients[ing] or 0
+    quick_cooking_ingredients[ing] = cur + cnt
   else
     EnableTriggerGroup("quick_cooking", false)
   end
@@ -1132,11 +1515,37 @@ function StartRecipeCapture(recipe_name)
     return
   end
 
+  DisplayTool(recipe_name)
+
   search_containers = {}
   search_found = {}
   search_count = 0
   current_recipe = { name = recipe_name, ingredients = { } }
   EnableTriggerGroup("get_recipe", true)
+end
+
+function DisplayTool(recipe_name)
+  if (requires_oven[recipe_name]) then
+    ColourTell("lightgray", "black", "You need an ")
+    ColourTell("yellow", "black", "oven")
+    ColourNote("lightgray", "black", " to cook this.")
+  elseif (requires_griddle[recipe_name]) then
+    ColourTell("lightgray", "black", "You need a ")
+    ColourTell("yellow", "black", "griddle")
+    ColourNote("lightgray", "black", " to cook this.")
+  elseif (requires_mixing_bowl[recipe_name]) then
+    ColourTell("lightgray", "black", "You need a ")
+    ColourTell("yellow", "black", "mixing bowl")
+    ColourNote("lightgray", "black", " to cook this.")
+  elseif (requires_cauldron[recipe_name]) then
+    ColourTell("lightgray", "black", "You need a ")
+    ColourTell("yellow", "black", "cauldron")
+    ColourNote("lightgray", "black", " to cook this.")
+  elseif (requires_icebox[recipe_name]) then
+    ColourTell("lightgray", "black", "You need an ")
+    ColourTell("yellow", "black", "icebox")
+    ColourNote("lightgray", "black", " to cook this.")
+  end
 end
 
 function AddIngredientToRecipe(ingredient, trigger_style_runs, line)
@@ -1166,29 +1575,30 @@ end
 
 function EndRecipeCapture()
   EnableTriggerGroup("get_recipe", false)
-  
-  Note("")
-  Hyperlink("cooking search", "[Search]", "", "silver", "black", false)
-  Tell(" - ")
-  if current_recipe.name ~= nil and #current_recipe.name > 0 then
-    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(1)", "[Cook 1]", "Cook " .. Trim(current_recipe.name), "silver", "black", false)
-    Tell(" ")
-    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(2)", "[Cook 2]", "Cook " .. Trim(current_recipe.name) .. " twice!", "silver", "black", false)
-    Tell(" ")
-    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(0)", "[Cook All]", "Cook " .. Trim(current_recipe.name) .. " as many times as you can!", "silver", "black", false)
-    Tell(" - ")
+  if current_recipe.name ~= nil and #current_recipe.name > 0 and config.storage_container ~= nil and #config.storage_container > 0 then
+    Note("")
+    Tell("[")
+    Hyperlink("cooking search", "Search", "Search entire inventory for ingredients", "silver", "black", false)
+    if not tracked_recipes[current_recipe.name:upper()] then
+      Tell("] [")
+      Hyperlink("cooking track " .. current_recipe.name, "Track", "Track this recipe", "silver", "black", false)
+    end
+    Tell("] - [")
+    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(1)", "Cook 1", "Cook " .. Trim(current_recipe.name), "silver", "black", false)
+    Tell("] [")
+    Hyperlink("!!" .. GetPluginID() .. ":CookRecipe(0)", "Cook All", "Cook " .. Trim(current_recipe.name) .. " as many times as you can!", "silver", "black", false)
+    Tell("] - ")
+    ColourTell("silver", "black", "Get All:")
+    Tell(" [")
+    Hyperlink("cooking getall " .. config.storage_container, config.storage_container, "Take all the ingredients you need from your container", "silver", "black", false)
+    Tell("] - ")
+    ColourTell("silver", "black", "Pouch: ")
+    Tell("[")
+    Hyperlink("!!" .. GetPluginID() .. ":AddRecipeToPouch()", "Track All", "", "silver", "black", false)
+    Tell("] - [")
+    Hyperlink("!!" .. GetPluginID() .. ":ClearPouch()", "Clear", "", "silver", "black", false)
+    Note("]")
   end
-  ColourTell("silver", "black", "Get All:")
-  if config.storage_container ~= nil and #config.storage_container > 0 then
-    Tell(" ")
-    Hyperlink("cooking getall " .. config.storage_container, "[" .. config.storage_container .. "]", "", "silver", "black", false)
-  end
-  Tell(" - ")
-  ColourTell("silver", "black", "Pouch: ")
-  Hyperlink("!!" .. GetPluginID() .. ":AddRecipeToPouch()", "[Track All]", "", "silver", "black", false)
-  Tell(" - ")
-  Hyperlink("!!" .. GetPluginID() .. ":ClearPouch()", "[Clear]", "", "silver", "black", false)
-  Note("")
 end
 
 function SearchFoundIngredient(ingredient, location)
