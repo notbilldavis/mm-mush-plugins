@@ -253,6 +253,10 @@ Commands:
   <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] An orc with a shaved head jiggles seductively as she maintains the bar\.$" regexp="y" send_to="12" sequence="100">
     <send>CheckNpcProgress("a bartender with a low-cut top")</send>
   </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] A tall\, grey\-crowned man with beady eyes and an apron welcomes you up to the bar\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Angus Slichman, proprietor")</send>
+  </trigger>
   
 </triggers>
 
@@ -314,32 +318,33 @@ local automation_temp_off = false
 local triggered_while_off = false
 local checking_ingredients = false
 local quick_cooking_count = { }
+local current_npc_filter = {}
 
 local db = nil
 
 local npcs = { 
-  { name = "Faltel", area = "Templeton", room = "Fox Fur Tavern", num = "45972", race = "Elf" },
-  { name = "Shady", area = "Templeton", room = "Fool's Gold Tavern", num = "47034", race = "Human" },
-  { name = "Grundel", area = "Templeton", room = "Fisherman's Cafe", num = "46452", race = "Human" },
-  { name = "Urkfet, the bartender", area = "Tellerium", room = "Seagull Tavern", num = "41835", race = "Troll" },
-  { name = "Bovel, the barkeep", area = "Tellerium", room = "Peachtree Tavern", num = "41807", race = "Mino" },
-  { name = "Miller the bartender", area = "Winton", room = "The Trash Compactor Bar and Grill", num = "335857", race = "Human" },
-  { name = "Flam", area = "Rune", room = "Flam's Steak House", num = "10722", race = "Dracon" },
-  { name = "Friedburg", area = "Lowangen", room = "Friedburg's Training", num = "16090", race = "Human" },
-  { name = "Finn", area = "A Hill Giant Refuge", room = "Finn's Tavern", num = "345845", race = "Giant" },
-  { name = "a rapacious chemwalker", area = "Dungeon Deceit", room = "", num = "", race = "" },
-  { name = "Angus", area = "Smuggler's Gulch", room = "The Far End of the Saloon", num = "9373", race = "Human" },
-  { name = "Hungry Harmook", area = "Towne of Decara", room = "An Overflowing Workshop", num = "116305", race = "Llamataur" },
-  { name = "Shroom", area = "Towne of Decara", room = "The Tipsy Toadstool", num = "116030", race = "Dracon" },
-  { name = "a malnourished girl", area = "Refuge of the Xanai", room = "", num = "", race = "" },
-  { name = "Alimenta", area = "Rahdiyr", room = "Alimenta's Tavern", num = "199976", race = "Sidhe" },
-  { name = "Sam the Barkeep", area = "Human Outpost", room = "The Bar at the Longbranch", num = "50867", race = "Human" },
-  { name = "Cortez, the bartender", area = "Cavhfail", room = "Blue Crescent Tavern", num= "199045", race = "Fey" },
-  { name = "a busy bartender", area = "Genauras", room = "", num = "", race = "" },
-  { name = "the bartender", area = "A Ghost Town", room = "", num = "", race = "" },
-  { name = "Grundy the Bartender", area = "Renn", room = "The Juggling Gopher", num = "78967", race = "halfling" },
-  { name = "a bartender with a low-cut top", area = "Hlegmal's Tavern", room = "The Back Bar", num = "385957", race = "Orc" },
-  { name = "a famished ghast", area = "Domain of Arbaces", room = "", num = "", race = "" },
+  { name = "Faltel", area = "Templeton", room = "Fox Fur Tavern", num = "45972", race = "Elf", plane = "Alyria" },
+  { name = "Shady", area = "Templeton", room = "Fool's Gold Tavern", num = "47034", race = "Human", plane = "Alyria" },
+  { name = "Grundel", area = "Templeton", room = "Fisherman's Cafe", num = "46452", race = "Human", plane = "Alyria" },
+  { name = "Urkfet, the bartender", area = "Tellerium", room = "Seagull Tavern", num = "41835", race = "Troll", plane = "Alyria" },
+  { name = "Bovel, the barkeep", area = "Tellerium", room = "Peachtree Tavern", num = "41807", race = "Mino", plane = "Alyria" },
+  { name = "Miller the bartender", area = "Winton", room = "The Trash Compactor Bar and Grill", num = "335857", race = "Human", plane = "Alyria" },
+  { name = "Flam", area = "Rune", room = "Flam's Steak House", num = "10722", race = "Dracon", plane = "Alyria" },
+  { name = "Friedburg", area = "Lowangen", room = "Friedburg's Training", num = "16090", race = "Human", plane = "Alyria" },
+  { name = "Finn", area = "A Hill Giant Refuge", room = "Finn's Tavern", num = "345845", race = "Giant", plane = "Alyria" },
+  { name = "a rapacious chemwalker", area = "Dungeon Deceit", room = "", num = "", race = "", plane = "Alyria" },
+  { name = "Angus Slichman, proprietor", area = "Smuggler's Gulch", room = "The Far End of the Saloon", num = "9373", race = "Human", plane = "Underground" },
+  { name = "Hungry Harmook", area = "Towne of Decara", room = "An Overflowing Workshop", num = "116305", race = "Llamataur", plane = "Underground" },
+  { name = "Shroom", area = "Towne of Decara", room = "The Tipsy Toadstool", num = "116030", race = "Dracon", plane = "Underground" },
+  { name = "a malnourished girl", area = "Refuge of the Xanai", room = "", num = "", race = "", plane = "Underground" },
+  { name = "Alimenta", area = "Rahdiyr", room = "Alimenta's Tavern", num = "199976", race = "Sidhe", plane = "Faerie" },
+  { name = "Sam the Barkeep", area = "Human Outpost", room = "The Bar at the Longbranch", num = "50867", race = "Human", plane = "Faerie" },
+  { name = "Cortez, the bartender", area = "Cavhfail", room = "Blue Crescent Tavern", num= "199045", race = "Fey", plane = "Faerie" },
+  { name = "a busy bartender", area = "Genauras", room = "", num = "", race = "", plane = "SUG" },
+  { name = "the bartender", area = "A Ghost Town", room = "", num = "", race = "", plane = "SUG" },
+  { name = "Grundy the Bartender", area = "Renn", room = "The Juggling Gopher", num = "78967", race = "halfling", plane = "SUG" },
+  { name = "a bartender with a low-cut top", area = "Hlegmal's Tavern", room = "The Back Bar", num = "385957", race = "Orc", plane = "SUG" },
+  { name = "a famished ghast", area = "Domain of Arbaces", room = "", num = "", race = "", plane = "Other" },
 }
 
 local non_food_items = {
@@ -499,6 +504,7 @@ function SetCharacterName(name)
     config.pouchname = serialization_helper.GetValueOrDefault(config.pouchname, "a pouch of plenitude")
     config.logging = serialization_helper.GetValueOrDefault(config.logging, false)
     config.show_grid = serialization_helper.GetValueOrDefault(config.show_grid, true)
+    config.ignored_npcs = serialization_helper.GetValueOrDefault(config.ignored_npcs, {})
 
     if config.enableonstart then
       config.automate_pouch = true
@@ -721,15 +727,36 @@ function addConsumerToRecipe(recipe_name)
 end
 
 function ClickShowNpcs()
-  showSpecificNpcs(npcs)
+  local valid_npcs = {}
+  for _, npc in ipairs(npcs) do
+    if not config.ignored_npcs[npc.name:upper()] then
+      valid_npcs[#valid_npcs + 1] = npc
+    end
+  end
+  showSpecificNpcs(valid_npcs, true)
 end
 
-function showSpecificNpcs(filtered_npcs)
-  local name_len, area_len, room_len, num_len, race_len = 32, 21, 35, 8, 11
-  local total_len = name_len + area_len + room_len + num_len + race_len + 4
+function ClickShowAllNpcs()
+  showSpecificNpcs(npcs, true)
+end
+
+function showSpecificNpcs(filtered_npcs, override_current)
+  if override_current then
+    current_npc_filter = filtered_npcs
+  end
+
+  local rec = {}
+  for _, recipe in pairs(tracked_recipes) do
+    table.insert(rec, recipe)
+  end
+
+  local name_len, area_len, room_len, num_len, race_len, opt_len = 32, 21, 35, 8, 11, 4
+  local total_len = name_len + area_len + room_len + num_len + race_len + (opt_len * 3) + 4
   Note("." .. string.rep("-", total_len) .. ".")
-  Note("| NPC Name" .. string.rep(" ", name_len - 9) .. "| Area" .. string.rep(" ", area_len - 5) .. "| Room" .. string.rep(" ", room_len - 5) .. "| GMCP" .. string.rep(" ", num_len - 5) .. "| Race" .. string.rep(" ", race_len - 5) .. "|")
-  Note("|" .. string.rep("-", name_len) .. "." .. string.rep("-", area_len) .. "." .. string.rep("-", room_len) .. "." .. string.rep("-", num_len) .. "." .. string.rep("-", race_len) .. "|")
+  Tell("| NPC Name" .. string.rep(" ", name_len - 9) .. "| Area" .. string.rep(" ", area_len - 5) .. "| Room" .. string.rep(" ", room_len - 5) .. "| GMCP" .. string.rep(" ", num_len - 5) .. "| Race" .. string.rep(" ", race_len - 5) .. "| 1 | 2 | ")
+  Hyperlink("!!" .. GetPluginID() .. ":ClickExplainNpcs()", "?", "Help", "blue", "black", false)
+  Note(" |")
+  Note("|" .. string.rep("-", name_len) .. "." .. string.rep("-", area_len) .. "." .. string.rep("-", room_len) .. "." .. string.rep("-", num_len) .. "." .. string.rep("-", race_len) .. ".---.---.---|")
   for _, npc in ipairs(filtered_npcs) do
     Tell("| ")
     local formatted_name = npc.name:gsub("(%w)(%w*)", function(a,b) return string.upper(a)..b end)    
@@ -755,22 +782,159 @@ function showSpecificNpcs(filtered_npcs)
     end
     Tell("| ")
     if npc.race ~= nil and npc.race ~= "" then
-      ColourTell("green", "black", npc.race .. string.rep(" ", race_len - #npc.race - 1))
+      ColourTell("magenta", "black", npc.race .. string.rep(" ", race_len - #npc.race - 1))
     else
       Tell(string.rep(" ", race_len - 1))
     end
-    Note("|")
+
+    Tell("| ")
+    if #rec > 0 and rec[1].eaten[npc.name:upper()] then
+      ColourTell("green", "black", "X")
+    else
+      Tell(" ")
+    end
+    Tell(" | ")
+
+    if #rec > 1 and rec[2].eaten[npc.name:upper()] then
+      ColourTell("green", "black", "X")
+    else
+      Tell(" ")
+    end
+    Tell(" | ")
+
+    local tt = "Ignore"
+    if config.ignored_npcs[npc.name:upper()] then
+      tt = "Stop ignoring"
+    end
+    Hyperlink("!!" .. GetPluginID() .. ":ClickIgnore(" .. npc.name .. ")", "i", tt, "red", "black", false)
+    Note(" |")
   end
 
   if #filtered_npcs <= 0 then
-    local no_npcs = "You can't feed that recipe to any NPCs right now!"
+    local no_npcs = "There are no results for your filter!"
     Tell("| ")
     ColourTell("cyan", "black", no_npcs .. string.rep(" ", total_len - #no_npcs - 1))
     Note("|")
   end
 
   Note("." .. string.rep("-", total_len) .. ".")
+
+  local line_options = { "Alyria" }
+  local options = { "Underground", "Faerie", "SUG", "Ignored", "All" }
+  for i, opt in ipairs(options) do
+    local new_line_content = table.concat(line_options, " ") .. " " .. opt
+    if #new_line_content < total_len - 2 then
+      table.insert(line_options, opt)
+    else
+      showNpcOptions(line_options, total_len - 2)
+      line_options = {}
+      table.insert(line_options, opt)
+    end
+  end
+
+  if line_options and #line_options > 0 then
+    showNpcOptions(line_options, total_len)
+  end
+
+  Note("." .. string.rep("-", total_len) .. ".")
+
   SendNoEcho("")
+end
+
+function ClickExplainNpcs()
+  local cnt = 1
+  for _, recipe in pairs(tracked_recipes) do
+    Note(" - Recipe " .. cnt .. " is " .. recipe.name)
+    cnt = cnt + 1
+  end
+  if cnt == 1 then
+    Note("You are not tracking any recipes")
+  elseif cnt == 2 then
+    Note(" - Recipe 2 is not being tracked")
+  end
+  Note("Click the 'i' link to toggle ignore on that npc")
+end
+
+function showNpcOptions(options, total_length)
+  local line = table.concat(options, " ")
+  if total_length <= #line then
+    line = line:sub(1, total_length)
+  end
+
+  local padding = total_length - #line
+  local left_padding = math.floor(padding / 2)
+  local right_padding = padding - left_padding
+
+  Tell("|" .. string.rep(" ", left_padding))
+  for _, opt in ipairs(options) do
+    Hyperlink("!!" .. GetPluginID() .. ":ClickShow" .. opt .. "Npcs()", opt, "", "white", "black", false)
+    Tell(" ")
+  end
+  Note(string.rep(" ", right_padding - 1) .. "|")
+end
+
+function ClickShowIgnoredNpcs()
+  local valid_npcs = {}
+  for _, npc in ipairs(npcs) do
+    if config.ignored_npcs[npc.name:upper()] then
+      table.insert(valid_npcs, npc)
+    end
+  end
+  showSpecificNpcs(valid_npcs, false)
+end
+
+function ClickShowAlyriaNpcs()
+  local valid_npcs = {}
+  for _, npc in ipairs(current_npc_filter) do
+    if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Alyria" then
+      table.insert(valid_npcs, npc)
+    end
+  end
+  showSpecificNpcs(valid_npcs, false)
+end
+
+function ClickShowUndergroundNpcs()
+  local valid_npcs = {}
+  for _, npc in ipairs(current_npc_filter) do
+    if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Underground" then
+      table.insert(valid_npcs, npc)
+    end
+  end
+  showSpecificNpcs(valid_npcs, false)
+end
+
+function ClickShowFaerieNpcs()
+  local valid_npcs = {}
+  for _, npc in ipairs(current_npc_filter) do
+    if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Faerie" then
+      table.insert(valid_npcs, npc)
+    end
+  end
+  showSpecificNpcs(valid_npcs, false)
+end
+
+function ClickShowSUGNpcs()
+  local valid_npcs = {}
+  for _, npc in ipairs(current_npc_filter) do
+    if not config.ignored_npcs[npc.name:upper()] and npc.plane == "SUG" then
+      table.insert(valid_npcs, npc)
+    end
+  end
+  showSpecificNpcs(valid_npcs, false)
+end
+
+function ClickIgnore(npc)
+  if config.ignored_npcs[npc:upper()] then
+    config.ignored_npcs[npc:upper()] = not config.ignored_npcs[npc:upper()]
+  else
+  config.ignored_npcs[npc:upper()] = true
+  end
+  if config.ignored_npcs[npc:upper()] then
+    Note("The NPC '" .. npc .. "' is now being ignored.")
+  else
+    Note("The NPC '" .. npc .. "' is no longer being ignored.")
+  end
+  serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
 end
 
 function ClickTrackedIngredients()
@@ -1028,12 +1192,16 @@ end
 function ShowNpcs(filter)
   local filtered_npcs = {}
   if filter == nil or Trim(filter) == "" then
-    filtered_npcs = npcs
+    for _, npc in ipairs(npcs) do
+      if not config.ignored_npcs[npc.name:upper()] then
+        table.insert(filtered_npcs, npc)
+      end
+    end
   else
     for _, recipe in pairs(tracked_recipes) do
       if recipe ~= nil and string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
         for _, npc in ipairs(npcs) do
-          if not recipe.eaten[npc.name:upper()] then
+          if not recipe.eaten[npc.name:upper()] and not config.ignored_npcs[npc.name:upper()] then
             table.insert(filtered_npcs, npc)
           end
         end
@@ -1042,7 +1210,7 @@ function ShowNpcs(filter)
     end
   end
 
-  showSpecificNpcs(filtered_npcs)
+  showSpecificNpcs(filtered_npcs, true)
 end
 
 function Configure(args)
