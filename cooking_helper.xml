@@ -257,6 +257,14 @@ Commands:
   <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] A tall\, grey\-crowned man with beady eyes and an apron welcomes you up to the bar\.$" regexp="y" send_to="12" sequence="100">
     <send>CheckNpcProgress("Angus Slichman, proprietor")</send>
   </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)A gangly llamataur tightens the bolts on an electromechanical device\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Hungry Harmook")</send>
+  </trigger>
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] Shroom the bartender is here\, leering at you\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("Shroom")</send>
+  </trigger>
   
 </triggers>
 
@@ -884,8 +892,12 @@ function ClickShowIgnoredNpcs()
 end
 
 function ClickShowAlyriaNpcs()
+  showAlyriaNpcs(current_npc_filter)
+end
+
+function showAlyriaNpcs(npc_filter)
   local valid_npcs = {}
-  for _, npc in ipairs(current_npc_filter) do
+  for _, npc in ipairs(npc_filter) do
     if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Alyria" then
       table.insert(valid_npcs, npc)
     end
@@ -894,8 +906,12 @@ function ClickShowAlyriaNpcs()
 end
 
 function ClickShowUndergroundNpcs()
+  showUndergroundNpcs(current_npc_filter)
+end
+
+function showUndergroundNpcs(npc_filter)
   local valid_npcs = {}
-  for _, npc in ipairs(current_npc_filter) do
+  for _, npc in ipairs(npc_filter) do
     if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Underground" then
       table.insert(valid_npcs, npc)
     end
@@ -904,8 +920,12 @@ function ClickShowUndergroundNpcs()
 end
 
 function ClickShowFaerieNpcs()
+  showFaerieNpcs(current_npc_filter)
+end
+
+function showFaerieNpcs(npc_filter)
   local valid_npcs = {}
-  for _, npc in ipairs(current_npc_filter) do
+  for _, npc in ipairs(npc_filter) do
     if not config.ignored_npcs[npc.name:upper()] and npc.plane == "Faerie" then
       table.insert(valid_npcs, npc)
     end
@@ -914,8 +934,12 @@ function ClickShowFaerieNpcs()
 end
 
 function ClickShowSUGNpcs()
+  showSUGNpcs(current_npc_filter)
+end
+
+function showSUGNpcs(npc_filter)
   local valid_npcs = {}
-  for _, npc in ipairs(current_npc_filter) do
+  for _, npc in ipairs(npc_filter) do
     if not config.ignored_npcs[npc.name:upper()] and npc.plane == "SUG" then
       table.insert(valid_npcs, npc)
     end
@@ -1190,27 +1214,38 @@ function TryFeedNpc(feed)
 end
 
 function ShowNpcs(filter)
-  local filtered_npcs = {}
-  if filter == nil or Trim(filter) == "" then
-    for _, npc in ipairs(npcs) do
-      if not config.ignored_npcs[npc.name:upper()] then
-        table.insert(filtered_npcs, npc)
-      end
-    end
+  filter = Trim(filter or "")
+  if filter:upper() == "ALYRIA" then
+    showAlyriaNpcs(npcs)
+  elseif filter:upper() == "UNDERGROUND" then
+    showUndergroundNpcs(npcs)
+  elseif filter:upper() == "FAERIE" then
+    showFaerieNpcs(npcs)
+  elseif filter:upper() == "SUG" then
+    showSUGNpcs(npcs)
   else
-    for _, recipe in pairs(tracked_recipes) do
-      if recipe ~= nil and string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
-        for _, npc in ipairs(npcs) do
-          if not recipe.eaten[npc.name:upper()] and not config.ignored_npcs[npc.name:upper()] then
-            table.insert(filtered_npcs, npc)
-          end
+    local filtered_npcs = {}
+    if filter == "" then
+      for _, npc in ipairs(npcs) do
+        if not config.ignored_npcs[npc.name:upper()] then
+          table.insert(filtered_npcs, npc)
         end
-        break
+      end
+    else      
+      for _, recipe in pairs(tracked_recipes) do
+        if recipe ~= nil and string.find(recipe.name:upper(), Trim(filter:upper())) ~= nil then
+          for _, npc in ipairs(npcs) do
+            if not recipe.eaten[npc.name:upper()] and not config.ignored_npcs[npc.name:upper()] then
+              table.insert(filtered_npcs, npc)
+            end
+          end
+          break
+        end
       end
     end
+      
+    showSpecificNpcs(filtered_npcs, true)
   end
-
-  showSpecificNpcs(filtered_npcs, true)
 end
 
 function Configure(args)
