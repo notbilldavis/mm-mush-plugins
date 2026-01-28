@@ -168,7 +168,7 @@ needed_manuals = {
   "strike pain", "one with the forest", "battle caster", "animate weapon", "smoke invocation",
   "salt invocation", "dust invocation", "ash invocation", "water evocation", "ice evocation",
   "lightning evocation", "steam evocation", "salt evocation", "polearm", "hand to hand", "resurrect",
-  "throwing", "peek", "halberd", "throwing knife"
+  "throwing", "peek", "halberd", "throwing knife", "yo-yo", "detect truth"
 }
 
 owned_manuals = {}
@@ -238,7 +238,7 @@ function setCharacterName(name)
     
     owned_manuals = serialization_helper.GetSerializedVariable(character_name .. "_owned_manuals")
     discovered_manuals = serialization_helper.GetSerializedVariable("prof_tracker_discovered_manuals")
-    current_request = serialization_helper.GetSerializedVariable(character_name .. "current_request")
+    current_request = GetVariable(character_name .. "current_request") or ""
 
     owned_manuals_set = {}
     needed_manuals_set = {}
@@ -269,7 +269,7 @@ end
 function saveData()
   serialization_helper.SaveSerializedVariable(character_name .. "_owned_manuals", owned_manuals)
   serialization_helper.SaveSerializedVariable("prof_tracker_discovered_manuals", discovered_manuals)
-  if current_request ~= nil then
+  if current_request ~= nil and current_request ~= "" then
     SetVariable(character_name .. "current_request", current_request)
     SaveState()
   end
