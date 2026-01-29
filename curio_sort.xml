@@ -895,8 +895,6 @@ function displayAltarInfo(altar)
     else
       ColourNote(color, "black", "This altar providing " .. affect .. " will expire in " .. timer_string)
     end
-  else
-    Note("Couldn't find: " .. proper_name)
   end
 end
 
