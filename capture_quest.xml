@@ -503,6 +503,12 @@ function LocateCrystal(location)
   end
   
   local crystal = searcher.LocateCrystal(location)
+
+  if crystal == nil then
+    -- edge case for sea monster spines or whatever
+    crystal = searcher.LocateCrystal(string.gsub(location, "~o~", "~~~"))
+  end
+
   if crystal == nil then
     Note("The crystal could not be found!")
   else
