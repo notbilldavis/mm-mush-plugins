@@ -492,7 +492,6 @@ end
 
 function OnAnyPrompt()
   EnableTriggerGroup("quick_cooking", false)
-
 end
 
 function SetCharacterName(name)
@@ -502,6 +501,7 @@ function SetCharacterName(name)
     character_name = Trim(name)
 
     tracked_recipes = serialization_helper.GetSerializedVariable(character_name .. "_cooking_recipes")
+    current_recipe = serialization_helper.GetSerializedVariable(character_name .. "_current_recipe")
     config = serialization_helper.GetSerializedVariable(character_name .. "_cooking_config")
     
     config.storage_container = serialization_helper.GetValueOrDefault(config.storage_container, "trunk")
@@ -712,6 +712,8 @@ function ClickAddConsumer()
       if recipe_choice ~= nil then
         addConsumerToRecipe(choices[recipe_choice])
       end
+    else
+      addConsumerToRecipe(choices[1])
     end
   else
     ColourNote("cyan", "black", "You aren't tracking any recipes to add a consumer to yet.")
@@ -1402,6 +1404,8 @@ function GetAll(container)
     return
   end
 
+  cooking_failure = false
+
   if container == nil or container == "" then
     container = Trim(config.storage_container)
   end
@@ -1416,15 +1420,17 @@ function GetAll(container)
 end
 
 function getIngredient(ingredient, container)
-  if config.logging then
-    Send("get \"" .. ingredient .. "\" " .. container)
-  else
-    SendNoEcho("get \"" .. ingredient .. "\" " .. container)
+  if not cooking_failure then
+    if config.logging then
+      Send("get \"" .. ingredient .. "\" " .. container)
+    else
+      SendNoEcho("get \"" .. ingredient .. "\" " .. container)
+    end
   end
 end
 
 function doFinalCook()
-  if cooking then
+  if cooking and not cooking_failure then
     if config.logging then
       Send("cook " .. current_recipe.name)
       Send("put '" .. current_recipe.name .. "' " .. Trim(config.storage_container))
@@ -1617,6 +1623,8 @@ function EndQuickCookingSearch()
       end
     end
 
+    cooking_failure = false
+
     if cooking_amount < cooking_total then
       ColourNote("white", "black", "Cooking " .. current_recipe.name .. " " .. cooking_amount .. " times. (" .. cooking_total .. " possible with your current ingredients)")
     else
@@ -1684,7 +1692,12 @@ function endCook()
   cooking = false
   cooking_amount = 0
   cooking_infinite = false
-  Note("Cooking process complete.")
+  if cooking_failure then
+    Note("There was a problem.")
+    cooking_failure = false
+  else
+    Note("Cooking process complete.")
+  end
 end
 
 --------------
@@ -1778,6 +1791,7 @@ end
 
 function EndRecipeCapture()
   EnableTriggerGroup("get_recipe", false)
+  serialization_helper.SaveSerializedVariable(character_name .. "_current_recipe", current_recipe)
   if current_recipe.name ~= nil and #current_recipe.name > 0 and config.storage_container ~= nil and #config.storage_container > 0 then
     Note("")
     Tell("[")
@@ -1974,7 +1988,8 @@ end
 function EndCooking()
   if cooking then
     cooking = false
-    Note("An ingredient you need to cook " .. current_recipe.name .. " was not found in " .. config.storage_container .. ".")
+    cooking_failure = true
+    Note("Aborting cook! You are either missing an ingredient, aren't in a room with the right equipment, or don't have the index card held.")
   end
 end
 
