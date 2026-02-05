@@ -47,6 +47,10 @@ Use 'prof needed' or 'prof owned' or just 'prof' for all commands.
     <send>add("%1")</send>
   </alias>
 
+  <alias match="^prof[ ]+remove[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
+    <send>remove("%1")</send>
+  </alias>
+
   <alias match="^prof[ ]+clear$" enabled="y" regexp="y" send_to="12" sequence="100" group="profession_tracker">
     <send>clear()</send>
   </alias>
@@ -328,16 +332,37 @@ function endCount()
 end
 
 function add(manual)
-  local lower_manual = manual:lower()
-  if needed_manuals_set[lower_manual] then
+  manual = Trim(manual or ""):lower()
+  if manual == "" then
+    Note("You must specify a manual to add.")    
+  elseif needed_manuals_set[manual] then
     added(manual)
   else
     Note("You don't need that manual for the mark.")
   end
 end
 
+function remove(manual)
+  manual = Trim(manual or ""):lower()
+  if manual == "" then
+    Note("You must specify a manual to remove.")    
+  elseif owned_manuals_set[manual] then
+    for i = 1, #owned_manuals do
+      if (string.lower(owned_manuals[i]) == manual) then
+        table.remove(owned_manuals, i)
+        owned_manuals_set[manual] = nil
+        saveData()
+        Note("Removed the manual of " .. manual .. " from the owned manuals.") 
+        break
+      end
+    end
+  else
+    Note("The manual of " .. manual .. " isn't in your owned list.")
+  end
+end
+
 function ensure(manual)
-  manual = manual:lower()
+  manual = Trim(manual or ""):lower()
   current_request = manual
   if not needed_manuals_set[manual] then
     needed_manuals_set[manual] = true
@@ -356,17 +381,19 @@ function isManualNeeded(name)
 end
 
 function need(prefix, manual)
-  local isNeededString = " [not needed]"
+  local is_needed_tag, tag_color = " [not needed]", "lightgray"
   if needed_manuals_set[manual] then
     if owned_manuals_set[manual] then
-      isNeededString = " [already have]"
+      is_needed_tag = " [already have]"
+      tag_color = "green"
     else
-      isNeededString = " [NEEDED]"
+      is_needed_tag = " [NEEDED]"
+      tag_color = "red"
     end
   end
 
   ColourTell("lightgray", "black", prefix .. " a manual of " .. manual .. " (new)")
-  ColourNote("lightgray", "black", isNeededString)
+  ColourNote(tag_color, "black", is_needed_tag)
 
   if counting then
     local prefix_count = Trim(prefix:gsub("[()]", ""))
@@ -527,6 +554,7 @@ function showCommands()
   showCommand("prof needed", "show the manuals you need")
   showCommand("prof owned", "show the manuals you have already collected or turned in")
   showCommand("prof add <manual>", "manually add to the owned list, use just the name of the skill/spell")
+  showCommand("prof remove <manual>", "manually remove from the owned list, if you lost it or added it by mistake")
   showCommand("prof clear", "clear your entire owned list for this character, must confirm")
   showCommand("prof update", "try to update from github, it will try this on disconnect")
 end
