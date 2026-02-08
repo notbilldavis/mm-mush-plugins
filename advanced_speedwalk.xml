@@ -1,0 +1,1121 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="advanced_speedwalk" author="Oona" id="eb10863081d6445e9b75d570" language="Lua" purpose="chain together advanced commands for more complex speedwalks">
+<description trim="y">
+<![CDATA[
+
+This plugin allows you to create advanced speedwalks that can interact with the mapper,
+run specific distances, search areas until something is found, unlock doors, cast spells,
+kill specific targets, loot specific items, peek into rooms, wait for a specified time,
+and display message boxes. You can define speedwalks using a combination of these commands
+and execute them with a single command.
+
+Make sure you have the speedwalk_miniwindow.lua, serializationhelper.lua, and consthelper.lua
+files in your lua directory and GMCP is enabled if you want the mapper to work correctly.
+
+To view all available speedwalks, you can use the command:
+    - aspd
+
+To use the plugin, you can start a speedwalk by name with the command:
+    - aspd <speedwalk>
+
+Run multiple speedwalks one after the other by separating them with a space:
+    - aspd <speedwalk1> <speedwalk2> ...
+
+A window will appear showing the current status of the speedwalk, including any items
+that have been seen and/or collected during the speedwalk.
+
+Manage the currently running speedwalk with the following commands:
+    - aspd cancel : Cancels the current speedwalk.
+    - aspd pause : Pauses the current speedwalk.
+    - aspd resume : Resumes a paused speedwalk.
+
+You can also create new speedwalks or manage existing ones using the following commands:
+    - aspd new : Opens a mini-window to create a new speedwalk.
+    - aspd edit : Opens a mini-window to edit the speedwalk.
+
+Step types:
+    - Execute: 
+        + Send a single command to the MUD
+        + Can repeat 0 to 9 times
+        + Use a semicolon to add many at a time (s;e;n;get key trunk;n;put key trunk)
+        + Advances to the next step immediately
+      
+    - Mapper:
+        + Uses the mapper plugin to go to a specific room
+        + Advances to the next step after arriving
+        + If the mapper gets stuck, using the 'mapper resume' command should get you back on track
+
+    - Run:
+        + Uses the run command to run to a specific location or in a specific direction
+        + Advances to the next step after stopping at the destination
+        + Will account to getting attacked or buffeted on water mid run and course correct
+
+    - Distance:
+        + Just like the run command above but will stop after moving a specified number of runs
+        + Advances to the next step when the number is hit
+        + Will course correct just like run does
+
+    - Search:
+        + Uses the search command to look for hidden doors in a direction
+        + Advances to the next step when the hidden door has been found
+        + Using this in a room without a hidden exit is probably going to gunk it up
+
+    - Unlock:
+        + Will cast magic unlock in the direction specified
+        + Advances to the next step when the door is unlocked
+        + Probably just use the Cast step below, especially if you are psionic
+
+    - Kill:
+        + Kills the specified mob by using the kill command with a keyword
+        + Advances to the next step when the mob is slain
+
+    - Loot:
+        + Kills the specified mob to get a specified item, the item should be the exact short description
+        + Advances when the specified item has been looted
+        + This isn't as implemented as I want, eventually it will keep attacking and watch for respawn
+
+    - Peek:
+        + Looks in the direction specified, opening any doors if needed.
+        + Advances to the next step immediately
+        + Useful for checking rooms for scatter items without entering
+        + Should probably pause if it find something, I'll add that later
+
+    - Wait:
+        + Advances to the next step after the specific number of seconds
+
+    - Prompt:
+        + Shows a message box with a specified message
+        + Advances to the next step on a "yes" response
+        + Pauses the speedwalk on a "no" response
+
+    - Pause:
+        + Immediately pauses the speedwalk with an optional message.
+        + Advances to the next step when using "aspd resume" or clicking the resume button
+
+    - Cast:
+        + Casts the spell you specify
+        + Will recast when you lose your concentration
+        + Advances to the next step on successful cast.
+
+Each step has a delay of .3 seconds. Will probably make this configurable in the future.
+
+]]>
+</description>
+</plugin>
+<aliases>
+  <alias match="^aspd(.*?)$" enabled="y" regexp="y" send_to="12">
+    <send>startSpeedwalk("%1")</send>
+  </alias>
+</aliases>
+<triggers>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Your travel abruptly comes to a halt\.$" send_to="12" sequence="100" group="run_step">
+    <send>checkRunStep()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You are buffeted to the (.*?) by crosswinds\!$" send_to="12" sequence="100" group="run_step">
+    <send>checkRunStep("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You run (.*?)ward\.$" send_to="12" sequence="100" group="run_step">
+    <send>checkDistanceStep("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) begins attacking you\!$" send_to="12" sequence="100" group="run_step">
+    <send>attackedDuringRun(true)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) has been slain\!$" send_to="12" sequence="100" group="run_step">
+    <send>attackedDuringRun(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You discover (.*?)\!$" send_to="12" sequence="100" group="search_step">
+    <send>checkSearchStep(true)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You stop searching the area\.$" send_to="12" sequence="100" group="search_step">
+    <send>checkSearchStep(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^The (.*?) glows a brilliant blue, then fades.$" send_to="12" sequence="100" group="unlock_step">
+    <send>checkUnlockStep(true)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You lose your concentration\.$" send_to="12" sequence="100" group="unlock_step">
+    <send>checkUnlockStep(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You have completed your casting\.$" send_to="12" sequence="100" group="cast_step">
+    <send>checkCastStep(true)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You lose your concentration\.$" send_to="12" sequence="100" group="cast_step">
+    <send>checkCastStep(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) has been slain\!$" send_to="12" sequence="100" group="kill_step">
+    <send>checkKillStep()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take (.*?) from the corpse of (.*?)\.$" send_to="12" sequence="100" group="loot_step">
+    <send>checkLootStep("%1")</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) blocks you as you try to escape\!$" send_to="12" sequence="100">
+    <send>fleeBlocked()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) grabs ahold of your shoulders\, and pulls you back towards it\!$" send_to="12" sequence="100">
+    <send>fleeBlocked()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) large\, completely smooth\, dark crystal orb is here(.*?)$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>sawOrb()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)A heavy leather\-bound book lays here\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>sawManual()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)The jagged shard of a dark crystal orb lies on the ground\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>sawShard()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)This single sheet of paper has been deserted\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>sawParchment()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)t least for the moment\, this (.*?) wallet has nobody paying attention to it(.*?)$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>sawWallet()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take an orb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotOrb()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)manual emits a bright flare of white light as you take it and it binds with you\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotManual()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a counterfeit manual\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotManual()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a shard of an orb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotShard()</send>
+  </trigger>  
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a didactic parchment\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotParchment()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a lost wallet\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotWallet()</send>
+  </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^A lost wallet emits a bright flare of white light as you take it and it binds with you\." send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotWallet()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Your disembodied soul rises from your ravaged corpse\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>pauseSpeedwalk()</send>
+  </trigger>
+</triggers>
+
+<script>
+
+<![CDATA[
+
+require "gmcphelper"
+
+local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
+local can_create, speedwalk_editor = pcall(require, "speedwalk_miniwindow")
+local const_installed, consts = pcall(require, "consthelper")
+
+if not serializer_installed then
+  ColourNote("black", "red", "The Advanced Speedwalk plugin requires the serializationhelper.lua script to be installed.")
+  return
+end
+
+if not can_create then
+  ColourNote("black", "red", "The Advanced Speedwalk plugin requires the speedwalk_miniwindow.lua script to be installed.")
+  return
+end
+
+if not const_installed then
+  ColourNote("black", "red", "The Advanced Speedwalk plugin requires the consthelper.lua script to be installed.")
+  return
+end
+
+local WIN = "aspd_" .. GetPluginID()
+local FONT = WIN .. "_font"
+local INFO_FONT = WIN .. "_info_font"
+
+local all_speedwalks = {}
+local is_speedwalking = false
+local active_speedwalk = nil
+local current_step = 0
+local is_paused = false
+
+local mapper_room = nil
+local run_direction = nil
+local run_direction_count = nil
+local attacked_during_run = false
+local buffeted_direction = nil
+local search_direction = nil
+local search_found = false
+local unlock_direction = nil
+local casting_spell = nil
+local loot_item = nil
+
+local orb_seen, orb_taken = 0
+local manual_seen, manual_taken = 0
+local shard_seen, shard_taken = 0
+local parchment_seen, parchment_taken = 0
+local wallet_seen, wallet_taken = 0
+
+local border_width = GetInfo(277)
+local char_width, char_height, info_char_height, button_height
+local header_text, cancel_text = "Advanced Speedwalk", "Cancel"
+local pause_text, resume_text = "Pause", "Resume"
+local header_width, cancel_width, pause_width, resume_width
+local window_width, window_height
+local left_button_width, right_button_width
+
+function OnPluginInstall()
+  initButton() 
+  loadSpeedwalks()
+end
+
+function OnPluginClose() pluginStop() end
+function OnPluginDisable() pluginStop() end
+function OnPluginDisconnect() pluginStop() end
+
+function OnPluginBroadcast(msg, id, name, text)
+  if (id =="f67c4339ed0591a5b010d05b" and is_speedwalking and text == "room.info") then
+    checkMapperStep()
+  end
+end
+
+function pluginStop()
+  if is_speedwalking then
+    finishSpeedwalk()
+  end
+
+  if can_create then
+    speedwalk_editor.hide()
+  end
+end
+
+function loadSpeedwalks()
+  all_speedwalks = serialization_helper.GetSerializedVariable("advanced_speedwalks", {})
+  if all_speedwalks == nil then
+    all_speedwalks = {}
+  end
+  local has_some = false
+  for name, steps in pairs(all_speedwalks) do
+    has_some = true
+    break
+  end
+  if not has_some then
+    Note("There are no saved advanced speedwalks. Use 'aspd new' to create one.")
+  end
+end
+
+function startSpeedwalk(speedwalk_id)
+  speedwalk_id = Trim(speedwalk_id or ""):lower()
+  if speedwalk_id == "" then
+    showAllSpeedwalks()
+  elseif speedwalk_id == "help" then
+    showHelp()
+  elseif speedwalk_id == "cancel" then 
+    finishSpeedwalk()
+  elseif speedwalk_id == "pause" then
+    pauseSpeedwalk()
+  elseif speedwalk_id == "resume" then
+    resumeSpeedwalk()
+  elseif speedwalk_id == "new" then
+    createNewSpeedwalk()
+  elseif speedwalk_id:sub(1, 4) == "edit" then
+    edit(speedwalk_id:sub(5, #speedwalk_id))
+  else
+    if speedwalk_id:find(" ") then
+      local concat = {}
+      for id in speedwalk_id:gmatch("%S+") do
+        local sw = all_speedwalks[id]
+        if not sw then
+          Note("There is not a speedwalk called " .. id .. ".")
+          return
+        end
+        for _, step in ipairs(sw) do
+          table.insert(concat, step)
+        end
+      end
+      active_speedwalk = concatSpeedwalks(all_speedwalks, step, unpack(concat))
+    else
+      active_speedwalk = all_speedwalks[speedwalk_id]
+    end
+    if not active_speedwalk then
+      Note("There is not a speedwalk called " .. speedwalk_id .. ".")
+    else
+      beginSpeedwalk(1)
+    end
+  end
+end
+
+function beginSpeedwalk(start_step)
+  is_speedwalking = true
+  updateButtons()
+  resetVariables(true)
+
+  start_step = tonumber(Trim(start_step or ""))
+  if start_step and start_step > 0 and start_step < #active_speedwalk then
+    current_step = start_step - 1
+  end
+
+  EnableTriggerGroup("advanced_speedwalking", true)
+  advanceToNextStep()
+end
+
+function advanceToNextStep()
+  if not is_paused and is_speedwalking then
+    resetVariables(false)
+    current_step = current_step + 1
+    local step = active_speedwalk[current_step]
+    if not step then
+      finishSpeedwalk()
+    else
+      DoAfterSpecial(0.3, "handleAdvancement()", sendto.script)
+    end
+  end
+end
+
+function handleAdvancement()
+  if is_speedwalking then
+    local step = active_speedwalk[current_step]
+    if step:sub(1, 1) == "~" then
+      handleSpecialStep(step)
+    else
+      Execute(step)
+      advanceToNextStep()
+    end
+  end
+end
+
+function resetVariables(all)
+  if all then
+    orb_seen, manual_seen, shard_seen = 0, 0, 0
+    orb_taken, manual_taken, shard_taken = 0, 0, 0
+    parchment_seen, wallet_seen, current_step = 0, 0, 0
+    parchment_taken, wallet_taken = 0, 0
+    is_paused = false
+  end
+
+  mapper_room, run_direction, run_direction_count = nil, nil, nil
+  buffeted_direction, search_direction, search_found = nil, nil, nil
+  unlock_direction, casting_spell, loot_item = nil, nil, nil
+  attacked_during_run = false
+  EnableTriggerGroup("run_step", false)
+  EnableTriggerGroup("search_step", false)
+  EnableTriggerGroup("unlock_step", false)
+  EnableTriggerGroup("cast_step", false)
+  EnableTriggerGroup("kill_step", false)
+  EnableTriggerGroup("loot_step", false)
+end
+
+function handleSpecialStep(step)
+  if #step < 3 then
+    ColourNote("red", "black", "There was an error with the following speedwalk step: " .. step)
+  else
+    local tag = step:sub(2, 2)
+    local val = step:sub(3, #step)
+
+    if tag == "m" then
+      handleMapperStep(val)
+    elseif tag == "r" then
+      handleRunStep(val)
+    elseif tag == "d" then
+      handleDistanceStep(val)
+    elseif tag == "s" then
+      handleSearchStep(val)
+    elseif tag == "u" then
+      handleUnlockStep(val)
+    elseif tag == "k" then
+      handleKillStep(val)
+    elseif tag == "l" then
+      handleLootStep(val)
+    elseif tag == "p" then
+      handlePeekStep(val)
+    elseif tag == "w" then
+      handleWaitStep(val)
+    elseif tag == "x" then
+      handleMessageBoxStep(val)
+    elseif tag == "z" then
+      pauseSpeedwalk(val)
+    elseif tag == "c" then
+      handleCastStep(val)
+    else
+      local repeat_count = tonumber(tag)
+      if repeat_count == nil then
+        ColourNote("red", "black", "Unknown tag: " .. tag)
+      else
+        handleRepeatStep(val, repeat_count)
+      end
+    end
+  end
+end
+
+function handleMapperStep(target_room)
+  local current_room = getGmcpRoomNumber()
+  if current_room == target_room then
+    advanceToNextStep()
+  else
+    mapperGoto(target_room)
+  end
+end
+
+function mapperGoto(room)
+  mapper_room = room
+  Execute("mapper goto " .. room)
+end
+
+function checkMapperStep()
+  if mapper_room then
+    local current_room = getGmcpRoomNumber()
+    if current_room == mapper_room then
+      mapper_room = nil
+      advanceToNextStep()
+    else
+      Note("Speedwalk is waiting for room " .. active_speedwalk[current_step] .. "... Try 'mapper resume' if you are stuck or 'aspd cancel' to cancel.")
+    end
+  end
+end
+
+function handleRunStep(dir)
+  run_direction = dir
+  buffeted_direction = nil
+  EnableTriggerGroup("run_step", true)
+  Execute("run " .. dir)
+end
+
+function handleDistanceStep(dir_and_count)
+  local dir, count = splitTwo(dir_and_count)
+  run_direction_count = tonumber(count)
+  handleRunStep(dir)
+end
+
+function checkRunStep(dir)
+  if not dir or dir == "" then
+    if not buffeted_direction and not attacked_during_run then
+      advanceToNextStep()
+    elseif buffeted_direction then
+      correctRunAfterBuffet()
+    end
+  else
+    buffeted_direction = dir
+  end
+end
+
+function checkDistanceStep()
+  if run_direction_count ~= nil then
+    run_direction_count = run_direction_count - 1
+    if run_direction_count <= 0 then
+      run_direction_count = nil
+      Execute("run cancel")
+    end
+  end
+end
+
+function correctRunAfterBuffet()
+  if buffeted_direction == "north" then
+    Execute("south")
+  elseif buffeted_direction == "northeast" then
+    Execute("southwest")
+  elseif buffeted_direction == "east" then
+    Execute("west")
+  elseif buffeted_direction == "southeast" then
+    Execute("northwest")
+  elseif buffeted_direction == "south" then
+    Execute("north")
+  elseif buffeted_direction == "southwest" then
+    Execute("northeast")
+  elseif buffeted_direction == "west" then
+    Execute("east")
+  elseif buffeted_direction == "northwest" then
+    Execute("southeast")
+  end
+
+  handleRunStep(run_direction)
+end
+
+function attackedDuringRun(attacked)
+  attacked_during_run = attacked
+  if not attacked then
+  -- ne, sw, w, e, e, w, s, pw, e, w, se, nw, 330869, 330871, ne, sw, se
+    DoAfterSpecial(2, "handleRunStep(\"" .. run_direction .. "\")", sendto.script)
+
+    -- beltane has unsouthwest and mulkanthanos needs to mapper to 3900588 before running xalt 
+  end
+end
+
+function handleSearchStep(dir)
+  EnableTriggerGroup("search_step", true)
+  search_direction = dir
+  search_found = false
+  Execute("search " .. dir)
+end
+
+function checkSearchStep(found)
+  if not found and search_found then
+    -- do nothing, we did the thing already
+  elseif found then
+    search_found = true
+    advanceToNextStep()
+  else
+    Execute("search " .. search_direction)
+  end
+end
+
+function handleUnlockStep(dir)
+  EnableTriggerGroup("unlock_step", true)
+  unlock_direction = dir
+  Execute("cast 'magic unlock' " .. dir) -- TODO: allow using knock instead
+end
+
+function checkUnlockStep(success)
+  if not success then
+    handleUnlockStep(unlock_direction)
+  else
+    advanceToNextStep()
+  end
+end
+
+function handleCastStep(spell)
+  EnableTriggerGroup("cast_step", true)
+  casting_spell = spell
+  Execute("cast '" .. spell .. "'")
+end
+
+function checkCastStep(success)
+  if not success then
+    handleCastStep(casting_spell)
+  else
+    advanceToNextStep()
+  end
+end
+
+function handleKillStep(target)
+  EnableTriggerGroup("kill_step", true)
+  Execute("kill " .. target)
+end
+
+function checkKillStep()
+  advanceToNextStep()
+end
+
+function handleLootStep(targets)
+  EnableTriggerGroup("loot_step", true)
+  local mob, item = splitTwo(targets)
+  
+  loot_item = item
+  Execute("kill " .. target)
+end
+
+function checkLootStep(item)
+  if item:lower() == item:lower() then
+    advanceToNextStep()
+  end
+end
+
+function handlePeekStep(direction)
+  Send("open " .. direction)
+  Send("look " .. direction)
+  advanceToNextStep()
+end
+
+function handleWaitStep(duration)
+  DoAfterSpecial(tonumber(duration), "advanceToNextStep()", sendto.script)
+end
+
+function handleMessageBoxStep(text)
+  local result = utils.msgbox(text, "Advanced Speedwalk", "yesno", "?")
+  if result == "yes" then
+    advanceToNextStep()
+  else
+    pauseSpeedwalk()
+  end
+end
+
+function handleRepeatStep(command, repeat_count)
+  local wait_time = 0.3
+  for t = 1, repeat_count do
+    DoAfter(wait_time, command)
+    wait_time = wait_time + 0.3
+  end
+
+  DoAfterSpecial(wait_time + .3, "advanceToNextStep()", sendto.script)
+end
+
+function finishSpeedwalk()
+  WindowShow(WIN, false)
+  is_speedwalking = false
+  EnableTriggerGroup("advanced_speedwalking", false)
+  DoAfterSpecial(.25, "report()", sendto.script)
+end
+
+function fleeBlocked()
+  Execute("mapper resume")
+end
+
+function report()
+  if orb_seen == 0 and shard_seen == 0 and wallet_seen == 0 and manual_seen == 0 and parchment_seen == 0 then
+    Note("Speedwalk finished, no scatter items were seen.")
+  else
+    Note("Speedwalk finished, the following scatter items were seen:")
+
+    if orb_seen > 0 then
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", tostring(orb_seen))
+      if orb_seen == 1 then Tell(" orb of Vandemaar")
+      else Tell(" orbs of Vandemaar") end
+      if orb_taken < orb_seen then
+        ColourTell("red", "black", " " .. orb_taken .. " of " .. orb_seen)
+        if orb_taken == 1 then ColourTell("red", "black", " was picked up!")
+        else ColourTell("red", "black", " were picked up!") end
+      end
+      Note()
+    end
+
+    if shard_seen > 0 then
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", tostring(shard_seen))
+      if shard_seen == 1 then Tell(" shard of an orb of Vandemaar")
+      else Tell(" shards of an orb of Vandemaar") end
+      if shard_taken < shard_seen then
+        ColourTell("red", "black", " " .. shard_taken .. " of " .. shard_seen)
+        if shard_taken == 1 then ColourTell("red", "black", " was picked up!")
+        else ColourTell("red", "black", " were picked up!") end
+      end
+      Note()
+    end
+
+    if wallet_seen > 0 then
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", tostring(wallet_seen))
+      if wallet_seen == 1 then Tell(" lost wallet")
+      else Tell(" lost wallets") end
+      if wallet_taken < wallet_seen then
+        ColourTell("red", "black", " " .. wallet_taken .. " of " .. wallet_seen)
+        if wallet_taken == 1 then ColourTell("red", "black", " was picked up!")
+        else ColourTell("red", "black", " were picked up!") end
+      end
+      Note()
+    end
+
+    if manual_seen > 0 then
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", tostring(manual_seen))
+      if manual_seen == 1 then Tell(" skill manual")
+      else Tell(" skill manuals") end
+      if manual_taken < manual_seen then
+        ColourTell("red", "black", " " .. manual_taken .. " of " .. manual_seen)
+        if manual_taken == 1 then ColourTell("red", "black", " was picked up!")
+        else ColourTell("red", "black", " were picked up!") end
+      end
+      Note()
+    end
+
+    if parchment_seen > 0 then
+      ColourTell("cyan", "black", " * ")
+      ColourTell("white", "black", tostring(parchment_seen))
+      if parchment_seen == 1 then Tell(" didactic parchment")
+      else Tell(" didactic parchments") end
+      if parchment_taken < parchment_seen then
+        ColourTell("red", "black", " " .. parchment_taken .. " of " .. parchment_seen)
+        if parchment_taken == 1 then ColourTell("red", "black", " was picked up!")
+        else ColourTell("red", "black", " were picked up!") end
+      end
+      Note()
+    end
+  end
+  resetVariables(true)
+  SendNoEcho("")
+end
+
+function sawOrb()
+  Execute("mapper stop")
+  Execute("get orb")
+  orb_seen = orb_seen + 1
+  Execute("mapper resume")
+  updateButtons()
+end
+
+function sawManual()
+  Execute("mapper stop")
+  Execute("get manual")
+  manual_seen = manual_seen + 1
+  Execute("mapper resume")
+  updateButtons()
+end
+
+function sawShard()
+  Execute("mapper stop")
+  Execute("get shard")
+  shard_seen = shard_seen + 1
+  Execute("mapper resume")
+  updateButtons()
+end
+
+function sawParchment()
+  Execute("mapper stop")
+  Execute("get parchment")
+  parchment_seen = parchment_seen + 1
+  Execute("mapper resume")
+  updateButtons()
+end
+
+function sawWallet()
+  Execute("mapper stop")
+  Execute("get wallet")
+  wallet_seen = wallet_seen + 1
+  Execute("mapper resume")
+  updateButtons()
+end
+
+function gotOrb()
+  orb_taken = orb_taken + 1
+  updateButtons()
+end
+
+function gotManual()
+  manual_taken = manual_taken + 1
+  updateButtons()
+end
+
+function gotShard()
+  shard_taken = shard_taken + 1
+  updateButtons()
+end
+
+function gotParchment()
+  parchment_taken = parchment_taken + 1
+  updateButtons()
+end
+
+function gotWallet()
+  wallet_taken = wallet_taken + 1
+  updateButtons()
+end
+
+function pauseSpeedwalk(msg)
+  if is_speedwalking and not is_paused then
+    is_paused = true
+    updateButtons()
+    if msg and msg ~= "" then
+      Note(msg)
+    else
+      Note("Speedwalk paused. Click 'Resume' to continue.")
+    end
+  end
+end
+
+function initButton()
+  WindowCreate(WIN, 0, 0, 50, 50, miniwin.pos_center_all, 0, 0)
+  WindowSetZOrder(WIN, 9999)
+  WindowFont(WIN, FONT, "Lucida Console", 12)
+  WindowFont(WIN, INFO_FONT, "Lucida Console", 8)
+  
+  char_width = WindowTextWidth(WIN, FONT, "X")
+  char_height = WindowFontInfo(WIN, FONT, 1) + 2
+  info_char_height = WindowFontInfo(WIN, INFO_FONT, 1) + 2
+  button_height = char_height * 3 + (border_width * 2)
+  
+  header_width, cancel_width = char_width * #header_text, char_width * #cancel_text
+  pause_width, resume_width = char_width * #pause_text, char_width * #resume_text
+  left_button_width = cancel_width + (border_width * 2) + (char_width * 4)
+  right_button_width = resume_width + (border_width * 2) + (char_width * 4)
+  window_width = left_button_width + border_width + right_button_width
+  window_height = button_height + (info_char_height * 5) + (border_width * 4)
+  
+  WindowResize(WIN, window_width, window_height, 0)
+  WindowPosition(WIN, 0, 0, miniwin.pos_center_all, 0)
+
+  WindowShow(WIN, false)
+end
+
+function updateButtons()
+  WindowShow(WIN, false)
+
+  if is_speedwalking then
+    local right_button_text, right_button_color, right_button_id, right_button_callback = pause_text, ColourNameToRGB("orange"), "pause_button", "pause_buttonClick"
+    if is_paused then
+      right_button_text, right_button_color, right_button_id, right_button_callback = resume_text, ColourNameToRGB("green"), "resume_button", "resume_buttonClick"
+    end
+
+    WindowDeleteAllHotspots(WIN)
+
+    addButton(0, 0, left_button_width, ColourNameToRGB("red"), cancel_text, "cancel_button", "cancel_buttonClick")
+    addButton(left_button_width + border_width, 0, right_button_width, right_button_color, right_button_text, right_button_id, right_button_callback)
+
+    WindowRectOp(WIN, miniwin.rect_fill, 0, button_height + border_width, window_width, window_height, ColourNameToRGB("black"))
+    for i = 0, border_width do
+      WindowRectOp(WIN, miniwin.rect_frame, i, button_height + border_width + i, window_width - i, window_height - i, ColourNameToRGB("silver"))
+    end
+
+    addInfo(border_width * 3, button_height + border_width * 2 + 2, orb_seen, orb_taken, "Orb")
+    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height, shard_seen, shard_taken, "Fragment")
+    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 2, manual_seen, manual_taken, "Manual")
+    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 3, parchment_seen, parchment_taken, "Parchment")
+    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 4, wallet_seen, wallet_taken, "Wallet")
+
+    WindowShow(WIN, true)
+  end
+end
+
+function addButton(x, y, width, color, text, id, callback)
+  local text_left = x + border_width + char_width
+  local text_top = y + button_height / 2 - char_height / 2
+
+  WindowRectOp(WIN, miniwin.rect_fill, x, y, x + width, y + button_height, color)
+  for i = 0, border_width do
+    WindowRectOp(WIN, miniwin.rect_frame, x + i, y + i, x + width - i, y + button_height - i, ColourNameToRGB("silver"))
+  end
+  
+  for i = 1, #text do
+    text_left = text_left + char_width
+    createShadowCharacter(text:sub(i,i), text_left, text_top)
+  end
+
+  WindowAddHotspot(WIN, id, x + border_width, y + border_width, x + width - border_width * 2, y + button_height - border_width * 2, "", "", "", "", callback, "", miniwin.cursor_hand, 0)
+end
+
+function addInfo(x, y, seen, taken, name)
+  seen = seen or 0
+  taken = taken or 0
+  local text = name .. ": " .. (seen or 0) .. " seen. " .. (taken or 0) .. " taken."
+  local color = ColourNameToRGB("white")
+  if seen > taken then
+    color = ColourNameToRGB("red")
+  elseif seen > 0 then
+    color = ColourNameToRGB("green")
+  end
+  WindowText(WIN, INFO_FONT, text, x, y, 0, 0, color, true)
+end
+
+function createShadowCharacter(character, x, y)
+  WindowText(WIN, FONT, character, x + 2, y + 2, 0, 0, ColourNameToRGB("darkred"), true)
+
+  WindowText(WIN, FONT, character, x, y - 1, 0, 0, ColourNameToRGB("black"), true)
+  WindowText(WIN, FONT, character, x, y, 0, 0, ColourNameToRGB("black"), true)
+  WindowText(WIN, FONT, character, x, y + 1, 0, 0, ColourNameToRGB("black"), true)
+  
+  WindowText(WIN, FONT, character, x + 1, y + 1, 0, 0, ColourNameToRGB("white"), true)
+end
+
+function createNewSpeedwalk()
+  if is_speedwalking then
+    Note("You are already speedwalking. Please cancel the current speedwalk before starting a new one.")
+  else
+    speedwalk_editor.show()
+  end
+end
+
+function cancel_buttonClick(flags, hostspot_id)
+  Note("Speedwalk canceled at step " .. current_step .. ".")
+  finishSpeedwalk()
+end
+
+function pause_buttonClick(flags, hostspot_id)
+  pauseSpeedwalk()
+end
+
+function resume_buttonClick(flags, hostspot_id)
+  is_paused = false
+  updateButtons()
+  advanceToNextStep()
+end
+
+function getGmcpRoomNumber()
+  local res, gmcparg = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", "room.info")
+  luastmt = "gmcpdata = " .. gmcparg
+  assert(loadstring(luastmt or ""))()
+  return gmcpval("num")
+end
+
+function splitTwo(input)
+  local parts = {}
+  local i = 1
+  local len = #input
+
+  local function skipSpaces()
+    while i <= len and input:sub(i,i):match("%s") do
+      i = i + 1
+    end
+  end
+
+  local function parseQuoted(quote)
+    i = i + 1
+    local start = i
+    local out = {}
+
+    while i <= len do
+      local c = input:sub(i,i)
+      if c == "\\" and i < len then
+        table.insert(out, input:sub(i+1,i+1))
+        i = i + 2
+      elseif c == quote then
+        i = i + 1
+        break
+      else
+        table.insert(out, c)
+        i = i + 1
+      end
+    end
+
+    return table.concat(out)
+  end
+
+  local function parseWord()
+    local start = i
+    while i <= len and not input:sub(i,i):match("%s") do
+      i = i + 1
+    end
+    return input:sub(start, i-1)
+  end
+
+  skipSpaces()
+
+  if i <= len then
+    local c = input:sub(i,i)
+    if c == '"' or c == "'" then
+      parts[1] = parseQuoted(c)
+    else
+      parts[1] = parseWord()
+    end
+  end
+
+  skipSpaces()
+
+  if i <= len then
+    local c = input:sub(i,i)
+    if c == '"' or c == "'" then
+      parts[2] = parseQuoted(c)
+    else
+      parts[2] = input:sub(i):match("^%s*(.-)%s*$")
+    end
+  end
+
+  return parts[1], parts[2]
+end
+
+function concatSpeedwalks(speedwalks, start, ...)
+  local result = {}
+
+  local function push(value)
+    result[#result + 1] = value
+  end
+
+  start = tonumber(start) or 1
+
+  for i, item in ipairs({...}) do
+    if i >= start then
+      if type(item) == "string" and speedwalks[item] then
+        for _, v in ipairs(speedwalks[item]) do
+          push(v)
+        end
+      else
+        push(item)
+      end
+    end
+  end
+
+  return result
+end
+
+function showAllSpeedwalks()
+  local longest_name = getLongestName()
+  local total_speedwalks = 0
+  local total_steps = 0
+  if longest_name == 0 then
+    Note("There are no saved speedwalks. Use 'aspd new' to create one.")
+  else
+    Note("." .. string.rep("-", longest_name + 2) .. "." .. string.rep("-", 7) .. "." .. string.rep("-", 12) .. ".")
+    Tell("| ")
+    ColourTell("magenta", "black", "Name")
+    Tell(string.rep(" ", longest_name - 4) .. " | ")
+    ColourTell("magenta", "black", "Steps")
+    Note(" |" .. string.rep(" ", 12) .. "|")
+    Note("." .. string.rep("-", longest_name + 2) .. "." .. string.rep("-", 7) .. "." .. string.rep("-", 12) .. "|")
+
+    for name, steps in pairs(all_speedwalks) do
+      local step_count = tostring(#steps) .. string.rep(" ", 5 - #tostring(#steps))
+      Tell("| ")
+      Hyperlink("!!" .. GetPluginID() .. ":startSpeedwalk(" .. name .. ")", name, "Start", "white", "black", false)
+      Tell(string.rep(" ", longest_name - #name) .. " | ")
+      ColourTell("cyan", "black", step_count )
+      Tell(" | ")
+      Hyperlink("!!" .. GetPluginID() .. ":edit(" .. name .. ")", "edit", "Edit", "yellow", "black", false)
+      ColourTell("gray", "black", " - ")
+      Hyperlink("!!" .. GetPluginID() .. ":delete(" .. name .. ")", "del", "Delete", "red", "black", false)
+      Note(" |")
+      total_speedwalks = total_speedwalks + 1
+      total_steps = total_steps + #steps
+    end
+    Note("." .. string.rep("-", longest_name + 2) .. "." .. string.rep("-", 7) .. "." .. string.rep("-", 12) .. ".")
+    Tell("| ")
+    local total_count = tostring(total_speedwalks)
+    ColourTell("white", "black", "Total: " .. total_count .. string.rep(" ", longest_name - #total_count - 7))
+    Tell(" | ")
+    local total_step_count = tostring(total_steps) .. string.rep(" ", 5 - #tostring(total_steps))
+    ColourTell("cyan", "black", total_step_count)
+    Tell(" | ")
+    Hyperlink("!!" .. GetPluginID() .. ":createNewSpeedwalk()", "create new", "Create New", "green", "black", false)
+    Note(" |")
+    Note("." .. string.rep("-", longest_name + 2) .. "." .. string.rep("-", 7) .. "." .. string.rep("-", 12) .. ".")
+  end
+  SendNoEcho("")
+end
+
+function edit(name)
+  if is_speedwalking then
+    Note("You are already speedwalking. Please cancel the current speedwalk before editing a speedwalk.")
+  else
+    name = Trim(name or "")
+    if all_speedwalks[name] then
+      speedwalk_editor.show(name)
+    else
+      Note("There is not a speedwalk with the name '" .. name .. "'.")
+    end
+  end
+end
+
+function delete(name)
+  if is_speedwalking then
+    Note("You are already speedwalking. Please cancel the current speedwalk before deleting a speedwalk.")
+  else
+    if all_speedwalks[name] then
+      if utils.msgbox("Are you sure you want to delete the speedwalk '" .. name .. "'?", "Delete Speedwalk", "yesno", "?") == "yes" then
+        all_speedwalks[name] = nil
+        serialization_helper.SetSerializedVariable("advanced_speedwalks", all_speedwalks)
+        Note("Deleted advanced speedwalk '" .. name .. "'.")
+      else
+        Note("Aborted deletion of speedwalk '" .. name .. "'.")
+      end
+    else
+      Note("There is not a speedwalk called '" .. name .. "'.")
+    end
+  end
+end
+
+function getLongestName()
+  local longest_name = 0
+  for name in pairs(all_speedwalks) do
+    if name and #name > longest_name then
+      longest_name = #name
+    end
+  end
+  return longest_name
+end
+
+function showHelp()
+  Note()
+  ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
+  Note()
+  SendNoEcho("")
+end
+
+]]>
+
+</script>
+</muclient>
