@@ -12,7 +12,7 @@ and display message boxes. You can define speedwalks using a combination of thes
 and execute them with a single command.
 
 Make sure you have the speedwalk_miniwindow.lua, serializationhelper.lua, and consthelper.lua
-files in your lua directory and GMCP is enabled if you want the mapper to work correctly.
+files in your lua directory.
 
 To view all available speedwalks, you can use the command:
     - aspd
@@ -99,6 +99,9 @@ Step types:
         + Will recast when you lose your concentration
         + Advances to the next step on successful cast.
 
+    - Plan:
+        + Same as cast but with a plan
+
 Each step has a delay of .3 seconds. Will probably make this configurable in the future.
 
 ]]>
@@ -147,6 +150,10 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
   </trigger>
 
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You have completed your casting\.$" send_to="12" sequence="100" group="cast_step">
+    <send>checkCastStep(true)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You settle on a plan\.$" send_to="12" sequence="100" group="cast_step">
     <send>checkCastStep(true)</send>
   </trigger>
 
@@ -257,6 +264,7 @@ local search_direction = nil
 local search_found = false
 local unlock_direction = nil
 local casting_spell = nil
+local planning_skill = nil
 local loot_item = nil
 
 local orb_seen, orb_taken = 0
@@ -330,6 +338,7 @@ function startSpeedwalk(speedwalk_id)
   elseif speedwalk_id:sub(1, 4) == "edit" then
     edit(speedwalk_id:sub(5, #speedwalk_id))
   else
+    all_speedwalks = serialization_helper.GetSerializedVariable("advanced_speedwalks", {})
     if speedwalk_id:find(" ") then
       local concat = {}
       for id in speedwalk_id:gmatch("%S+") do
@@ -405,6 +414,7 @@ function resetVariables(all)
   mapper_room, run_direction, run_direction_count = nil, nil, nil
   buffeted_direction, search_direction, search_found = nil, nil, nil
   unlock_direction, casting_spell, loot_item = nil, nil, nil
+  planning_skill = nil
   attacked_during_run = false
   EnableTriggerGroup("run_step", false)
   EnableTriggerGroup("search_step", false)
@@ -445,6 +455,8 @@ function handleSpecialStep(step)
       pauseSpeedwalk(val)
     elseif tag == "c" then
       handleCastStep(val)
+    elseif tag == "n" then
+      handlePlanStep(val)
     else
       local repeat_count = tonumber(tag)
       if repeat_count == nil then
@@ -587,9 +599,19 @@ function handleCastStep(spell)
   Execute("cast '" .. spell .. "'")
 end
 
+function handlePlanStep(skill)
+  EnableTriggerGroup("cast_step", true)
+  planning_skill = skill
+  Execute("plan '" .. skill .. "'")
+end
+
 function checkCastStep(success)
   if not success then
-    handleCastStep(casting_spell)
+    if casting_spell and casting_spell ~= "" then
+      handleCastStep(casting_spell)
+    elseif planning_skill and planning_skill ~= "" then
+      handlePlanStep(planning_skill)
+    end
   else
     advanceToNextStep()
   end
@@ -1024,6 +1046,8 @@ function concatSpeedwalks(speedwalks, start, ...)
 end
 
 function showAllSpeedwalks()
+  all_speedwalks = serialization_helper.GetSerializedVariable("advanced_speedwalks", {})
+
   local longest_name = getLongestName()
   local total_speedwalks = 0
   local total_steps = 0

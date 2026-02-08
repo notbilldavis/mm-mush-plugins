@@ -18,8 +18,8 @@ local number_validator = { validate = checkNumber }
 local name_validator = { validate = checkName }
 
 local STEP_TYPES = { EXECUTE = 1, MAPPER = 2, RUN = 3, DISTANCE = 4, SEARCH = 5,
-                     UNLOCK = 6, KILL = 7, LOOT = 8, PEEK = 9,
-                     WAIT = 10, WAIT_PROMPT = 11, PAUSE = 12, CAST = 13 }
+                     UNLOCK = 6, KILL = 7, LOOT = 8, PEEK = 9, WAIT = 10, 
+                     WAIT_PROMPT = 11, PAUSE = 12, CAST = 13, PLAN = 14 }
 
 local speedwalk_name = ""
 local steps = {}
@@ -252,9 +252,11 @@ formatStepDisplay = function(step, index)
   elseif step.type == STEP_TYPES.PAUSE then
     local reason = step.value or ""
     if reason == "" then reason = "default reason" end
-    return prefix .. "Pause: pause (" .. reason .. ")"
+    return prefix .. "Pause: ".. reason
   elseif step.type == STEP_TYPES.CAST then
     return prefix .. "Cast: cast '" .. (step.value or "???") .. "'"
+  elseif step.type == STEP_TYPES.PLAN then
+    return prefix .. "Plan: plan '" .. (step.value or "???") .. "'"
   end
   return prefix .. step.type .. ": " .. (step.value or "???")
 end
@@ -263,7 +265,7 @@ function speedwalk_onAddClick(flags, hotspot_id)
   local addIdx = utils.choose("Select Step Type", "Add Step", {
     "Execute Command", "Mapper Step", "Run Step", "Distance Step", "Search Step",
     "Unlock Step", "Kill Step", "Loot Step", "Peek Step", "Wait Step", "Prompt Step",
-    "Pause Step", "Cast Step" })
+    "Pause Step", "Cast Step", "Plan Step" })
     
   addStep(addIdx)   
   draw()
@@ -550,13 +552,17 @@ editStep = function(type, value)
     
   elseif type == STEP_TYPES.CAST then
     local spell = utils.inputbox("Enter the name of the spell to cast:", "Edit Cast Step", value , nil, nil, string_validator)
-    if spell then
-      if spell:find(" ") and spell:find("'") ~= 1 and spell:find("\"") ~= 1 then
-        spell = "'" .. spell .. "'"
-      end
-      return spell
+    if spell and Trim(spell) ~= "" then
+      return Trim(spell)
+    end
+
+  elseif type == STEP_TYPES.PLAN then
+    local plan = utils.inputbox("Enter the name of the skill to plan:", "Edit Plan Step", value , nil, nil, string_validator)
+    if plan and Trim(plan) ~= "" then
+      return Trim(plan)
     end
   end
+
   return value
 end
 
@@ -601,6 +607,9 @@ parseSpeedwalkToSteps = function(speedwalk)
     elseif step:sub(1,2) == "~c" then
       entry.type = STEP_TYPES.CAST
       entry.value = step:sub(3)
+    elseif step:sub(1,2) == "~n" then
+      entry.type = STEP_TYPES.PLAN
+      entry.value = step:sub(3)
     else
       entry.type = STEP_TYPES.EXECUTE
       entry.value = step
@@ -639,6 +648,8 @@ createSpeedwalkFromSteps = function()
       table.insert(result, "~z" .. step.value)
     elseif step.type == STEP_TYPES.CAST then
       table.insert(result, "~c" .. step.value)
+    elseif step.type == STEP_TYPES.PLAN then
+      table.insert(result, "~n" .. step.value)
     end
   end
   return result
