@@ -5,6 +5,18 @@ I'm still adding to a lot of these so let me know if you see any issues by sendi
 
 If you have the updatehelper.lua file these will try to download the files you need, but your best bet to avoid errors is to just download everything in the [lua folder](https://github.com/notbilldavis/mm-mush-plugins/tree/main/lua) to the lua folder in your local MUSHclient directory then install the ones you want one at a time. If you forgot a file it should tell you when you install it.
 
+## Advanced Speedwalks
+
+![Image](https://github.com/user-attachments/assets/e867f524-395a-4d8f-8d29-9fa7bf6f7907)
+
+Advanced speedwalks that can interact with the mapper, run specific distances, search areas, cast spells, kill targets, and more.
+
+Steps are chained appropriately and it will also report on any scatter items during your speedwalk.
+
+Use "aspd help" for the commands and more info.
+
+Needs the speedwalk_miniwindow.lua, serializationhelper.lua, and consthelper.lua files in your lua directory.
+
 ## Affects Buttons
 
 ![Image](https://github.com/user-attachments/assets/0b1a8ae0-0dd4-4c08-a141-92fe0da7cf5a)
