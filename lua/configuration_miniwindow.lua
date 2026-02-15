@@ -2,6 +2,7 @@ local const_installed, consts = pcall(require, "consthelper")
 
 local WIN = "configuration_" .. GetPluginID()
 local FONT = WIN .. "_font"
+local FONT_HEADER = FONT .. "_header"
 local FONT_UNDERLINE = FONT .. "_underline"
 
 local POSITION = nil
@@ -11,16 +12,24 @@ local CONFIG = nil
 local SAVE_CALLBACK = nil
 local SECTION_STATUS = { }
 
+local line_padding = 4
+local border_padding = line_padding + consts.GetBorderWidth() * 2
+local window_title = "Configuration"
+
 local show, hide, update, createFontOption, createNumberOption, createTextOption, createBoolOption, createColorOption, createListOption
-local initialize, calculate, draw, drawWindow, drawHeader, drawSection, drawOptions, drawOption,
+local initialize, calculate, draw, drawWindow, drawHeader, drawSection, drawOptions, drawOption, drawBorder,
  changeNumber, changeText, changeColor, changeBool, changeFont, changeList, validateNumber, measureSection,
  measureOption
 
-show = function(config, saveCallback)
+show = function(config, saveCallback, title)
   if not CONFIG then
     CONFIG = config
     SAVE_CALLBACK = saveCallback
     initialize()
+  end
+
+  if title ~= nil then
+    window_title = title
   end
 
   draw()
@@ -37,12 +46,15 @@ initialize = function()
   WindowCreate(WIN, 0, 0, 50, 50, miniwin.pos_center_all, 0, 0)
   WindowSetZOrder(WIN, 9999)
   WindowFont(WIN, FONT, "Lucida Console", 9)
+  WindowFont(WIN, FONT_HEADER, "Lucida Console", 10, true)
   WindowFont(WIN, FONT_UNDERLINE, "Lucida Console", 9, false, false, true)
 
   POSITION = {}
   SIZES = {}
 
   SIZES.LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1) - WindowFontInfo(WIN, FONT, 4) + 2 
+  SIZES.HEADER_HEIGHT = WindowFontInfo(WIN, FONT_HEADER, 1) - WindowFontInfo(WIN, FONT_HEADER, 4) + 2 
+  SIZES.BUTTON_HEIGHT = SIZES.LINE_HEIGHT + line_padding * 2
   SIZES.LABEL_WIDTH = 100
   SIZES.VALUE_WIDTH = 100
 end
@@ -54,6 +66,7 @@ draw = function()
   drawWindow()  
   drawHeader()
   drawOptions()
+  drawBorder()
 
   WindowShow(WIN, true)
 end
@@ -62,41 +75,37 @@ drawWindow = function()
   WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP , 4, 2)
   WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
   WindowRectOp(WIN, miniwin.rect_fill, 0, 0, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, consts.black)
-  for i = 1, consts.GetBorderWidth() + 1 do
+end
+
+drawBorder = function()
+  for i = 0, consts.GetBorderWidth() do
     WindowRectOp(WIN, miniwin.rect_frame, 0 + i, 0 + i, POSITION.WINDOW_WIDTH - i, POSITION.WINDOW_HEIGHT - i, consts.silver)
   end
 end
 
 drawHeader = function()
-  WindowText(WIN, FONT, "Configuration", 4 + consts.GetBorderWidth(), 4 + consts.GetBorderWidth(), 0, 0, consts.white, true)
-  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), consts.white, miniwin.pen_solid, 2)
-  WindowLine(WIN, POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), consts.white, miniwin.pen_solid, 2)
-  WindowAddHotspot(WIN, "close_hotspot", POSITION.WINDOW_WIDTH - SIZES.LINE_HEIGHT - 2 - consts.GetBorderWidth(), 2 + consts.GetBorderWidth(), POSITION.WINDOW_WIDTH - 2 - consts.GetBorderWidth(), SIZES.LINE_HEIGHT + 2 + consts.GetBorderWidth(), "", "", "", "", "configuration_onClose", "Close", miniwin.cursor_hand, 0)
+  local button_size = SIZES.LINE_HEIGHT
+  local header_text_width = WindowTextWidth(WIN, FONT_HEADER, window_title)
+  local center_line = border_padding + SIZES.HEADER_HEIGHT / 2 - 2
+  local line_start = border_padding + 20 + header_text_width + line_padding * 2
+  local line_end = POSITION.WINDOW_WIDTH - border_padding * 2 - button_size
 
-  local single, space = WindowTextWidth(WIN, FONT, "[+]"), WindowTextWidth(WIN, FONT, " ")
-  local start_x = 4 + consts.GetBorderWidth() + WindowTextWidth(WIN, FONT, "Configuration") + space
-  local collapse_color, expand_color = consts.dimgray, consts.dimgray
+  WindowLine(WIN, border_padding, center_line, border_padding + 20, center_line, consts.silver, miniwin.pen_solid, 2)
+  WindowText(WIN, FONT_HEADER, window_title, border_padding + 20 + line_padding, border_padding, 0, 0, consts.white, true)
+  WindowLine(WIN, line_start, center_line, line_end, center_line, consts.silver, miniwin.pen_solid, 2)
 
-  for k, _ in pairs(CONFIG) do
-    if SECTION_STATUS[k] then
-      collapse_color = consts.white
-    else
-      expand_color = consts.white
-    end
-  end
+  local button_start = line_end + border_padding
+  local button_end = button_start + button_size
+  WindowRectOp(WIN, miniwin.rect_fill, button_start, border_padding, button_end, border_padding + button_size, consts.black)
+  WindowRectOp(WIN, miniwin.rect_frame, button_start, border_padding, button_end, border_padding + button_size, consts.white)
+  WindowLine(WIN, button_start + 2, border_padding + 2, button_end - 3, border_padding + button_size - 3, consts.white, miniwin.pen_solid, 2)
+  WindowLine(WIN, button_start + 2, border_padding + button_size - 3, button_end - 3, border_padding + 2, consts.white, miniwin.pen_solid, 2)
+  WindowAddHotspot(WIN, "close_hotspot", button_start, border_padding, button_end, border_padding + button_size, "", "", "", "", "configuration_onClose", "Close", miniwin.cursor_hand, 0)
 
-  WindowText(WIN, FONT, "[+] ", start_x, 6, 0, 0, expand_color)
-  WindowText(WIN, FONT, "[-]", start_x + single + space, 6, 0, 0, collapse_color)
-  if expand_color == consts.white then
-    WindowAddHotspot(WIN, "expand_all", start_x, 6, start_x + single, 6 + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
-  end
-  if collapse_color == consts.white then
-    WindowAddHotspot(WIN, "collapse_all", start_x + single + space, 6, start_x + space + single * 2, 6 + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
-  end
 end
 
 drawOptions = function()
-  local y = SIZES.LINE_HEIGHT + (consts.GetBorderWidth() * 2)
+  local y = SIZES.LINE_HEIGHT + border_padding + line_padding
   for key, group in consts.pairsByKeys(CONFIG) do
     y = drawSection(0, y, key, group)
   end
@@ -114,7 +123,7 @@ drawSection = function(indents, y, key, group)
   local title_width = WindowTextWidth(WIN, FONT, marker .. title)
   WindowText(WIN, FONT, marker .. title, 4 + consts.GetBorderWidth(), y, 0, 0, consts.white, true)
   WindowAddHotspot(WIN, key, consts.GetBorderWidth(), y, title_width + consts.GetBorderWidth() + 2, y + SIZES.LINE_HEIGHT, "", "", "", "", "configuration_onExpandCollapse", "", miniwin.cursor_hand, 0)
-  y = y + SIZES.LINE_HEIGHT
+  y = y + SIZES.LINE_HEIGHT + line_padding
 
   local sortFunc = function(a, b)
     local sort_a = a.value.sort 
@@ -214,7 +223,7 @@ drawOption = function(indents, y, parent_key, key, option)
     end
   end
 
-  return y + SIZES.LINE_HEIGHT
+  return y + SIZES.LINE_HEIGHT + line_padding
 end
 
 hide = function()
@@ -406,14 +415,14 @@ calculate = function()
     
   SIZES.LABEL_WIDTH = math.max(SIZES.LABEL_WIDTH, l_width)
   SIZES.VALUE_WIDTH = math.max(SIZES.VALUE_WIDTH, v_width + WindowTextWidth(WIN, FONT, "- + "))
-  POSITION.WINDOW_HEIGHT = math.min(height + consts.GetBorderWidth(), consts.GetOutputHeight() - 50)
+  POSITION.WINDOW_HEIGHT = math.min(height + border_padding, consts.GetOutputHeight() - 50)
   POSITION.WINDOW_WIDTH = math.min(SIZES.LABEL_WIDTH + 25 + SIZES.VALUE_WIDTH + (consts.GetBorderWidth() * 2), consts.GetOutputWidth() - 50)
   POSITION.WINDOW_LEFT = ((consts.GetOutputWidth()) / 2 + consts.GetOutputLeft()) - POSITION.WINDOW_WIDTH / 2
   POSITION.WINDOW_TOP = ((consts.GetOutputHeight()) / 2 + consts.GetOutputTop()) - POSITION.WINDOW_HEIGHT / 2
 end
 
 measureSection = function(indents, height, key, group, l_width, v_width)
-  height = height + SIZES.LINE_HEIGHT
+  height = height + SIZES.LINE_HEIGHT + line_padding
   if height > consts.GetOutputHeight() then
     Note("Config screen is too big, collapse some sections.")
     return height, l_width, v_width
@@ -449,7 +458,7 @@ measureOption = function(indents, height, parent_key, key, option, l_width, v_wi
   local value_width = WindowTextWidth(WIN, FONT, option.value)
   if label_width > l_width then l_width = label_width end
   if option.type ~= "color" and value_width > v_width then v_width = value_width end
-  return height + SIZES.LINE_HEIGHT, l_width, v_width
+  return height + SIZES.LINE_HEIGHT + line_padding, l_width, v_width
 end
 
 createFontOption = function(sort, label, font, hint, enabled)
