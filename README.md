@@ -3,6 +3,8 @@ Some plugins I've made for MUSHclient to use when playing Materia Magica.
 
 I'm still adding to a lot of these so let me know if you see any issues by sending a tell or mail to Oona.
 
+If you have the base MUSHclient from the Materia Magica website, you should go to [https://github.com/MateriaMagicaLLC/mm-mushclient-scripts/tree/master/lua](https://github.com/MateriaMagicaLLC/mm-mushclient-scripts/tree/master/lua) and download these into your lua folder. They are updated versions.
+
 If you have the updatehelper.lua file these will try to download the files you need, but your best bet to avoid errors is to just download everything in the [lua folder](https://github.com/notbilldavis/mm-mush-plugins/tree/main/lua) to the lua folder in your local MUSHclient directory then install the ones you want one at a time. If you forgot a file it should tell you when you install it.
 
 ## Advanced Speedwalks
