@@ -5,7 +5,7 @@ local const_installed, consts = pcall(require, "consthelper")
 local prepare, initialize, load, create, draw, drawWindow, isEmptyButton, dragMouseDown, dragMouseMove,
   dragMouseRelease, clear, close, save, setAffect, removeAffect, checkDuration, checkForNotifyAdd, checkForNotifyRemove,
   getConfiguration, onConfigureDone, adjustAnchor, drawHeader, drawAffect, createFavoriteStar, getExpiration, isAutoUpdateEnabled,
-  getButtonColor, getTimeFromMinutes, castFavorites, getDuration,
+  getButtonColor, getTimeFromMinutes, castFavorites, getDuration, removeAllAffects,
   addButton, editButton, renameButton, deleteButton, moveButtonUp, moveButtonDown, toggleFavorite, toggleBroadcast, getTooltip
 
 local WIN = "affectsbuttons_" .. GetPluginID()
@@ -418,10 +418,17 @@ removeAffect = function(affect, notify, refresh)
   end
 end
 
+removeAllAffects = function()
+  CURRENT_AFFECTS = {}
+  PERM_AFFECTS = {}
+  draw()
+end
+
 checkDuration = function(affect)
+  local existing_duration = DURATIONS[affect]
   local expires_in = CURRENT_AFFECTS[affect] - os.time()
-  if DURATIONS[affect] == nil or DURATIONS[affect] < expires_in then
-    DURATIONS[affect] = expires_in
+  DURATIONS[affect] = expires_in
+  if DURATIONS[affect] ~= existing_duration then
     serialization_helper.SaveSerializedVariable(SERIALIZE_TAGS.DURATIONS, DURATIONS)
   end
 end
@@ -954,6 +961,7 @@ return {
   Save = save,
   SetAffect = setAffect,
   RemoveAffect = removeAffect,
+  RemoveAllAffects = removeAllAffects,
   GetConfiguration = getConfiguration,
   OnConfigureDone = onConfigureDone,
   CastFavorites = castFavorites,

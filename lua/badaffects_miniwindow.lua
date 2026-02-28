@@ -2,7 +2,7 @@ local serializer_installed, serialization_helper = pcall(require, "serialization
 local config_installed, config_window = pcall(require, "configuration_miniwindow")
 local const_installed, consts = pcall(require, "consthelper")
 
-local initialize, clear, close, save, getConfiguration, onConfigureDone, setAffect, removeAffect
+local initialize, clear, close, save, getConfiguration, onConfigureDone, setAffect, removeAffect, removeAllAffects
 local load, create, draw, setSizeAndPositionToContent, drawToggleButton, drawAffectsWindows,
   drawAffectsText, adjustAnchor, getFriendlyExpire
 
@@ -499,6 +499,11 @@ removeAffect = function(affect, redraw)
   end
 end
 
+removeAllAffects = function()
+  BAD_STUFF = {}
+  if CONFIG.ENABLED then draw() end
+end
+
 getFriendlyExpire = function(expires_in)
   if (expires_in > 0) then
     local minutes = expires_in / 60
@@ -556,5 +561,6 @@ return {
   GetConfiguration = getConfiguration, 
   OnConfigureDone = onConfigureDone, 
   SetAffect = setAffect, 
-  RemoveAffect = removeAffect
+  RemoveAffect = removeAffect,
+  RemoveAllAffects = removeAllAffects
 }

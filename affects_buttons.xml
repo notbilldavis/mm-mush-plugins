@@ -168,6 +168,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>DisarmedBroadcast("%2")</send>
   </trigger> 
 
+  <trigger match="^(.*?) powers deftly knock (.*?) from your grasp\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
+    <send>DisarmedBroadcast("%2")</send>
+  </trigger> 
+
   <trigger match="(.*?) batters you mercilessly before finally cleaving your (.*?) in twain\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>DisarmedBroadcast("%2")</send>
   </trigger> 
@@ -186,6 +190,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
 
   <trigger match="^Your vision returns\!$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAffect("blindness")</send>
+  </trigger>
+
+  <trigger match="^Your disembodied soul rises from your ravaged corpse\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
+    <send>RemoveAllAffects()</send>
   </trigger>
 </triggers>
 
@@ -452,6 +460,11 @@ function RemoveAffect(affect)
   local parsed_affect = parseAffect(affect)
   buttons_window.RemoveAffect(parsed_affect, notify_changes)
   badaffects_window.RemoveAffect(parsed_affect, notify_changes)
+end
+
+function RemoveAllAffects()
+  buttons_window.RemoveAllAffects()
+  badaffects_window.RemoveAllAffects()
 end
 
 function DisarmedBroadcast(weapon)
