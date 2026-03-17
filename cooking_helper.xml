@@ -386,6 +386,7 @@ local requires_oven = {
   ["Bernadette's peanut butter cookies"] = true,
   ["a savory crimini pastry"] = true,
   ["a strawberry shortcake"] = true,
+  ["a slice of tiramisu"] = true,
 }
 
 local requires_griddle = {
