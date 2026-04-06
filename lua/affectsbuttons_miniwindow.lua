@@ -94,6 +94,9 @@ load = function()
   CONFIG.AUTOUPDATE = serialization_helper.GetValueOrDefault(CONFIG.AUTOUPDATE, true)
   CONFIG.Z_POSITION = serialization_helper.GetValueOrDefault(CONFIG.Z_POSITION, 500)
 
+  CONFIG.CLEAN_ENABLED = serialization_helper.GetValueOrDefault(CONFIG.CLEAN_ENABLED, false)
+  CONFIG.IGNORE_RACIAL_AFFECTS = serialization_helper.GetValueOrDefault(CONFIG.IGNORE_RACIAL_AFFECTS, false)
+
   POSITION.WINDOW_LEFT = serialization_helper.GetValueOrDefault(POSITION.WINDOW_LEFT, consts.GetOutputRightOutside())
   POSITION.WINDOW_TOP = serialization_helper.GetValueOrDefault(POSITION.WINDOW_TOP, consts.GetOutputTopOutside() + 1)
   POSITION.WINDOW_WIDTH = serialization_helper.GetValueOrDefault(POSITION.WINDOW_WIDTH, CONFIG.BUTTON_WIDTH + CONFIG.HORIZONTAL_PADDING * 2)
@@ -257,7 +260,7 @@ drawAffect = function(affect, title, command, top_pos, favorite)
     HAS_ACTIVE_AFFECTS = true
   end
 
-  local max_duration = DURATIONS[affect] or 300
+  local max_duration = DURATIONS[affect] or math.huge
   local current = consts.clamp(expires_in, 0, max_duration)
   local meter_right = consts.clamp((right - left) * (current / max_duration), 0, right)
   
@@ -395,7 +398,9 @@ setAffect = function(affect, time, notify, refresh)
       local previous_temp = CURRENT_AFFECTS[affect] or 0
       CURRENT_AFFECTS[affect] = os.time() + (time / 4 * 60) + 5 -- add a 5 second buffer
 
-      checkDuration(affect)
+      if previous_temp == 0 then
+        checkDuration(affect)
+      end
       checkForNotifyAdd(notify, affect, previous_temp)
     end
 
@@ -427,9 +432,11 @@ end
 checkDuration = function(affect)
   local existing_duration = DURATIONS[affect]
   local expires_in = CURRENT_AFFECTS[affect] - os.time()
-  DURATIONS[affect] = expires_in
-  if DURATIONS[affect] ~= existing_duration then
-    serialization_helper.SaveSerializedVariable(SERIALIZE_TAGS.DURATIONS, DURATIONS)
+  if not existing_duration or existing_duration < expires_in then
+    DURATIONS[affect] = expires_in
+    if DURATIONS[affect] ~= existing_duration then
+      serialization_helper.SaveSerializedVariable(SERIALIZE_TAGS.DURATIONS, DURATIONS)
+    end
   end
 end
 
@@ -449,7 +456,9 @@ getConfiguration = function()
   return {
     OPTIONS = {
       REFRESH_TIME = config_window.CreateNumberOption(1, "Refresh Time", CONFIG.REFRESH_TIME, 0, 1000, "The amount of time before updating the UI."),
-      AUTOUPDATE = config_window.CreateBoolOption(2, "Auto-Update", CONFIG.AUTOUPDATE, "Whether or not this plugins will try to update on close.")
+      CLEAN_ENABLED = config_window.CreateBoolOption(2, "Clean Enabled", CONFIG.CLEAN_ENABLED, "Whether or not to clean up the affects command with a custom grid."),
+      IGNORE_RACIAL_AFFECTS = config_window.CreateBoolOption(3, "Ignore Racial Affects", CONFIG.IGNORE_RACIAL_AFFECTS, "Whether or not to ignore racial affects in the above cleaned custom grid."),
+      AUTOUPDATE = config_window.CreateBoolOption(4, "Auto-Update", CONFIG.AUTOUPDATE, "Whether or not this plugins will try to update on close.")
     },
     PANEL = {
       AUTO_HEIGHT = config_window.CreateBoolOption(1, "Auto Height", CONFIG.AUTO_HEIGHT, "Automatically size the panel height based on the contents."),

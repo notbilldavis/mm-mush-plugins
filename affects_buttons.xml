@@ -168,6 +168,10 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>DisarmedBroadcast("%2")</send>
   </trigger> 
 
+  <trigger match="^(.*?) knocks (.*?) from your grip\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
+    <send>DisarmedBroadcast("%2")</send>
+  </trigger> 
+
   <trigger match="^(.*?) powers deftly knock (.*?) from your grasp\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>DisarmedBroadcast("%2")</send>
   </trigger> 
@@ -192,8 +196,24 @@ MAKE SURE YOU TURN 'SHOW-AFFECT-SPOILERS' ON IN-GAME!
     <send>RemoveAffect("blindness")</send>
   </trigger>
 
+  <trigger match="^The shimmering bands of light surrounding you fade and vanish\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
+    <send>RemoveAffect("spell shield")</send>
+  </trigger>
+
   <trigger match="^Your disembodied soul rises from your ravaged corpse\.$" enabled="y" keep_evaluating="y" regexp="y" send_to="12" sequence="100" group="affects_buttons">
     <send>RemoveAllAffects()</send>
+  </trigger>
+
+  <trigger match="^You are affected by the following\:$" enabled="n" keep_evaluating="y" regexp="y" send_to="14" sequence="100" omit_from_output="y" group="affects_buttons_clean">
+    <send></send>
+  </trigger>
+
+  <trigger match="^(.*)$" enabled="n" keep_evaluating="y" regexp="y" send_to="14" sequence="100" omit_from_output="y" group="affects_buttons_clean">
+    <send>CleanAffectLine("%1")</send>
+  </trigger>
+
+  <trigger match="^Total of .* affects%.$" enabled="n" keep_evaluating="y" regexp="y" send_to="14" sequence="100" omit_from_output="y" group="affects_buttons_clean">
+    <send></send>
   </trigger>
 </triggers>
 
@@ -240,6 +260,8 @@ if not buttons_installed then table.insert(missing_required_files, "lua/affectsb
 if not badaffects_installed then table.insert(missing_required_files, "lua/badaffects_miniwindow.lua") end
 
 local notify_changes = true
+local affects_buffer = {}
+local affects_lengths = { name = 6, mod = 8, time = 9, costs = 0 }
 
 function OnPluginInstall() pluginStart() end
 function OnPluginEnable() pluginStart() end
@@ -276,6 +298,7 @@ function pluginStart()
   
   EnableTrigger("first_prompt", true)
   EnableTriggerGroup("get_affects", false)
+  EnableTriggerGroup("affects_buttons_clean", false)
   buttons_window.Prepare()
 end
 
@@ -430,6 +453,12 @@ function StartCapturingAffects()
   EnableTriggerGroup("get_affects", true)
   buttons_window.Clear()
   badaffects_window.Clear()
+
+  local config = buttons_window.GetConfiguration()
+  if config.OPTIONS.CLEAN_ENABLED then
+    EnableTriggerGroup("affects_buttons_clean", true)
+    affects_buffer = {}
+  end
 end
 
 function StopCapturingAffects()
@@ -437,6 +466,71 @@ function StopCapturingAffects()
   EnableTriggerGroup("get_affects", false)
   buttons_window.Draw()
   badaffects_window.Draw()
+  EnableTriggerGroup("affects_buttons_clean", false)
+  
+  local config = buttons_window.GetConfiguration()
+  if config.OPTIONS.CLEAN_ENABLED then
+    displayCleanAffects()  
+  end
+end
+
+function CleanAffectLine(line)
+  local config = buttons_window.GetConfiguration()
+  if config.OPTIONS.CLEAN_ENABLED then
+    local typ, name, mod, val, mins = string.match(line, "^(%w+):%s+([%w%s]+)%s+%-%s+Level%s+%d+,%s+modifies%s+([%w%-]+)%s+by%s+([%-%d]+)%s+for%s+(%d+)%s+minutes")
+    if not typ then
+      typ, name, mod, val = string.match(line, "^(%w+):%s+([%w%s]+)%s+%-%s+Level%s+%d+,%s+modifies%s+([%w%-]+)%s+by%s+([%-%d]+)")
+    end
+
+    if not typ or not name then return end
+    if typ:lower() == "racial" and config.IGNORE_RACIAL_AFFECTS then return end
+
+    name = Trim(name or "")
+    mod = Trim(mod or "")
+    val = Trim(val or "")
+    mins = Trim(mins or "")
+
+    affects_buffer[name] = affects_buffer[name] or {
+      mods = "",
+      costs = "",
+      costs_raw = {},
+      min_time = math.huge,
+      timer_string = "permanent",
+      timer_color = "green"
+    }
+
+    local entry = affects_buffer[name]
+    if mod and val then
+      entry.mods = entry.mods .. (entry.mods == "" and "" or ", ") .. mod .. " " .. (tonumber(val) >= 0 and "+" or "") .. val
+    end
+
+    if #mins > 0 then
+      local converted_time = tonumber(mins or 0) or 0
+      if converted_time < entry.min_time then
+        entry.timer_color, entry.timer_string = getTimerColorAndString(converted_time)
+        entry.min_time = converted_time
+      end
+    end
+
+    for block in string.gmatch(line, "%b[]") do
+      local val, stat = string.match(block, "([%-%d%%]+)%s*(%w+)")
+      if val and stat then
+        if not entry.costs_raw[stat] then
+          entry.costs_raw[stat] = val
+        end
+      end
+    end
+
+    entry.costs = ""
+    for stat, vals in pairs(entry.costs_raw) do
+      entry.costs = entry.costs .. (entry.costs == "" and "" or ", ") .. (vals or "") .. " " .. stat
+    end
+
+    if #name > affects_lengths.name then affects_lengths.name = #name end
+    if entry.mods and #entry.mods > affects_lengths.mod then affects_lengths.mod = #entry.mods end
+    if entry.timer_string and #entry.timer_string > affects_lengths.time then affects_lengths.time = #entry.timer_string end
+    if entry.costs and #entry.costs > affects_lengths.costs then affects_lengths.costs = #entry.costs end
+  end
 end
 
 function SetAffect(affect, time_str, refresh)
@@ -511,6 +605,146 @@ function parseAffect(affect)
   end
 
   return affect
+end
+
+function displayCleanAffects()
+  local entries = {}
+
+  for name, data in pairs(affects_buffer) do
+    table.insert(entries, {
+      name = name,
+      data = data
+    })
+  end
+
+  table.sort(entries, function(a, b)
+    local ta = tonumber(a.data.min_time) or math.huge
+    local tb = tonumber(b.data.min_time) or math.huge
+    if ta == math.huge and tb == math.huge then return a.name < b.name end
+    if ta == math.huge then return true end
+    if tb == math.huge then return false end
+    if ta == tb then return a.name < b.name end
+    return ta > tb
+  end)
+
+  local total_width = 8 + affects_lengths.name + affects_lengths.mod + affects_lengths.time
+  if affects_lengths.costs > 0 then total_width = total_width + affects_lengths.costs + 3 end
+
+  drawHeader(total_width)
+
+  local total_count, perm_count, expiring_count = 0, 0, 0
+  for _, affect in pairs(entries) do
+    total_count = total_count + 1
+    if affect.data.timer_string == "permanent" then perm_count = perm_count + 1
+    elseif affect.data.timer_color == "red" then expiring_count = expiring_count + 1 end
+
+    Tell("| ")
+    ColourTell("lightgray", "black", affect.name .. string.rep(" ", affects_lengths.name - #affect.name + 1))
+    Tell("| ")
+    ColourTell("lightgray", "black", affect.data.mods .. string.rep(" ", affects_lengths.mod - #affect.data.mods + 1))
+    Tell("| ")
+    
+    ColourTell(affect.data.timer_color, "black", affect.data.timer_string .. string.rep(" ", affects_lengths.time - #affect.data.timer_string + 1))
+    if affects_lengths.costs > 0 then
+      Tell("| ")
+      ColourTell("lightgray", "black", affect.data.costs .. string.rep(" ", affects_lengths.costs - #affect.data.costs + 1))
+    end
+
+    Note("|")
+  end
+
+  drawFooter(total_width, total_count, perm_count, expiring_count)
+end
+
+function drawHeader(total_width)
+  local name_header = "Affect"
+  local mod_header = "Modifies"
+  local time_header = "Time Left"
+  local costs_header = "Costs"
+
+  local name_spacing = string.rep(" ", affects_lengths.name - #name_header)
+  local mod_spacing = string.rep(" ", affects_lengths.mod - #mod_header)
+  local time_spacing = string.rep(" ", affects_lengths.time - #time_header)
+  local costs_spacing = string.rep(" ", affects_lengths.costs - #costs_header)
+
+  Tell(".")
+  Tell(string.rep("-", total_width))
+  Note(".")
+
+  Tell("| ")
+  ColourTell("magenta", "black", name_header .. name_spacing)
+  Tell(" | ")
+  ColourTell("magenta", "black", mod_header .. mod_spacing)
+  Tell(" | ")
+  ColourTell("magenta", "black", time_header .. time_spacing)
+  if (affects_lengths.costs > 0) then
+    Tell(" | ")
+    ColourTell("magenta", "black", costs_header .. costs_spacing)
+  end
+  Note(" |")
+
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.name + 2))
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.mod + 2))
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.time + 2))
+  if (affects_lengths.costs > 0) then
+    Tell(".")
+    Tell(string.rep("-", affects_lengths.costs + 2))
+  end
+  Note(".")
+end
+
+function drawFooter(total_width, total_count, perm_count, expiring_count)
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.name + 2))
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.mod + 2))
+  Tell(".")
+  Tell(string.rep("-", affects_lengths.time + 2))
+  if (affects_lengths.costs > 0) then
+    Tell(".")
+    Tell(string.rep("-", affects_lengths.costs + 2))
+  end
+  Note(".")  
+
+  local summary = string.format("Total: %d", total_count)
+  if perm_count > 0 then summary = summary .. string.format(", Permanent: %d", perm_count) end
+  if expiring_count > 0 then summary = summary .. string.format(", Expiring Soon: %d", expiring_count) end
+
+  local padding = string.rep(" ", total_width - #summary - 2)
+  Tell("| ")
+  ColourTell("cyan", "black", summary .. padding)
+  Note(" |")
+
+  Tell(".")
+  Tell(string.rep("-", total_width))
+  Note(".")
+end
+
+getTimerColorAndString = function(time)
+  if (time == nil or time == math.huge) then
+    return "green", "permanent"
+  else
+    time = time / 4 * 60 -- convert from mud time to real time
+    local seconds = time % 60
+    local minutes = math.floor(time / 60) % 60
+    local hours = math.floor(time / 3600) % 24
+
+    local color = "green"
+    if (minutes < 5) then
+      color = "red"
+    elseif minutes < 10 then
+      color = "yellow"
+    end
+
+    if hours > 0 then
+      return color, string.format("%02d hr, %02d min, %02d sec", hours, minutes, seconds)
+    end
+    
+    return color, string.format("%02d min, %02d sec", minutes, seconds)
+  end
 end
 
 ---------------
