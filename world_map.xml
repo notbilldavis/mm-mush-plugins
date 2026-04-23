@@ -35,15 +35,15 @@ Coming soon:
 
 </plugin>
 <aliases>
-  <alias match="^worldmap[ ]+crystal[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^worldmap[ ]+crystal[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="world_map">
     <send>setCrystal("%1")</send>
   </alias>
 
-  <alias match="^worldmap[ ]+dest(?:ination)?[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^worldmap[ ]+dest(?:ination)?[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="world_map">
     <send>setDestination("%1")</send>
   </alias>
 
-  <alias match="^worldmap[ ]+config$" enabled="y" regexp="y" send_to="12" sequence="100">
+  <alias match="^worldmap[ ]+config$" enabled="y" regexp="y" send_to="12" sequence="100" group="world_map">
     <send>configure()</send>
   </alias>
 </aliases>

@@ -16,12 +16,12 @@ local ICON_CACHE = {}
 local TILE_CACHE = {}
 local CACHE_ORDER = {}
 
-local IS_RESIZING = false
+local POSITIONING_MODE = false
 local IS_DRAGGING = false
-local RESIZE_DRAG_X = nil
-local RESIZE_DRAG_Y = nil
-local START_DRAG_Y = 0
-local START_DRAG_OFFSET = 0
+local IS_RESIZING = false
+local DRAG_GRAB_X = 0
+local DRAG_GRAB_Y = 0
+local RESIZE_HANDLE_SIZE = 16
 
 local COORD_X = nil
 local COORD_Y = nil
@@ -87,12 +87,13 @@ setCrystalCoords = function(x, y)
 end
 
 setDestinationCoords = function(i, x, y)
+  local entry = (x ~= nil and y ~= nil) and { x = x, y = y } or nil
   if i == 1 then
-    MARKERS.one = { x = x, y = y }
+    MARKERS.one = entry
   elseif i == 2 then
-    MARKERS.two = { x = x, y = y }
+    MARKERS.two = entry
   elseif i == 3 then
-    MARKERS.three = { x = x, y = y }
+    MARKERS.three = entry
   end
   drawMiniWindow()
 end
@@ -262,8 +263,8 @@ drawMiniWindow = function()
     local offset_y = local_y - height / 2
     local debug_boxes = {}
 
-    offset_x = -1 * (offset_x + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x + consts.GetBorderWidth())
-    offset_y = -1 * (offset_y + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y + consts.GetBorderWidth())
+    offset_x = math.floor(-1 * (offset_x + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x + consts.GetBorderWidth()))
+    offset_y = math.floor(-1 * (offset_y + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y + consts.GetBorderWidth()))
     
     local window_name = WIN
     if CONFIG.CIRCLE then
@@ -276,13 +277,13 @@ drawMiniWindow = function()
 
     table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y, offset_x, offset_y, "main", 32768))  
     table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y, offset_x + 1150, offset_y, "right", ColourNameToRGB("red")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y, offset_x - 1151, offset_y, "left", ColourNameToRGB("tomato")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y, offset_x - 1150, offset_y, "left", ColourNameToRGB("tomato")))
     table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y + 1, offset_x, offset_y + 750, "down", ColourNameToRGB("blue")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y - 1, offset_x, offset_y - 751, "up", ColourNameToRGB("deepskyblue")))      
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y - 1, offset_x, offset_y - 750, "up", ColourNameToRGB("deepskyblue")))
     table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y + 1, offset_x + 1150, offset_y + 750, "right-down", ColourNameToRGB("yellow")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y - 1, offset_x - 1151, offset_y - 751, "left-up", ColourNameToRGB("cyan")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y - 1, offset_x + 1150, offset_y - 751, "right-up", ColourNameToRGB("orange")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y + 1, offset_x - 1151, offset_y + 750, "left-down", ColourNameToRGB("purple")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y - 1, offset_x - 1150, offset_y - 750, "left-up", ColourNameToRGB("cyan")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y - 1, offset_x + 1150, offset_y - 750, "right-up", ColourNameToRGB("orange")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y + 1, offset_x - 1150, offset_y + 750, "left-down", ColourNameToRGB("purple")))
     
     if CONFIG.DRAW_DEBUG then
       for _, box in ipairs(debug_boxes) do
@@ -296,7 +297,6 @@ drawMiniWindow = function()
       end
     end
 
-    -- TODO: these marks don't show on map wrapping
     tryShowCrystalMarker(window_name, max_x, max_y, scaled_x, scaled_y)
     tryShowDestinationMarkers(window_name, max_x, max_y, scaled_x, scaled_y)
 
@@ -326,8 +326,31 @@ drawMiniWindow = function()
       end
     end
     
-    WindowAddHotspot(WIN, "world_map_hotspot", consts.GetBorderWidth(), consts.GetBorderWidth(), width - consts.GetBorderWidth(), height - consts.GetBorderWidth(), "", "", "", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)  
-    WindowScrollwheelHandler(WIN, "world_map_hotspot", "OnWheel")  
+    if POSITIONING_MODE then
+      if CONFIG.CIRCLE then
+        WindowCircleOp(WIN, miniwin.circle_ellipse, 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT,
+          ColourNameToRGB("orange"), miniwin.pen_solid, consts.GetBorderWidth(), 0, miniwin.brush_null)
+      else
+        for i = 0, consts.GetBorderWidth() + 1 do
+          WindowRectOp(WIN, miniwin.rect_frame, i, i, CONFIG.WINDOW_WIDTH - i, CONFIG.WINDOW_HEIGHT - i, ColourNameToRGB("orange"))
+        end
+      end
+      local rx, ry = CONFIG.WINDOW_WIDTH - 1, CONFIG.WINDOW_HEIGHT - 1
+      WindowRectOp(WIN, miniwin.rect_fill, rx - RESIZE_HANDLE_SIZE + 1, ry - RESIZE_HANDLE_SIZE + 1, rx, ry, ColourNameToRGB("dimgray"))
+      for i = 1, 3 do
+        local d = i * 4
+        WindowLine(WIN, rx - RESIZE_HANDLE_SIZE + d, ry - 2, rx - 2, ry - RESIZE_HANDLE_SIZE + d, ColourNameToRGB("silver"), miniwin.pen_solid, 1)
+      end
+      WindowAddHotspot(WIN, "world_map_hotspot", 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT,
+        "", "", "OnDragMouseDown", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)
+      WindowDragHandler(WIN, "world_map_hotspot", "OnDragMove", "OnDragRelease", 0)
+      WindowAddHotspot(WIN, "resize_hotspot", rx - RESIZE_HANDLE_SIZE + 1, ry - RESIZE_HANDLE_SIZE + 1, rx, ry,
+        "", "", "OnResizeMouseDown", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)
+      WindowDragHandler(WIN, "resize_hotspot", "OnResizeMove", "OnResizeRelease", 0)
+    else
+      WindowAddHotspot(WIN, "world_map_hotspot", consts.GetBorderWidth(), consts.GetBorderWidth(), width - consts.GetBorderWidth(), height - consts.GetBorderWidth(), "", "", "", "", "OnMouseUp", "", miniwin.cursor_arrow, 0)
+      WindowScrollwheelHandler(WIN, "world_map_hotspot", "OnWheel")
+    end
     
     WindowSetZOrder(WIN, 9999)
     
@@ -357,49 +380,58 @@ tryShowCrystalMarker = function(window_name, max_x, max_y, center_x, center_y)
 
   local crystal_x = MARKERS.crystal.x / PLANE_DETAILS[CURRENT_PLANE].x * max_x
   local crystal_y = MARKERS.crystal.y / PLANE_DETAILS[CURRENT_PLANE].y * max_y
-  local crystal_offset_x = crystal_x - center_x
-  local crystal_offset_y = crystal_y - center_y
 
   WindowLoadImageMemory(window_name, "crystal_icon", ICON_CACHE.crystal)
   local icon_point_x = WindowImageInfo(window_name, "crystal_icon", 2) * -1/2
   local icon_point_y = WindowImageInfo(window_name, "crystal_icon", 3) * -1
 
   local width, height = WindowInfo(window_name, 3), WindowInfo(window_name, 4)
-  local draw_x = width / 2 + crystal_offset_x + icon_point_x
-  local draw_y = height / 2 + crystal_offset_y + icon_point_y
+  local loops_x = PLANE_DETAILS[CURRENT_PLANE].l and { -max_x, 0, max_x } or { 0 }
+  local loops_y = PLANE_DETAILS[CURRENT_PLANE].l and { -max_y, 0, max_y } or { 0 }
 
-  if draw_x < consts.GetBorderWidth() or draw_x > (width - consts.GetBorderWidth()) or 
-    draw_y < consts.GetBorderWidth() or draw_y > (height - consts.GetBorderWidth()) then
-   return
+  for _, dx in ipairs(loops_x) do
+    for _, dy in ipairs(loops_y) do
+      local draw_x = width / 2 + (crystal_x + dx - center_x) + icon_point_x
+      local draw_y = height / 2 + (crystal_y + dy - center_y) + icon_point_y
+      if draw_x >= consts.GetBorderWidth() and draw_x <= (width - consts.GetBorderWidth()) and
+         draw_y >= consts.GetBorderWidth() and draw_y <= (height - consts.GetBorderWidth()) then
+        WindowDrawImageAlpha(WIN, "crystal_icon", draw_x, draw_y, 0, 0, .8)
+      end
+    end
   end
-
-  WindowDrawImageAlpha(WIN, "crystal_icon", draw_x, draw_y, 0, 0, .8)
 end
 
 tryShowDestinationMarkers = function(window_name, max_x, max_y, center_x, center_y)
   local markers = { "one", "two", "three" }
+  local loops_x = PLANE_DETAILS[CURRENT_PLANE].l and { -max_x, 0, max_x } or { 0 }
+  local loops_y = PLANE_DETAILS[CURRENT_PLANE].l and { -max_y, 0, max_y } or { 0 }
+
   for _, marker in ipairs(markers) do
-    if MARKERS[marker] == nil or MARKERS[marker].x == nil or MARKERS[marker].y == nil then return end
+    if MARKERS[marker] == nil or MARKERS[marker].x == nil or MARKERS[marker].y == nil then
+      goto continue
+    end
 
     local marker_x = MARKERS[marker].x / PLANE_DETAILS[CURRENT_PLANE].x * max_x
     local marker_y = MARKERS[marker].y / PLANE_DETAILS[CURRENT_PLANE].y * max_y
-    local marker_offset_x = marker_x - center_x
-    local marker_offset_y = marker_y - center_y
 
     WindowLoadImageMemory(window_name, marker .. "_icon", ICON_CACHE[marker])
     local icon_point_x = WindowImageInfo(window_name, marker .. "_icon", 2) * -1/2
-    local icon_point_y = WindowImageInfo(window_name, marker.."_icon", 3) * -1
+    local icon_point_y = WindowImageInfo(window_name, marker .. "_icon", 3) * -1
 
     local width, height = WindowInfo(window_name, 3), WindowInfo(window_name, 4)
-    local draw_x = width / 2 + marker_offset_x + icon_point_x
-    local draw_y = height / 2 + marker_offset_y + icon_point_y
 
-    if draw_x < consts.GetBorderWidth() or draw_x > (width - consts.GetBorderWidth()) or 
-      draw_y < consts.GetBorderWidth() or draw_y > (height - consts.GetBorderWidth()) then
-    return
+    for _, dx in ipairs(loops_x) do
+      for _, dy in ipairs(loops_y) do
+        local draw_x = width / 2 + (marker_x + dx - center_x) + icon_point_x
+        local draw_y = height / 2 + (marker_y + dy - center_y) + icon_point_y
+        if draw_x >= consts.GetBorderWidth() and draw_x <= (width - consts.GetBorderWidth()) and
+           draw_y >= consts.GetBorderWidth() and draw_y <= (height - consts.GetBorderWidth()) then
+          WindowDrawImageAlpha(WIN, marker .. "_icon", draw_x, draw_y, 0, 0, .8)
+        end
+      end
     end
 
-    WindowDrawImageAlpha(WIN, marker .. "_icon", draw_x, draw_y, 0, 0, .8)
+    ::continue::
   end
 end
 
@@ -469,12 +501,145 @@ getMapTile = function(window_name, x, y, ox, oy, is_main)
   return filepath
 end
 
+local function windowFlags()
+  return CONFIG.CIRCLE and 6 or 2
+end
+
+function OnDragMouseDown(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    IS_DRAGGING = true
+    DRAG_GRAB_X = WindowInfo(WIN, 14)
+    DRAG_GRAB_Y = WindowInfo(WIN, 15)
+  end
+end
+
+function OnDragMove(flags, hotspot_id)
+  if IS_DRAGGING then
+    local pos_x = WindowInfo(WIN, 17) - DRAG_GRAB_X
+    local pos_y = WindowInfo(WIN, 18) - DRAG_GRAB_Y
+    WindowPosition(WIN, pos_x, pos_y, 0, miniwin.create_absolute_location)
+  end
+end
+
+function OnDragRelease(flags, hotspot_id)
+  if IS_DRAGGING then
+    IS_DRAGGING = false
+    CONFIG.WINDOW_LEFT = WindowInfo(WIN, 10)
+    CONFIG.WINDOW_TOP  = WindowInfo(WIN, 11)
+    CONFIG.AUTO_ADJUST_SIZE = false
+    saveMiniWindow()
+    drawMiniWindow()
+  end
+end
+
+function OnResizeMouseDown(flags, hotspot_id)
+  if flags == miniwin.hotspot_got_lh_mouse then
+    IS_RESIZING = true
+    CONFIG.AUTO_ADJUST_SIZE = false
+  end
+end
+
+function OnResizeMove(flags, hotspot_id)
+  if IS_RESIZING then
+    local mouse_x = GetInfo(283)
+    local mouse_y = GetInfo(284)
+    CONFIG.WINDOW_WIDTH  = math.max(100, mouse_x - CONFIG.WINDOW_LEFT)
+    CONFIG.WINDOW_HEIGHT = math.max(100, mouse_y - CONFIG.WINDOW_TOP)
+    WindowResize(WIN, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0)
+  end
+end
+
+function OnResizeRelease(flags, hotspot_id)
+  if IS_RESIZING then
+    IS_RESIZING = false
+    CONFIG.AUTO_ADJUST_SIZE = false
+    saveMiniWindow()
+    drawMiniWindow()
+  end
+end
+
+local function clickToWorldCoords(win_x, win_y)
+  if COORD_X == nil or COORD_Y == nil or CURRENT_PLANE == nil then return nil, nil end
+  local border = consts.GetBorderWidth()
+  local width  = CONFIG.WINDOW_WIDTH  - border * 2
+  local height = CONFIG.WINDOW_HEIGHT - border * 2
+  local num_of_tiles = 2 ^ ZOOM_LEVEL[CURRENT_PLANE]
+  local max_x = 1150 * num_of_tiles
+  local max_y = 750  * num_of_tiles
+  local scaled_x = COORD_X / PLANE_DETAILS[CURRENT_PLANE].x * max_x + (win_x - border - width  / 2)
+  local scaled_y = COORD_Y / PLANE_DETAILS[CURRENT_PLANE].y * max_y + (win_y - border - height / 2)
+  if PLANE_DETAILS[CURRENT_PLANE].l then
+    scaled_x = scaled_x % max_x
+    scaled_y = scaled_y % max_y
+  end
+  local world_x = math.floor(scaled_x / max_x * PLANE_DETAILS[CURRENT_PLANE].x + 0.5)
+  local world_y = math.floor(scaled_y / max_y * PLANE_DETAILS[CURRENT_PLANE].y + 0.5)
+  return world_x, world_y
+end
+
 function OnMouseUp(flags, hotspot_id)
-  if flags == miniwin.hotspot_got_rh_mouse then
-    local result = WindowMenu(WIN, WindowInfo(WIN, 14),  WindowInfo(WIN, 15), "configure")
-    if result == "configure" then
-      configure()
+  if flags ~= miniwin.hotspot_got_rh_mouse then
+    if IS_DRAGGING then
+      IS_DRAGGING = false
+      CONFIG.WINDOW_LEFT = DRAG_PENDING_LEFT
+      CONFIG.WINDOW_TOP  = DRAG_PENDING_TOP
+      CONFIG.AUTO_ADJUST_SIZE = false
+      WindowCreate(WIN, CONFIG.WINDOW_LEFT, CONFIG.WINDOW_TOP, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT, 0, windowFlags(), 11766186)
+      saveMiniWindow()
+      drawMiniWindow()
+    elseif IS_RESIZING then
+      IS_RESIZING = false
+      CONFIG.WINDOW_WIDTH  = RESIZE_PENDING_WIDTH
+      CONFIG.WINDOW_HEIGHT = RESIZE_PENDING_HEIGHT
+      CONFIG.AUTO_ADJUST_SIZE = false
+      saveMiniWindow()
+      drawMiniWindow()
     end
+    return
+  end
+
+  local click_x = WindowInfo(WIN, 14)
+  local click_y = WindowInfo(WIN, 15)
+  local world_x, world_y = clickToWorldCoords(click_x, click_y)
+
+  local items = {}
+  if world_x ~= nil and not POSITIONING_MODE then
+    table.insert(items, "Set destination 1 here")
+    table.insert(items, "Set destination 2 here")
+    table.insert(items, "Set destination 3 here")
+    table.insert(items, "-")
+  end
+
+  local has_clear = not POSITIONING_MODE and (MARKERS.one ~= nil or MARKERS.two ~= nil or MARKERS.three ~= nil)
+  if has_clear then
+    if MARKERS.one   ~= nil then table.insert(items, "Clear destination 1") end
+    if MARKERS.two   ~= nil then table.insert(items, "Clear destination 2") end
+    if MARKERS.three ~= nil then table.insert(items, "Clear destination 3") end
+    table.insert(items, "-")
+  end
+
+  table.insert(items, POSITIONING_MODE and "Lock position" or "Position window")
+  table.insert(items, "-")
+  table.insert(items, "Configure")
+
+  local result = WindowMenu(WIN, click_x, click_y, table.concat(items, "|"))
+  if result == "Configure" then
+    configure()
+  elseif result == "Set destination 1 here" then
+    setDestinationCoords(1, world_x, world_y)
+  elseif result == "Set destination 2 here" then
+    setDestinationCoords(2, world_x, world_y)
+  elseif result == "Set destination 3 here" then
+    setDestinationCoords(3, world_x, world_y)
+  elseif result == "Clear destination 1" then
+    setDestinationCoords(1, nil, nil)
+  elseif result == "Clear destination 2" then
+    setDestinationCoords(2, nil, nil)
+  elseif result == "Clear destination 3" then
+    setDestinationCoords(3, nil, nil)
+  elseif result == "Position window" or result == "Lock position" then
+    POSITIONING_MODE = not POSITIONING_MODE
+    drawMiniWindow()
   end
 end
 
