@@ -265,7 +265,10 @@ Commands:
   <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)\[Shop\] Shroom the bartender is here\, leering at you\.$" regexp="y" send_to="12" sequence="100">
     <send>CheckNpcProgress("Shroom")</send>
   </trigger>
-  
+
+  <trigger group="cooking_helper" keep_evaluating="y" match="^(.*?)This twig\-skinny girl\'s face is older than her size would indicate\.$" regexp="y" send_to="12" sequence="100">
+    <send>CheckNpcProgress("a malnourished girl")</send>
+  </trigger>
 </triggers>
 
 <script>
@@ -729,7 +732,7 @@ function addConsumerToRecipe(recipe_name)
     if tracked_recipes[recipe_name:upper()].eaten[consumer_name:upper()] then
       Note("Consumer '" .. consumer_name .. "' has already eaten '" .. recipe_name .. "'")
     else
-      tracked_recipes[recipe_name:upper()].eaten[consumer:upper()] = { name = consumer, date = os.date('%Y-%m-%d %H:%M:%S') }
+      tracked_recipes[recipe_name:upper()].eaten[consumer_name:upper()] = { name = consumer_name, date = os.date('%Y-%m-%d %H:%M:%S') }
       Note("Consumer '" .. consumer_name .. "' has been recorded as having eaten '" .. recipe_name .. "'")
     end
   end
