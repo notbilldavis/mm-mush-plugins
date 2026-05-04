@@ -70,6 +70,10 @@ View help and your current custom sends for goto next:
 
 <aliases>
 
+<alias match="^goto$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>showLocations()</send>
+</alias>
+
 <alias match="^goto[ ]+north$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doNorthGate()</send>
 </alias>
@@ -100,6 +104,22 @@ View help and your current custom sends for goto next:
 
 <alias match="^goto[ ]+qm$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
     <send>doQuestMaster()</send>
+</alias>
+
+<alias match="^goto[ ]+lockers?$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>doLockers()</send>
+</alias>
+
+<alias match="^goto[ ]+post$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>doPostOffice()</send>
+</alias>
+
+<alias match="^goto[ ]+reagents?$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>doReagents()</send>
+</alias>
+
+<alias match="^goto[ ]+bank$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
+    <send>doBank()</send>
 </alias>
 
 <alias match="^goto[ ]+rep$" enabled="y" regexp="y" send_to="12" sequence="100" group="goto_aliases">
@@ -206,6 +226,10 @@ function OnPluginInstall()
     return
   else
     populateLocations()
+    setPostOffices()
+    setBanks()
+    setReagents()
+    setLockers()
     loadCustomData()
     EnableTriggerGroup("goto_aliases", true)
     EnableAliasGroup("goto_aliases", true)
@@ -281,6 +305,63 @@ function setLocation(key, continent, north, south, east, west, default_gate, qm,
   locations[key] = { north = north, south = south, east = east, west = west, qm = qm, rep = rep, continent = continent, default_gate = default_gate }
 end
 
+function setPostOffices()
+  locations["rune"]["post"] = "10560"
+  locations["sigil"]["post"] = "28083"
+  locations["diocletian"]["post"] = "28988"
+  locations["newrigel"]["post"] = "62584"
+  locations["xaventry"]["post"] = "73154"
+  locations["tellerium"]["post"] = "41703"
+  locations["templeton"]["post"] = "46556"
+  locations["piratescove"]["post"] = "29943"
+  locations["vospire"]["post"] = "40267"
+  locations["lowangen"]["post"] = "15961"
+  locations["maldra"]["post"] = "68121"
+end
+
+function setBanks()
+  locations["rune"]["bank"] = "10592"
+  locations["sigil"]["bank"] = "28014"
+  locations["diocletian"]["bank"] = "28985"
+  locations["newrigel"]["bank"] = "62529"
+  locations["xaventry"]["bank"] = "73970"
+  locations["tellerium"]["bank"] = "41702"
+  locations["templeton"]["bank"] = "46001"
+  locations["piratescove"]["bank"] = "29914"
+  locations["vospire"]["bank"] = "40282"
+  locations["lowangen"]["bank"] = "16072"
+  locations["maldra"]["bank"] = "68067"
+  locations["decara"]["bank"] = "116102"
+end
+
+function setReagents()
+  locations["rune"]["reagents"] = "10554"
+  locations["sigil"]["reagents"] = "28003"
+  locations["diocletian"]["reagents"] = "28987"
+  locations["newrigel"]["reagents"] = "62576"
+  locations["xaventry"]["reagents"] = "73745"
+  locations["templeton"]["reagents"] = "46405"
+  locations["piratescove"]["reagents"] = "29915"
+  locations["vospire"]["reagents"] = "39918"
+  locations["lowangen"]["reagents"] = "16062"
+  locations["maldra"]["reagents"] = "68111"
+end
+
+function setLockers()
+  locations["rune"]["locker"] = "10558"
+  locations["sigil"]["locker"] = "28034"
+  locations["diocletian"]["locker"] = "28984"
+  locations["newrigel"]["locker"] = "62542"
+  locations["xaventry"]["locker"] = "73156"
+  locations["tellerium"]["locker"] = "41710"
+  locations["templeton"]["locker"] = "45967"
+  locations["piratescove"]["locker"] = "29894"
+  locations["vospire"]["locker"] = "40266"
+  locations["lowangen"]["locker"] = "16232"
+  locations["vir"]["locker"] = "146151"
+  locations["decara"]["locker"] = "116084"
+end
+
 function loadCustomData()
   default_sends = {}
   default_sends[locations["rune"]["east"]] = "run newrigel"
@@ -335,6 +416,28 @@ function getDestinationRoom(destination)
     return nil
 end
 
+function showLocations()
+  local zone_key = getZoneKey()
+  if zone_key then
+    local location = locations[zone_key]
+    local exits = {}
+    if location.north then table.insert(exits, "north") end
+    if location.south then table.insert(exits, "south") end
+    if location.east then table.insert(exits, "east") end
+    if location.west then table.insert(exits, "west") end
+    if location.qm then table.insert(exits, "qm") end
+    if location.rep then table.insert(exits, "rep") end
+    if location.post then table.insert(exits, "post") end
+    if location.bank then table.insert(exits, "bank") end
+    if location.reagents then table.insert(exits, "reagents") end
+    if location.locker then table.insert(exits, "lockers") end
+
+    Note("You can goto: " .. table.concat(exits, ", "))
+  else
+    Note("There are no goto options from this location.")
+  end
+end
+
 function doLocation(destination)
   local room_number = getDestinationRoom(destination)
   if (room_number ~= nil) then
@@ -362,6 +465,22 @@ end
 
 function doDefaultGate() -- Default Gate
   doLocation("default_gate")
+end
+
+function doPostOffice() -- Post Office
+  doLocation("post")
+end
+
+function doBank() -- Bank
+  doLocation("bank")
+end
+
+function doReagents() -- Reagents
+  doLocation("reagents")
+end
+
+function doLockers() -- Lockers
+  doLocation("locker")
 end
 
 function doQuestMaster() -- Quest Master
