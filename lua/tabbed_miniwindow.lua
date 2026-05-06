@@ -7,12 +7,12 @@ local FONT = WIN .. "_capture_font"
 local HEADERFONT = WIN .. "_header_font"
 
 local prepare, initialize, capture, getDateString, close, isAutoUpdateEnabled, onConfigureDone, doDebug
-local load, save, create, draw, drawNotifications, addLineToTab, onScrollToBottom, drawWindow, drawTabs, drawLines,
-  drawScrollbar, drawResizeHandle, drawScrollToBottom, addTextToBuffer, clearTab, formatLines, populateSizes,
-  setSizeConst, renderRectangle, drawNotification, drawDragHandle, drawNotifications, drawSelection, hasSelection,
-  drawScrollbar, drawScrollbarDetails, drawResizeHandle, moveScrollBar, doRightClickHeaderMenu, doRightClickMenu,
-  showUnlockedRightClick, roundToNearestCharacter, copySelectedText, configure, addNewTab, adjustAnchor,
-  getSubstringByPixelRange, captureText, addStyledLine, shouldSkip, calculateOptimalWindowLines
+local load, save, create, draw, addLineToTab, onScrollToBottom, drawWindow, drawTabs, drawLines,
+  drawScrollbar, drawResizeHandle, drawScrollToBottom, addTextToBuffer, clearTab, formatLines, formatSegments,
+  appendFormattedLine, populateSizes, setSizeConst, renderRectangle, drawNotification, drawDragHandle,
+  drawNotifications, drawSelection, hasSelection, drawScrollbarDetails, moveScrollBar, doRightClickHeaderMenu,
+  doRightClickMenu, showUnlockedRightClick, roundToNearestCharacter, copySelectedText, configure, addNewTab,
+  adjustAnchor, getSubstringByPixelRange, captureText, addStyledLine, shouldSkip, calculateOptimalWindowLines
 
 local CONFIG = nil
 local POSITION = nil
@@ -241,8 +241,6 @@ load = function()
   CONFIG.ACTIVE_COLOR = serialization_helper.GetValueOrDefault(CONFIG.ACTIVE_COLOR, ColourNameToRGB("darkgreen"))
   CONFIG.INACTIVE_COLOR = serialization_helper.GetValueOrDefault(CONFIG.INACTIVE_COLOR, ColourNameToRGB("grey"))
   CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("gray"))
-  CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
-  CONFIG.DETAIL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.DETAIL_COLOR, ColourNameToRGB("silver"))
   CONFIG.SCROLL_COLOR = serialization_helper.GetValueOrDefault(CONFIG.SCROLL_COLOR, ColourNameToRGB("darkgray"))
   CONFIG.BACKGROUND_COLOR = serialization_helper.GetValueOrDefault(CONFIG.BACKGROUND_COLOR, ColourNameToRGB("black"))
   CONFIG.Z_POSITION = serialization_helper.GetValueOrDefault(CONFIG.Z_POSITION, 500)
@@ -273,16 +271,16 @@ create = function()
 
   WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
   
-  WindowFont(WIN, FONT, capfont.name, capfont.size, 
-    serialization_helper.ConvertToBool(capfont.bold), 
-    serialization_helper.ConvertToBool(capfont.italic), 
-    serialization_helper.ConvertToBool(capfont.italic), 
+  WindowFont(WIN, FONT, capfont.name, capfont.size,
+    serialization_helper.ConvertToBool(capfont.bold),
+    serialization_helper.ConvertToBool(capfont.italic),
+    serialization_helper.ConvertToBool(capfont.underline),
     serialization_helper.ConvertToBool(capfont.strikeout))
 
-  WindowFont(WIN, HEADERFONT, hdrfont.name, hdrfont.size, 
-    serialization_helper.ConvertToBool(hdrfont.bold), 
-    serialization_helper.ConvertToBool(hdrfont.italic), 
-    serialization_helper.ConvertToBool(hdrfont.italic), 
+  WindowFont(WIN, HEADERFONT, hdrfont.name, hdrfont.size,
+    serialization_helper.ConvertToBool(hdrfont.bold),
+    serialization_helper.ConvertToBool(hdrfont.italic),
+    serialization_helper.ConvertToBool(hdrfont.underline),
     serialization_helper.ConvertToBool(hdrfont.strikeout))
 
   CHARACTER_WIDTH = WindowTextWidth(WIN, FONT, "X")
@@ -330,78 +328,92 @@ addLineToTab = function(tab, channel, styledLineSegments)
 end
 
 addTextToBuffer = function(name, segments)
-  if TEXT_BUFFERS[name] == nil then 
+  if TEXT_BUFFERS[name] == nil then
     clearTab(name)
   end
 
   table.insert(TEXT_BUFFERS[name], segments)
 
+  local trimmed_count = 0
   if #TEXT_BUFFERS[name] > CONFIG.MAX_LINES then
+    trimmed_count = #formatSegments(TEXT_BUFFERS[name][1])
     table.remove(TEXT_BUFFERS[name], 1)
   end
 
   if name == CURRENT_TAB_NAME then
-    formatLines(name)
+    if trimmed_count > 0 then
+      formatLines(name)
+      SCROLL_OFFSETS[name] = math.max(0, (SCROLL_OFFSETS[name] or 0) - trimmed_count)
+    else
+      appendFormattedLine(name, segments)
+    end
   end
+end
+
+formatSegments = function(styles)
+  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 8 - consts.GetBorderWidth() * 2
+  local wrapped = {}
+  local currentLine = {}
+  local currentWidth = 0
+
+  for _, seg in ipairs(styles) do
+    local text = seg.text
+    local textcolour = seg.textcolour or "white"
+    local backcolour = seg.backcolour or "black"
+
+    if text ~= nil then
+      local i = 1
+      while i <= #text do
+        local fit_len = 0
+        local fit_width = 0
+        local j = i
+        while j <= #text do
+          local charWidth = WindowTextWidth(WIN, FONT, text:sub(j, j))
+          if currentWidth + fit_width + charWidth > maxWidth then break end
+          fit_width = fit_width + charWidth
+          fit_len = j - i + 1
+          j = j + 1
+        end
+
+        if fit_len == 0 then
+          fit_len = 1
+          fit_width = WindowTextWidth(WIN, FONT, text:sub(i, i))
+        end
+
+        table.insert(currentLine, { text = text:sub(i, i + fit_len - 1), textcolour = textcolour, backcolour = backcolour })
+        currentWidth = currentWidth + fit_width
+        i = i + fit_len
+
+        if currentWidth >= maxWidth then
+          table.insert(wrapped, currentLine)
+          currentLine = {}
+          currentWidth = 0
+        end
+      end
+    end
+  end
+
+  if #currentLine > 0 then
+    table.insert(wrapped, currentLine)
+  end
+
+  return wrapped
 end
 
 formatLines = function(list)
   if TEXT_BUFFERS[list] == nil then return end
-
-  local maxWidth = POSITION.WINDOW_WIDTH - CONFIG.SCROLL_WIDTH - 8 - consts.GetBorderWidth() * 2
-
-  FORMATTED_LINES[list] = {}    
-
+  FORMATTED_LINES[list] = {}
   for _, styles in ipairs(TEXT_BUFFERS[list]) do
-    local wrapped = {}
-    local currentLine = {}
-    local currentWidth = 0
-
-    for _, seg in ipairs(styles) do
-      local text = seg.text
-      local textcolour = seg.textcolour or "white"
-      local backcolour = seg.backcolour or "black"
-
-      if text ~= nil then
-        while #text > 0 do
-          local remaining = text
-          local fit = ""
-
-          for i = 1, #remaining do
-            local candidate = string.sub(remaining, 1, i)
-            local width = WindowTextWidth(WIN, FONT, candidate)
-
-            if currentWidth + width > maxWidth then
-              break
-            end
-
-            fit = candidate
-          end
-
-          if fit == "" then
-            fit = string.sub(remaining, 1, 1)
-          end
-
-          table.insert(currentLine, { text = fit, textcolour = textcolour, backcolour = backcolour })
-          currentWidth = currentWidth + WindowTextWidth(WIN, FONT, fit)
-          text = string.sub(text, #fit + 1)
-
-          if currentWidth >= maxWidth then
-            table.insert(wrapped, currentLine)
-            currentLine = {}
-            currentWidth = 0
-          end
-        end
-      end
-    end
-
-    if #currentLine > 0 then
-      table.insert(wrapped, currentLine)
-    end
-
-    for _, line in ipairs(wrapped) do
+    for _, line in ipairs(formatSegments(styles)) do
       table.insert(FORMATTED_LINES[list], line)
     end
+  end
+end
+
+appendFormattedLine = function(list, styles)
+  if FORMATTED_LINES[list] == nil then FORMATTED_LINES[list] = {} end
+  for _, line in ipairs(formatSegments(styles)) do
+    table.insert(FORMATTED_LINES[list], line)
   end
 end
 
@@ -595,8 +607,8 @@ end
 
 hasSelection = function(s)
   if s == nil then s = SELECTIONS[CURRENT_TAB_NAME] end
-  return s ~= nil and s.start_x ~= nil and s.start_y ~= nil and s.end_x ~= nil and s.end_y ~= nil 
-    and (s.start_x - s.end_x >= CHARACTER_WIDTH or s.end_x - s.start_x >= CHARACTER_WIDTH or s.start_y - s.end_y >= CHARACTER_WIDTH or s.end_y - s.start_y >= CHARACTER_WIDTH)
+  return s ~= nil and s.start_x ~= nil and s.start_y ~= nil and s.end_x ~= nil and s.end_y ~= nil
+    and (math.abs(s.start_x - s.end_x) >= CHARACTER_WIDTH or math.abs(s.start_y - s.end_y) >= LINE_HEIGHT)
 end
 
 drawScrollbar = function()
@@ -820,7 +832,7 @@ function OnResizerDrag()
     local mouse_x, mouse_y = GetInfo(283), GetInfo(284)
     
     local new_width = math.max(200, mouse_x - POSITION.WINDOW_LEFT)
-    local new_height = math.min(GetInfo(280), math.max(100, mouse_y + POSITION.WINDOW_TOP))
+    local new_height = math.min(GetInfo(280), math.max(100, mouse_y - POSITION.WINDOW_TOP))
 
     POSITION.WINDOW_WIDTH = new_width
     POSITION.WINDOW_HEIGHT = new_height
@@ -928,7 +940,18 @@ doRightClickHeaderMenu = function(name)
 
       elseif result == "Rename" then
         local new_name = utils.inputbox(tab["name"] or "", "Rename Tab", name)
-        if new_name ~= nil and #new_name > 0 then 
+        if new_name ~= nil and #new_name > 0 then
+          TEXT_BUFFERS[new_name] = TEXT_BUFFERS[name]
+          FORMATTED_LINES[new_name] = FORMATTED_LINES[name]
+          SCROLL_OFFSETS[new_name] = SCROLL_OFFSETS[name]
+          UNREAD_COUNT[new_name] = UNREAD_COUNT[name]
+          SELECTIONS[new_name] = SELECTIONS[name]
+          TEXT_BUFFERS[name] = nil
+          FORMATTED_LINES[name] = nil
+          SCROLL_OFFSETS[name] = nil
+          UNREAD_COUNT[name] = nil
+          SELECTIONS[name] = nil
+          if CURRENT_TAB_NAME == name then CURRENT_TAB_NAME = new_name end
           ALL_TABS[i]["name"] = new_name
           draw()
         end
@@ -938,6 +961,11 @@ doRightClickHeaderMenu = function(name)
       
       elseif result == "Delete Tab" then
         if i > 1 then
+          TEXT_BUFFERS[name] = nil
+          FORMATTED_LINES[name] = nil
+          SCROLL_OFFSETS[name] = nil
+          UNREAD_COUNT[name] = nil
+          SELECTIONS[name] = nil
           table.remove(ALL_TABS, i)
           draw()
         else
@@ -1082,18 +1110,25 @@ end
 
 addNewTab = function()
   local new_index = #ALL_TABS + 1
-  local channels = {}
+  local channel_list = {}
   for value, _ in pairs(POSSIBLE_CHANNELS) do
-    channels[value] = value
+    table.insert(channel_list, value)
   end
+  table.sort(channel_list)
   local new_tab_name = utils.inputbox("Enter a name for the new tab", "New Tab", "Tab " .. new_index)
   if new_tab_name ~= nil and new_tab_name ~= "" then
-    local new_tab_channels = utils.multilistbox("Choose the channels this tab will display", "New Tab", channels, nil)
-    local new_tab_notify = utils.msgbox("Should new entries added to this tab when it is invactive show a notification icon?", "New Tab", "yesno", "?")
-  
+    local selected = utils.multilistbox("Choose the channels this tab will display", "New Tab", channel_list, nil)
+    local new_tab_channels = {}
+    if selected then
+      for _, v in ipairs(selected) do
+        new_tab_channels[v] = true
+      end
+    end
+    local new_tab_notify = utils.msgbox("Should new entries added to this tab when it is inactive show a notification icon?", "New Tab", "yesno", "?")
+
     ALL_TABS[new_index] = {
       name = new_tab_name,
-      channels = new_tab_channels or {},
+      channels = new_tab_channels,
       notify = new_tab_notify == "yes"
     }
 
@@ -1254,7 +1289,7 @@ calculateOptimalWindowLines = function(max_height)
     lines = lines + 1
     height = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + lines * LINE_HEIGHT
   end
-  return lines - 1
+  return math.max(1, lines - 1)
 end
 
 doDebug = function()

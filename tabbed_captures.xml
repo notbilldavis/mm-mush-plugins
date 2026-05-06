@@ -116,7 +116,7 @@ Use 'capture update' to check for updates from github.
     <send>doCapture(TriggerStyleRuns, "%0", "novice")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="14" sequence="100" match="^AUCTION\: (.*?) has put (.+) up for auction\. Minimum bid is (.+) gp\.$">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" send_to="14" sequence="100" match="^AUCTION\: (.*?) has put (.*?) up for auction\. Minimum bid is (.*?)\.(\s*)$">
     <send>doCapture(TriggerStyleRuns, "%0", "auction")</send>
   </trigger>
 
@@ -124,7 +124,7 @@ Use 'capture update' to check for updates from github.
     <send>doCapture(TriggerStyleRuns, "%0", "aucverb")</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" match="^(.*?) yells \'(.+)\'$" regexp="y" send_to="14"sequence="100">
+  <trigger enabled="y" keep_evaluating="y" match="^(.*?) yells \'(.+)\'$" regexp="y" send_to="14" sequence="100">
     <send>doCapture(TriggerStyleRuns, "%0", "yell")</send>
   </trigger>
 
@@ -453,7 +453,6 @@ end
 
 function doDebug()
   capture_window.DoDebug()
-  captureGlobalEcho()
 end
 
 function strip_colors(msg)
