@@ -137,7 +137,15 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
     <send>checkSearchStep(true)</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You stop searching\, content that nothing remains unfound\.$" send_to="12" sequence="100" group="search_step">
+    <send>checkSearchStep(true)</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You stop searching the area\.$" send_to="12" sequence="100" group="search_step">
+    <send>checkSearchStep(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You will be able to perform another special action in (.*?) secon(.*?)\.$" send_to="12" sequence="100" group="search_step">
     <send>checkSearchStep(false)</send>
   </trigger>
 
@@ -161,6 +169,14 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
     <send>checkCastStep(false)</send>
   </trigger>
 
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Your spellcast fails\, as you are missing (.*?)\.$" send_to="12" sequence="100" group="cast_step">
+    <send>checkCastStep(false)</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^That spell cannot be cast while you are indoors\.$" send_to="12" sequence="100" group="cast_step">
+    <send>checkCastStep(true)</send>
+  </trigger>
+
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) has been slain\!$" send_to="12" sequence="100" group="kill_step">
     <send>checkKillStep()</send>
   </trigger>
@@ -173,7 +189,11 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
     <send>fleeBlocked()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) grabs ahold of your shoulders\, and pulls you back towards it\!$" send_to="12" sequence="100">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) grabs ahold of your shoulders\, and pulls you back towards (.*?)\!$" send_to="12" sequence="100">
+    <send>fleeBlocked()</send>
+  </trigger>
+
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?) grapples you with (.*?) as you flee\, pulling you back towards (.*?)\!$" send_to="12" sequence="100">
     <send>fleeBlocked()</send>
   </trigger>
 
@@ -193,16 +213,19 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
     <send>sawWallet()</send>
   </trigger>
 
-  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take an orb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take an (O|o)rb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
     <send>gotOrb()</send>
   </trigger>
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^(.*?)manual emits a bright flare of white light as you take it and it binds with you\.$" send_to="12" sequence="100" group="advanced_speedwalking">
     <send>gotManual()</send>
   </trigger>
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a manual of (.*?)\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+    <send>gotManual()</send>
+  </trigger>
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a counterfeit manual\.$" send_to="12" sequence="100" group="advanced_speedwalking">
     <send>gotManual()</send>
   </trigger>
-  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a shard of an orb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
+  <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a shard of an (O|o)rb of Vandemaar\.$" send_to="12" sequence="100" group="advanced_speedwalking">
     <send>gotShard()</send>
   </trigger>  
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^You take a didactic parchment\.$" send_to="12" sequence="100" group="advanced_speedwalking">
@@ -214,11 +237,14 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^A lost wallet emits a bright flare of white light as you take it and it binds with you\." send_to="12" sequence="100" group="advanced_speedwalking">
     <send>gotWallet()</send>
   </trigger>
-
   <trigger enabled="y" keep_evaluating="y" regexp="y" match="^Your disembodied soul rises from your ravaged corpse\.$" send_to="12" sequence="100" group="advanced_speedwalking">
     <send>pauseSpeedwalk()</send>
   </trigger>
 </triggers>
+
+<variables>
+  <variable name="speedwalk_active">false</variable>
+</variables>
 
 <script>
 
@@ -226,8 +252,9 @@ Each step has a delay of .3 seconds. Will probably make this configurable in the
 
 require "gmcphelper"
 
+local config_installed, config_window = pcall(require, "configuration_miniwindow")
 local serializer_installed, serialization_helper = pcall(require, "serializationhelper")
-local can_create, speedwalk_editor = pcall(require, "speedwalk_miniwindow")
+local editor_installed, speedwalk_editor = pcall(require, "speedwalk_miniwindow")
 local const_installed, consts = pcall(require, "consthelper")
 
 if not serializer_installed then
@@ -235,7 +262,7 @@ if not serializer_installed then
   return
 end
 
-if not can_create then
+if not editor_installed then
   ColourNote("black", "red", "The Advanced Speedwalk plugin requires the speedwalk_miniwindow.lua script to be installed.")
   return
 end
@@ -245,7 +272,12 @@ if not const_installed then
   return
 end
 
+if not config_installed then
+  ColourNote("black", "yellow", "You will not be able to configure settings without the configuration_miniwindow.lua script.")
+end
+
 local WIN = "aspd_" .. GetPluginID()
+local SWIN = "settings_" .. WIN
 local FONT = WIN .. "_font"
 local INFO_FONT = WIN .. "_info_font"
 
@@ -267,11 +299,21 @@ local casting_spell = nil
 local planning_skill = nil
 local loot_item = nil
 
-local orb_seen, orb_taken = 0
-local manual_seen, manual_taken = 0
-local shard_seen, shard_taken = 0
-local parchment_seen, parchment_taken = 0
-local wallet_seen, wallet_taken = 0
+local orb_seen, orb_taken = 0, 0
+local manual_seen, manual_taken = 0, 0
+local shard_seen, shard_taken = 0, 0
+local parchment_seen, parchment_taken = 0, 0
+local wallet_seen, wallet_taken = 0, 0
+
+local settings = {
+  { name = "Show Status Buttons", type = "bool", value = true },
+  { name = "Show Scatter Info", type = "bool", value = true },
+  { name = "Auto Get Scatter Items", type = "bool", value = true },
+  { name = "Step Delay (seconds)", type = "number", value = .3 },
+}
+
+local user_settings = {}
+local initialized = false
 
 local border_width = GetInfo(277)
 local char_width, char_height, info_char_height, button_height
@@ -280,8 +322,11 @@ local pause_text, resume_text = "Pause", "Resume"
 local header_width, cancel_width, pause_width, resume_width
 local window_width, window_height
 local left_button_width, right_button_width
+local last_sent_command = nil
 
 function OnPluginInstall()
+  resetVariables(true)
+  initSettings()
   initButton() 
   loadSpeedwalks()
 end
@@ -293,7 +338,13 @@ function OnPluginDisconnect() pluginStop() end
 function OnPluginBroadcast(msg, id, name, text)
   if (id =="f67c4339ed0591a5b010d05b" and is_speedwalking and text == "room.info") then
     checkMapperStep()
+  elseif (id == "f973af093e715dece34dc25f" and msg == "failed" and is_speedwalking) then
+    Execute("mapper resume")
   end
+end
+
+function OnPluginSent(msg)
+  last_sent_command = msg
 end
 
 function pluginStop()
@@ -301,8 +352,12 @@ function pluginStop()
     finishSpeedwalk()
   end
 
-  if can_create then
+  if editor_installed then
     speedwalk_editor.hide()
+  end
+
+  if config_installed then
+    config_window.Hide()
   end
 end
 
@@ -337,6 +392,8 @@ function startSpeedwalk(speedwalk_id)
     createNewSpeedwalk()
   elseif speedwalk_id:sub(1, 4) == "edit" then
     edit(speedwalk_id:sub(5, #speedwalk_id))
+  elseif speedwalk_id == "config" then
+    openSettings()
   else
     all_speedwalks = serialization_helper.GetSerializedVariable("advanced_speedwalks", {})
     if speedwalk_id:find(" ") then
@@ -365,7 +422,9 @@ end
 
 function beginSpeedwalk(start_step)
   is_speedwalking = true
+  SetVariable("speedwalk_active", "true")
   updateButtons()
+  CallPlugin("f973af093e715dece34dc25f", "set_delay")
   resetVariables(true)
 
   start_step = tonumber(Trim(start_step or ""))
@@ -385,7 +444,7 @@ function advanceToNextStep()
     if not step then
       finishSpeedwalk()
     else
-      DoAfterSpecial(0.3, "handleAdvancement()", sendto.script)
+      DoAfterSpecial(tonumber(user_settings["Step Delay (seconds)"]) or 0.3, "handleAdvancement()", sendto.script)
     end
   end
 end
@@ -554,10 +613,7 @@ end
 function attackedDuringRun(attacked)
   attacked_during_run = attacked
   if not attacked then
-  -- ne, sw, w, e, e, w, s, pw, e, w, se, nw, 330869, 330871, ne, sw, se
     DoAfterSpecial(2, "handleRunStep(\"" .. run_direction .. "\")", sendto.script)
-
-    -- beltane has unsouthwest and mulkanthanos needs to mapper to 3900588 before running xalt 
   end
 end
 
@@ -575,7 +631,7 @@ function checkSearchStep(found)
     search_found = true
     advanceToNextStep()
   else
-    Execute("search " .. search_direction)
+    DoAfter(1, "search " .. search_direction)
   end
 end
 
@@ -660,24 +716,28 @@ function handleMessageBoxStep(text)
 end
 
 function handleRepeatStep(command, repeat_count)
-  local wait_time = 0.3
+  local wait_time = user_settings["Step Delay (seconds)"] or 0.3
   for t = 1, repeat_count do
     DoAfter(wait_time, command)
-    wait_time = wait_time + 0.3
+    wait_time = wait_time + (user_settings["Step Delay (seconds)"] or 0.3)
   end
 
-  DoAfterSpecial(wait_time + .3, "advanceToNextStep()", sendto.script)
+  DoAfterSpecial(wait_time + (user_settings["Step Delay (seconds)"] or 0.3), "advanceToNextStep()", sendto.script)
 end
 
 function finishSpeedwalk()
   WindowShow(WIN, false)
   is_speedwalking = false
+  SetVariable("speedwalk_active", "false")
   EnableTriggerGroup("advanced_speedwalking", false)
+  CallPlugin("f973af093e715dece34dc25f", "reset_delay")
   DoAfterSpecial(.25, "report()", sendto.script)
 end
 
 function fleeBlocked()
-  Execute("mapper resume")
+  if last_sent_command then
+    Execute(last_sent_command)
+  end
 end
 
 function report()
@@ -756,43 +816,53 @@ function report()
 end
 
 function sawOrb()
-  Execute("mapper stop")
-  Execute("get orb")
   orb_seen = orb_seen + 1
-  Execute("mapper resume")
-  updateButtons()
+  if user_settings["Auto Get Scatter Items"] then  
+    Execute("mapper stop")
+    Execute("get orb")    
+    Execute("mapper resume")
+    updateButtons()
+  end
 end
 
 function sawManual()
-  Execute("mapper stop")
-  Execute("get manual")
   manual_seen = manual_seen + 1
-  Execute("mapper resume")
-  updateButtons()
+  if user_settings["Auto Get Scatter Items"] then
+    Execute("mapper stop")
+    Execute("get manual")
+    Execute("mapper resume")
+    updateButtons()
+  end
 end
 
 function sawShard()
-  Execute("mapper stop")
-  Execute("get shard")
   shard_seen = shard_seen + 1
-  Execute("mapper resume")
-  updateButtons()
+  if user_settings["Auto Get Scatter Items"] then
+    Execute("mapper stop")
+    Execute("get shard")
+    Execute("mapper resume")
+    updateButtons()
+  end
 end
 
 function sawParchment()
-  Execute("mapper stop")
-  Execute("get parchment")
   parchment_seen = parchment_seen + 1
-  Execute("mapper resume")
-  updateButtons()
+  if user_settings["Auto Get Scatter Items"] then
+    Execute("mapper stop")
+    Execute("get parchment")
+    Execute("mapper resume")
+    updateButtons()
+  end
 end
 
 function sawWallet()
-  Execute("mapper stop")
-  Execute("get wallet")
   wallet_seen = wallet_seen + 1
-  Execute("mapper resume")
-  updateButtons()
+  if user_settings["Auto Get Scatter Items"] then
+    Execute("mapper stop")
+    Execute("get wallet")
+    Execute("mapper resume")
+    updateButtons()
+  end
 end
 
 function gotOrb()
@@ -848,7 +918,11 @@ function initButton()
   left_button_width = cancel_width + (border_width * 2) + (char_width * 4)
   right_button_width = resume_width + (border_width * 2) + (char_width * 4)
   window_width = left_button_width + border_width + right_button_width
-  window_height = button_height + (info_char_height * 5) + (border_width * 4)
+  window_height = button_height + (border_width * 4)
+
+  if user_settings["Show Scatter Info"] then
+    window_height = button_height + (info_char_height * 5) + (border_width * 4)
+  end
   
   WindowResize(WIN, window_width, window_height, 0)
   WindowPosition(WIN, 0, 0, miniwin.pos_center_all, 0)
@@ -858,6 +932,10 @@ end
 
 function updateButtons()
   WindowShow(WIN, false)
+
+  if not user_settings["Show Status Buttons"] then
+    return
+  end
 
   if is_speedwalking then
     local right_button_text, right_button_color, right_button_id, right_button_callback = pause_text, ColourNameToRGB("orange"), "pause_button", "pause_buttonClick"
@@ -875,12 +953,13 @@ function updateButtons()
       WindowRectOp(WIN, miniwin.rect_frame, i, button_height + border_width + i, window_width - i, window_height - i, ColourNameToRGB("silver"))
     end
 
-    addInfo(border_width * 3, button_height + border_width * 2 + 2, orb_seen, orb_taken, "Orb")
-    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height, shard_seen, shard_taken, "Fragment")
-    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 2, manual_seen, manual_taken, "Manual")
-    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 3, parchment_seen, parchment_taken, "Parchment")
-    addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 4, wallet_seen, wallet_taken, "Wallet")
-
+    if user_settings["Show Scatter Info"] then
+      addInfo(border_width * 3, button_height + border_width * 2 + 2, orb_seen, orb_taken, "Orb")
+      addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height, shard_seen, shard_taken, "Fragment")
+      addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 2, manual_seen, manual_taken, "Manual")
+      addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 3, parchment_seen, parchment_taken, "Parchment")
+      addInfo(border_width * 3, button_height + border_width * 2 + 2 + info_char_height * 4, wallet_seen, wallet_taken, "Wallet")
+    end
     WindowShow(WIN, true)
   end
 end
@@ -1137,6 +1216,50 @@ function showHelp()
   ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3))
   Note()
   SendNoEcho("")
+end
+
+function initSettings()
+  if not initialized then
+    loadSettings()
+    initialized = true
+  end
+end
+
+function loadSettings()
+  local show_after_load = false
+  user_settings = serialization_helper.GetSerializedVariable("advanced_speedwalk_settings", {})
+  if type(obj) == "table" and next(obj) == nil then
+    show_after_load = true
+  end
+
+  for i, setting in ipairs(settings) do
+    if not user_settings[setting.name] then
+      user_settings[setting.name] = setting.value
+    end
+  end
+  
+  if show_after_load then
+    openSettings()
+  end
+end
+
+function openSettings()
+  if config_installed then
+    local config = { OPTIONS = {}}
+    for i, setting in ipairs(settings) do
+      if setting.type == "bool" then
+        config.OPTIONS[setting.name] = config_window.CreateBoolOption(i, setting.name, user_settings[setting.name], setting.hint)
+      elseif setting.type == "number" then
+        config.OPTIONS[setting.name] = config_window.CreateNumberOption(i, setting.name, user_settings[setting.name], setting.min, setting.max, setting.hint)
+      end
+    end
+
+    local function onConfigDone(grp, opt, config)
+      Note("grp: " .. grp .. ", opt: " .. opt)
+    end
+
+    config_window.Show(config, onConfigDone, "Advanced Speedwalk Settings")
+  end
 end
 
 ]]>
