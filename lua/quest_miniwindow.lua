@@ -533,7 +533,7 @@ setCrystalTarget = function(target)
 end
 
 checkBodyPartDrop = function(part, victim)
-  if PURSUER_TARGET ~= nil and PURSUER_TARGET:lower():find(Trim(victim:lower())) ~= nil then
+  if PURSUER_TARGET ~= nil and PURSUER_TARGET:lower():find(Trim(victim:lower()), 1, true) ~= nil then
     part = part:match("^[^%-]+") or part
     Send("get '" .. part .. "'")
     COLLECTED_PART = part
