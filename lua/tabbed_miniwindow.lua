@@ -919,8 +919,11 @@ doRightClickHeaderMenu = function(name)
 
       menu_items = menu_items .. "< | - | Clear | Mark as Read | - | Rename | New Tab"
 
-      if i <= 1 then menu_items = menu_items .. "^" end
-      menu_items = menu_items .. " | Delete Tab"
+      if i <= 1 then 
+        menu_items = menu_items .. " | ^Delete Tab"
+      else
+        menu_items = menu_items .. " | Delete Tab"
+      end
       
       if tab["notify"] then
         menu_items = menu_items .. " | +Notify"
