@@ -709,8 +709,8 @@ end
 
 function drag_move(flags, hotspot_id)
   if IS_DRAGGING then
-    local pos_x = clamp(WindowInfo(WIN, 17) - RESIZE_DRAG_X, 0, consts.GetClientWidth() - POSITION.WINDOW_WIDTH)
-    local pos_y = clamp(WindowInfo(WIN, 18) - RESIZE_DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
+    local pos_x = consts.clamp(WindowInfo(WIN, 17) - RESIZE_DRAG_X, 0, consts.GetClientWidth() - POSITION.WINDOW_WIDTH)
+    local pos_y = consts.clamp(WindowInfo(WIN, 18) - RESIZE_DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
 
     SetCursor(miniwin.cursor_hand)
     WindowPosition(WIN, pos_x, pos_y, 0, miniwin.create_absolute_location);

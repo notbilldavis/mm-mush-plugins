@@ -278,8 +278,8 @@ function quest_dragMouseDown(flags, hotspot_id)
 end
 
 function quest_dragMouseMove(flags, hotspot_id)
-  local pos_x = clamp(WindowInfo(WIN, 17) - DRAG_X, 0, GetInfo(281) - POSITION.WINDOW_WIDTH)
-  local pos_y = clamp(WindowInfo(WIN, 18) - DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
+  local pos_x = consts.clamp(WindowInfo(WIN, 17) - DRAG_X, 0, GetInfo(281) - POSITION.WINDOW_WIDTH)
+  local pos_y = consts.clamp(WindowInfo(WIN, 18) - DRAG_Y, 0, GetInfo(280) - LINE_HEIGHT)
 
   SetCursor(miniwin.cursor_hand)
   WindowPosition(WIN, pos_x, pos_y, 0, miniwin.create_absolute_location);
