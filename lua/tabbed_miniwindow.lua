@@ -12,7 +12,7 @@ local load, save, create, draw, addLineToTab, onScrollToBottom, drawWindow, draw
   appendFormattedLine, populateSizes, setSizeConst, renderRectangle, drawNotification, drawDragHandle,
   drawNotifications, drawSelection, hasSelection, drawScrollbarDetails, moveScrollBar, doRightClickHeaderMenu,
   doRightClickMenu, showUnlockedRightClick, roundToNearestCharacter, copySelectedText, configure, addNewTab,
-  adjustAnchor, getSubstringByPixelRange, captureText, addStyledLine, shouldSkip, calculateOptimalWindowLines
+  adjustAnchor, captureText, addStyledLine, shouldSkip, calculateOptimalWindowLines, drawResizePreview
 
 local CONFIG = nil
 local POSITION = nil
@@ -41,6 +41,11 @@ local IS_RESIZING = false
 local IS_DRAGGING = false
 local RESIZE_DRAG_X = nil
 local RESIZE_DRAG_Y = nil
+local LAST_FORMAT_WIDTH = 0
+local RESIZE_START_W = 0
+local RESIZE_START_H = 0
+local RESIZE_START_MX = 0
+local RESIZE_START_MY = 0
 local START_DRAG_Y = 0
 local START_DRAG_OFFSET = 0
 local SIZES = {}
@@ -50,10 +55,6 @@ local ANCHOR_LIST = {
   [1] = "Top Left (Window)", [2] = "Bottom Left (Window)", [3] = "Top Right (Window)", [4] = "Bottom Right (Window)", 
   [5] = "Top Fit Width (Output)", [6] = "Bottom Fit Width (Output)", [7] = "Right Top (Output)", [8] = "Left Top (Output)",
   [9] = "Right Bottom (Output)", [10] = "Left Bottom (Output)"
-}
-
-local STRETCH_LIST = {
-  [1] = "Horizontal (Window)", [2] = "Vertical (Window)", [3] = "Horizontal (Output)", [4] = "Vertical (Output)"
 }
 
 local POSSIBLE_CHANNELS = {
@@ -195,7 +196,6 @@ addStyledLine = function(channel, styledLineSegments)
   local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local was_at_bottom = #formattedLines <= currentOffset + CONFIG.WINDOW_LINES + 1
   local refresh = refresh_type.NONE
-  local notifications = {}
 
   for i = 1, #ALL_TABS do
     refresh = math.max(addLineToTab(ALL_TABS[i], channel, styledLineSegments), refresh)    
@@ -257,7 +257,7 @@ load = function()
   }
 
   ALL_TABS[1] = serialization_helper.GetValueOrDefault(ALL_TABS[1], default_tab)
-  CURRENT_TAB_NAME = ALL_TABS[1]["name"] or ""
+  CURRENT_TAB_NAME = ALL_TABS[1].name or ""
 
   POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + 10 + CONFIG.WINDOW_LINES * 10
   POSITION.WINDOW_WIDTH = serialization_helper.GetValueOrDefault(POSITION.WINDOW_WIDTH, consts.GetClientWidth() - consts.GetOutputRightOutside())
@@ -266,8 +266,8 @@ load = function()
 end
 
 create = function()
-  local capfont = CONFIG["CAPTURE_FONT"]
-  local hdrfont = CONFIG["HEADER_FONT"]
+  local capfont = CONFIG.CAPTURE_FONT
+  local hdrfont = CONFIG.HEADER_FONT
 
   WindowCreate(WIN, 0, 0, 0, 0, 0, 0, 0)
   
@@ -287,12 +287,12 @@ create = function()
   LINE_HEIGHT = WindowFontInfo(WIN, FONT, 1)
   HEADER_HEIGHT = WindowFontInfo(WIN, HEADERFONT, 1) + 10
   
-  POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + CONFIG.WINDOW_LINES * LINE_HEIGHT
+  POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + CONFIG.WINDOW_LINES * LINE_HEIGHT + 2
 end
 
 draw = function()
   if not INIT then return end
-    
+
   WindowShow(WIN, false)
 
   drawWindow()
@@ -305,17 +305,34 @@ draw = function()
   WindowShow(WIN, true)
 end
 
+drawResizePreview = function()
+  if not INIT then return end
+
+  WindowShow(WIN, false)
+  populateSizes()
+  WindowPosition(WIN, POSITION.WINDOW_LEFT, POSITION.WINDOW_TOP, 4, 2)
+  WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
+  WindowSetZOrder(WIN, CONFIG.Z_POSITION)
+  renderRectangle(SIZES.ENTIRE_WINDOW, math.max(1, consts.GetBorderWidth()))
+  drawTabs()
+  drawLines()
+  drawScrollbar()
+  drawResizeHandle()
+  drawScrollToBottom()
+  WindowShow(WIN, true)
+end
+
 addLineToTab = function(tab, channel, styledLineSegments)
-  if tab == nil or tab["channels"] == nil or tab["name"] == nil or tab["name"] == "" then
+  if tab == nil or tab.channels == nil or tab.name == nil or tab.name == "" then
     return refresh_type.NONE
   end
 
-  if tab["channels"][channel] then
-    local tab_name = tab["name"] or ""
+  if tab.channels[channel] then
+    local tab_name = tab.name or ""
     addTextToBuffer(tab_name, styledLineSegments)
     
     local ref = refresh_type.NONE
-    if tab["notify"] then ref = refresh_type.NOTIFICATIONS end
+    if tab.notify then ref = refresh_type.NOTIFICATIONS end
     if tab_name == CURRENT_TAB_NAME then ref = refresh_type.ALL end
     if ref ~= refresh_type.NONE then
       local cnt = UNREAD_COUNT[tab_name] or 0
@@ -424,7 +441,7 @@ drawWindow = function()
   WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, CONFIG.BACKGROUND_COLOR)
   WindowSetZOrder(WIN, CONFIG.Z_POSITION)
 
-  renderRectangle(SIZES.ENTIRE_WINDOW, consts.GetBorderWidth())
+  renderRectangle(SIZES.ENTIRE_WINDOW, math.max(1, consts.GetBorderWidth()))
 
   WindowDeleteAllHotspots(WIN)
 
@@ -458,21 +475,13 @@ populateSizes = function()
 end
 
 setSizeConst = function(left, top, right, bottom, color)
-  local sizeConst = {}
-  sizeConst.LEFT = left
-  sizeConst.TOP = top
-  sizeConst.RIGHT = right
-  sizeConst.BOTTOM = bottom
-  sizeConst.COLOR = color
-  sizeConst.WIDTH = right - left
-  sizeConst.HEIGHT = bottom - top
-  return sizeConst
+  return { LEFT=left, TOP=top, RIGHT=right, BOTTOM=bottom, COLOR=color, WIDTH=right-left, HEIGHT=bottom-top }
 end
 
 drawTabs = function()
   local x = consts.GetBorderWidth()
   for idx, tab in ipairs(ALL_TABS) do
-    local tab_name = tab["name"] or ""
+    local tab_name = tab.name or ""
     if tab_name ~= "" then
       local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
       local tab_color = (tab_name == CURRENT_TAB_NAME) and CONFIG.ACTIVE_COLOR or CONFIG.INACTIVE_COLOR
@@ -486,7 +495,7 @@ drawTabs = function()
       renderRectangle(SIZES.SINGLE_TAB, 1, CONFIG.BORDER_COLOR)
       WindowText(WIN, HEADERFONT, tab_name, center_pos_x, center_pos_y, 0, 0, CONFIG.HEADER_FONT.colour)
 
-      if tab["notify"] then
+      if tab.notify then
         drawNotification(tab_name, x + text_width)
       end
 
@@ -506,11 +515,11 @@ end
 drawNotifications = function()
   local x = SIZES.ENTIRE_HEADER.LEFT
   for idx, tab in ipairs(ALL_TABS) do
-    local tab_name = tab["name"] or ""
+    local tab_name = tab.name or ""
     if tab_name ~= "" then
       local text_width = WindowTextWidth(WIN, HEADERFONT, tab_name)
     
-      if tab["notify"] then
+      if tab.notify then
         drawNotification(tab_name, x + text_width)
       end
 
@@ -538,12 +547,7 @@ drawLines = function()
   SELECTED_TEXT = ""
 
   for i = offset + 1, #lines do
-    if y + LINE_HEIGHT > SIZES.TEXT_AREA.BOTTOM then
-      if offset >= #lines - CONFIG.WINDOW_LINES then
-        Note("The capture window is trying to display lines off the screen, configure the font settings and size.")
-      end
-      break
-    end
+    if y + LINE_HEIGHT > SIZES.TEXT_AREA.BOTTOM then break end
 
     local segments = lines[i]
     local x = SIZES.TEXT_AREA.LEFT + 2
@@ -564,16 +568,12 @@ drawSelection = function(x, y, w, offset, s)
   if not hasSelection(selection) then return end
 
   local drawing_line = math.floor((y - HEADER_HEIGHT + 2) / LINE_HEIGHT) + offset + 1
-  local bg_color = CONFIG.BACKGROUND_COLOR
-  if s.backcolour ~= nil and s.backcolour ~= "" then
-    bg_color = ColourNameToRGB(s.backcolour)
-  end
+  local bg_color = s.backcolour or CONFIG.BACKGROUND_COLOR
 
   WindowRectOp(WIN, miniwin.rect_fill, x, y, x + w, y + LINE_HEIGHT, bg_color)
 
   if drawing_line >= selection.starting_line and drawing_line <= selection.ending_line then
-    local reverse_x = selection.start_x > selection.end_x -- right to left
-    local reverse_y = selection.start_y > selection.end_y -- bottom to top
+    local reverse_y = selection.start_y > selection.end_y
     local low_x = math.min(selection.start_x, selection.end_x)
     local high_x = math.max(selection.start_x, selection.end_x)
     
@@ -621,7 +621,9 @@ drawScrollbar = function()
   local formattedLines = FORMATTED_LINES[CURRENT_TAB_NAME] or {}
   local total_lines = #formattedLines  
   local maxScroll = total_lines - CONFIG.WINDOW_LINES
-  local thumbsize = math.min(SIZES.SCROLL_SLIDER.HEIGHT, math.max(10, SIZES.SCROLL_SLIDER.HEIGHT * (CONFIG.WINDOW_LINES / (total_lines))))
+  local thumbsize = total_lines > 0
+    and math.min(SIZES.SCROLL_SLIDER.HEIGHT, math.max(10, SIZES.SCROLL_SLIDER.HEIGHT * CONFIG.WINDOW_LINES / total_lines))
+    or SIZES.SCROLL_SLIDER.HEIGHT
   local scrollRatio = current_offset / math.max(maxScroll, 1)
 
   SIZES.SCROLL_THUMB.TOP = (scrollRatio * (SIZES.SCROLL_SLIDER.HEIGHT - thumbsize)) + SIZES.SCROLL_SLIDER.TOP
@@ -658,7 +660,6 @@ function OnScrollThumbDragMove()
     local delta_lines = math.floor(delta / pixels_per_line)
     
     SCROLL_OFFSETS[CURRENT_TAB_NAME] = math.max(0, math.min(scrollable_lines, START_DRAG_OFFSET + delta_lines))
-    --Note("d: " .. delta .. ", pl: " .. per_line .. ", dl: " .. delta_lines)
     drawLines()
     drawScrollbar()
   end  
@@ -741,9 +742,11 @@ drawResizeHandle = function()
       n = n + 3
     end
 
-    WindowAddHotspot(WIN, "resizer", SIZES.RESIZE_HANDLE.LEFT, SIZES.RESIZE_HANDLE.TOP, SIZES.RESIZE_HANDLE.RIGHT, SIZES.RESIZE_HANDLE.BOTTOM, "", "", "OnResizerDown", "", "", "", miniwin.cursor_nw_se_arrow, 0)
-    WindowDragHandler(WIN, "resizer", "OnResizerDrag", "OnResizerRelease", 0)
-  end  
+    if not IS_RESIZING then
+      WindowAddHotspot(WIN, "resizer", SIZES.RESIZE_HANDLE.LEFT, SIZES.RESIZE_HANDLE.TOP, SIZES.RESIZE_HANDLE.RIGHT, SIZES.RESIZE_HANDLE.BOTTOM, "", "", "OnResizerDown", "", "", "", miniwin.cursor_nw_se_arrow, 0)
+      WindowDragHandler(WIN, "resizer", "OnResizerDrag", "OnResizerRelease", 0)
+    end
+  end
 end
 
 drawScrollToBottom = function()
@@ -782,7 +785,6 @@ onScrollToBottom = function()
   draw()
 end
 
--- Scroll handler
 function OnWheel(flags, hotspot_id)
   if bit.band(flags, miniwin.wheel_scroll_back) ~= 0 then
     moveScrollBar("down")
@@ -811,9 +813,8 @@ function OnHeaderClick(flags, hotspot_id)
       formatLines(hotspot_id)
     end
     CURRENT_TAB_NAME = hotspot_id
-    onScrollToBottom()
     UNREAD_COUNT[hotspot_id] = 0
-    draw()
+    onScrollToBottom()
   elseif flags == miniwin.hotspot_got_rh_mouse then
     doRightClickHeaderMenu(hotspot_id)
   end
@@ -822,6 +823,10 @@ end
 function OnResizerDown(flags, hotspot_id)
   if flags == miniwin.hotspot_got_lh_mouse then
     IS_RESIZING = true
+    RESIZE_START_W = POSITION.WINDOW_WIDTH
+    RESIZE_START_H = POSITION.WINDOW_HEIGHT
+    RESIZE_START_MX = WindowInfo(WIN, 17)
+    RESIZE_START_MY = WindowInfo(WIN, 18)
   elseif flags == miniwin.hotspot_got_rh_mouse then
     showUnlockedRightClick()
   end
@@ -829,27 +834,37 @@ end
 
 function OnResizerDrag()
   if IS_RESIZING then
-    local mouse_x, mouse_y = GetInfo(283), GetInfo(284)
-    
-    local new_width = math.max(200, mouse_x - POSITION.WINDOW_LEFT)
-    local new_height = math.min(GetInfo(280), math.max(100, mouse_y - POSITION.WINDOW_TOP))
+    local delta_x = WindowInfo(WIN, 17) - RESIZE_START_MX
+    local delta_y = WindowInfo(WIN, 18) - RESIZE_START_MY
+
+    local new_width = math.max(200, RESIZE_START_W + delta_x)
+    local desired_height = math.min(GetInfo(280) - POSITION.WINDOW_TOP,
+      math.max(HEADER_HEIGHT + LINE_HEIGHT + 2, RESIZE_START_H + delta_y))
+    local new_lines = math.max(1, calculateOptimalWindowLines(desired_height))
 
     POSITION.WINDOW_WIDTH = new_width
-    POSITION.WINDOW_HEIGHT = new_height
+    CONFIG.WINDOW_LINES = new_lines
+    POSITION.WINDOW_HEIGHT = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + new_lines * LINE_HEIGHT + 2
 
-    if (utils.timer() - LAST_REFRESH > 0.0333) then
-        WindowResize(WIN, POSITION.WINDOW_WIDTH, POSITION.WINDOW_HEIGHT, 0)
-        LAST_REFRESH = utils.timer()
+    if utils.timer() - LAST_REFRESH > 0.0333 then
+      LAST_REFRESH = utils.timer()
+      if new_width ~= LAST_FORMAT_WIDTH then
+        formatLines(CURRENT_TAB_NAME)
+        LAST_FORMAT_WIDTH = new_width
+      end
+      drawResizePreview()
     end
   end
 end
 
 function OnResizerRelease()
   if IS_RESIZING then
+    IS_RESIZING = false
+    LAST_FORMAT_WIDTH = 0
+    formatLines(CURRENT_TAB_NAME)
     save()
     create()
     draw()
-    IS_RESIZING = false
   end
 end
 
@@ -864,7 +879,6 @@ function OnTextAreaMouseDown(flags, hotspot_id)
       start_y = WindowInfo(WIN, 15)
     }
     IS_SELECTING = true
-    --Note("SELECTING")
   end
 end
 
@@ -872,15 +886,11 @@ function OnTextAreaMouseUp(flags, hotspot_id)
   if flags == miniwin.hotspot_got_rh_mouse then
     doRightClickMenu()
   else
-    --Note("DONE SELECTING")
     IS_SELECTING = false
     local selection = SELECTIONS[CURRENT_TAB_NAME]
-    if hasSelection(selection) then
-      
-    else
+    if not hasSelection(selection) then
       SELECTIONS[CURRENT_TAB_NAME] = nil
     end
-    
     draw()
   end
 end
@@ -894,10 +904,8 @@ doRightClickMenu = function()
   if result == "Copy" then
     copySelectedText()
   elseif result == "Clear" then
-    FORMATTED_LINES[CURRENT_TAB_NAME] = {}
-    TEXT_BUFFERS[CURRENT_TAB_NAME] = {}
-    SCROLL_OFFSETS[CURRENT_TAB_NAME] = 0
-    draw()
+    clearTab(CURRENT_TAB_NAME)
+    SELECTIONS[CURRENT_TAB_NAME] = nil
   elseif result == "Configure" then
     configure()
   end
@@ -908,9 +916,9 @@ doRightClickHeaderMenu = function(name)
   
   for i = 1, #ALL_TABS do
     local tab = ALL_TABS[i]
-    if tab["name"] == name then
+    if tab.name == name then
       for value, _ in pairs(POSSIBLE_CHANNELS) do
-        if tab["channels"][value] then
+        if tab.channels[value] then
           menu_items = menu_items .. "+" .. value .. " | "
         else
           menu_items = menu_items .. value .. " | "
@@ -925,7 +933,7 @@ doRightClickHeaderMenu = function(name)
         menu_items = menu_items .. " | Delete Tab"
       end
       
-      if tab["notify"] then
+      if tab.notify then
         menu_items = menu_items .. " | +Notify"
       else
         menu_items = menu_items .. " | Notify"
@@ -942,7 +950,7 @@ doRightClickHeaderMenu = function(name)
         draw()
 
       elseif result == "Rename" then
-        local new_name = utils.inputbox(tab["name"] or "", "Rename Tab", name)
+        local new_name = utils.inputbox(tab.name or "", "Rename Tab", name)
         if new_name ~= nil and #new_name > 0 then
           TEXT_BUFFERS[new_name] = TEXT_BUFFERS[name]
           FORMATTED_LINES[new_name] = FORMATTED_LINES[name]
@@ -955,7 +963,7 @@ doRightClickHeaderMenu = function(name)
           UNREAD_COUNT[name] = nil
           SELECTIONS[name] = nil
           if CURRENT_TAB_NAME == name then CURRENT_TAB_NAME = new_name end
-          ALL_TABS[i]["name"] = new_name
+          ALL_TABS[i].name = new_name
           draw()
         end
 
@@ -970,16 +978,17 @@ doRightClickHeaderMenu = function(name)
           UNREAD_COUNT[name] = nil
           SELECTIONS[name] = nil
           table.remove(ALL_TABS, i)
+          if CURRENT_TAB_NAME == name then CURRENT_TAB_NAME = ALL_TABS[1].name end
           draw()
         else
           Note("You can't remove the first tab!")
         end
 
       elseif result == "Notify" then
-        if ALL_TABS[i]["notify"] then
-          ALL_TABS[i]["notify"] = nil
+        if ALL_TABS[i].notify then
+          ALL_TABS[i].notify = nil
         else
-          ALL_TABS[i]["notify"] = true
+          ALL_TABS[i].notify = true
         end
       
       elseif result == "Configure" then
@@ -987,10 +996,10 @@ doRightClickHeaderMenu = function(name)
         
       elseif result ~= "" then
         if POSSIBLE_CHANNELS[result] then
-          if tab["channels"][result] then
-            ALL_TABS[i]["channels"][result] = nil
+          if tab.channels[result] then
+            ALL_TABS[i].channels[result] = nil
           else
-            ALL_TABS[i]["channels"][result] = true
+            ALL_TABS[i].channels[result] = true
           end
 
           draw()
@@ -1030,32 +1039,6 @@ end
 copySelectedText = function()
   SetClipboard(SELECTED_TEXT)
   Note("Copied '" .. SELECTED_TEXT .. "' to the clipboard")
-end
-
-getSubstringByPixelRange = function(text, startWidth, endWidth)
-    local measuredWidth = 0
-    local startIndex, endIndex
-
-    for i = 1, #text do
-        local char = text:sub(i, i)
-        local charWidth = WindowTextWidth(WIN, FONT, char)
-        measuredWidth = measuredWidth + charWidth
-
-        if not startIndex and measuredWidth >= startWidth then
-            startIndex = i
-        end
-
-        if not endIndex and measuredWidth >= endWidth then
-            endIndex = i
-            break
-        end
-    end
-
-    if startIndex then
-        return text:sub(startIndex, endIndex or #text)
-    else
-        return ""
-    end
 end
 
 save = function()
@@ -1124,7 +1107,7 @@ addNewTab = function()
     local new_tab_channels = {}
     if selected then
       for _, v in ipairs(selected) do
-        new_tab_channels[v] = true
+        new_tab_channels[channel_list[v]] = true
       end
     end
     local new_tab_notify = utils.msgbox("Should new entries added to this tab when it is inactive show a notification icon?", "New Tab", "yesno", "?")
@@ -1135,6 +1118,7 @@ addNewTab = function()
       notify = new_tab_notify == "yes"
     }
 
+    save()
     draw()
   end
 end
@@ -1202,75 +1186,86 @@ end
 
 adjustAnchor = function(anchor_id)
   local anchor = ANCHOR_LIST[anchor_id]
-  if anchor == nil or anchor == "" then
-    return
-  end
+  if anchor == nil or anchor == "" then return end
 
   local min_height = HEADER_HEIGHT + consts.GetBorderWidth() * 3 + LINE_HEIGHT
 
-  if anchor == "Top Left (Window)" then 
-    POSITION.WINDOW_LEFT = 0
-    POSITION.WINDOW_TOP = 0
-  elseif anchor == "Bottom Left (Window)" then 
-    POSITION.WINDOW_LEFT = 0
-    POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
-  elseif anchor == "Top Right (Window)" then
-    POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
-    POSITION.WINDOW_TOP = 0    
-  elseif anchor == "Bottom Right (Window)" then
-    POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
-    POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
-  elseif anchor == "Top Fit Width (Output)" then
-    if consts.GetOutputTopOutside() < min_height then
-      Note("There isn't enough room above the output to anchor there.")
-    else
-      CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetOutputTopOutside())
-      POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
+  local handlers = {
+    ["Top Left (Window)"] = function()
+      POSITION.WINDOW_LEFT = 0
       POSITION.WINDOW_TOP = 0
-      POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
-    end
-  elseif anchor == "Bottom Fit Width (Output)" then
-    if consts.GetOutputBottomOutside() > consts.GetClientHeight() - min_height then
-      Note("There isn't enough room below the output to anchor there.")
-    else
-      CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetClientHeight() - consts.GetOutputBottomOutside())
-      POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
-      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside()
-      POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
-    end
-  elseif anchor ==  "Right Top (Output)" then
-    if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
-      Note("There isn't enough room to the right of the output to anchor there.")
-    else
-      POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
-      POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
-      POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
-    end
-  elseif anchor ==  "Left Top (Output)" then
-    if consts.GetOutputLeftOutside() < 250 then
-      Note("There isn't enough room to the left of the output to anchor there.")
-    else
+    end,
+    ["Bottom Left (Window)"] = function()
       POSITION.WINDOW_LEFT = 0
-      POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
-      POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
-    end
-  elseif anchor ==  "Right Bottom (Output)" then
-    if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
-      Note("There isn't enough room to the right of the output to anchor there.")
-    else
-      POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
-      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
-      POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
-    end
-  elseif anchor ==  "Left Bottom (Output)" then
-    if consts.GetOutputLeftOutside() < 250 then
-      Note("There isn't enough room to the left of the output to anchor there.")
-    else
-      POSITION.WINDOW_LEFT = 0
-      POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
-      POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
-    end
-  end
+      POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
+    end,
+    ["Top Right (Window)"] = function()
+      POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
+      POSITION.WINDOW_TOP = 0
+    end,
+    ["Bottom Right (Window)"] = function()
+      POSITION.WINDOW_LEFT = consts.GetClientWidth() - POSITION.WINDOW_WIDTH
+      POSITION.WINDOW_TOP = consts.GetClientHeight() - POSITION.WINDOW_HEIGHT
+    end,
+    ["Top Fit Width (Output)"] = function()
+      if consts.GetOutputTopOutside() < min_height then
+        Note("There isn't enough room above the output to anchor there.")
+      else
+        CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetOutputTopOutside())
+        POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
+        POSITION.WINDOW_TOP = 0
+        POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
+      end
+    end,
+    ["Bottom Fit Width (Output)"] = function()
+      if consts.GetOutputBottomOutside() > consts.GetClientHeight() - min_height then
+        Note("There isn't enough room below the output to anchor there.")
+      else
+        CONFIG.WINDOW_LINES = calculateOptimalWindowLines(consts.GetClientHeight() - consts.GetOutputBottomOutside())
+        POSITION.WINDOW_LEFT = consts.GetOutputLeftOutside()
+        POSITION.WINDOW_TOP = consts.GetOutputBottomOutside()
+        POSITION.WINDOW_WIDTH = consts.GetOutputWidthOutside()
+      end
+    end,
+    ["Right Top (Output)"] = function()
+      if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
+        Note("There isn't enough room to the right of the output to anchor there.")
+      else
+        POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
+        POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
+        POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
+      end
+    end,
+    ["Left Top (Output)"] = function()
+      if consts.GetOutputLeftOutside() < 250 then
+        Note("There isn't enough room to the left of the output to anchor there.")
+      else
+        POSITION.WINDOW_LEFT = 0
+        POSITION.WINDOW_TOP = consts.GetOutputTopOutside()
+        POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
+      end
+    end,
+    ["Right Bottom (Output)"] = function()
+      if consts.GetOutputRightOutside() > consts.GetClientWidth() - 250 then
+        Note("There isn't enough room to the right of the output to anchor there.")
+      else
+        POSITION.WINDOW_LEFT = consts.GetOutputRightOutside()
+        POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
+        POSITION.WINDOW_WIDTH = consts.GetClientWidth() - consts.GetOutputRightOutside()
+      end
+    end,
+    ["Left Bottom (Output)"] = function()
+      if consts.GetOutputLeftOutside() < 250 then
+        Note("There isn't enough room to the left of the output to anchor there.")
+      else
+        POSITION.WINDOW_LEFT = 0
+        POSITION.WINDOW_TOP = consts.GetOutputBottomOutside() - POSITION.WINDOW_HEIGHT
+        POSITION.WINDOW_WIDTH = consts.GetOutputLeftOutside()
+      end
+    end,
+  }
+
+  if handlers[anchor] then handlers[anchor]() end
 
   create()
 end
@@ -1287,12 +1282,8 @@ renderRectangle = function(size_const, border, border_color)
 end
 
 calculateOptimalWindowLines = function(max_height)
-  local height, lines = LINE_HEIGHT, 1
-  while height < max_height do
-    lines = lines + 1
-    height = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + lines * LINE_HEIGHT
-  end
-  return math.max(1, lines - 1)
+  local overhead = consts.GetBorderWidth() * 3 + HEADER_HEIGHT + 2
+  return math.max(1, math.floor((max_height - overhead) / LINE_HEIGHT))
 end
 
 doDebug = function()
