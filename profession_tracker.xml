@@ -173,7 +173,8 @@ needed_manuals = {
   "salt invocation", "dust invocation", "ash invocation", "water evocation", "ice evocation",
   "lightning evocation", "steam evocation", "salt evocation", "polearm", "hand to hand", "resurrect",
   "throwing", "peek", "halberd", "throwing knife", "yo-yo", "detect truth", "force field", "forget",
-  "float", "irritation", "telekinetic bash", "protection from good", "control winds", "fatigue"
+  "float", "irritation", "telekinetic bash", "protection from good", "control winds", "fatigue",
+  "second defense"
 }
 
 owned_manuals = {}
