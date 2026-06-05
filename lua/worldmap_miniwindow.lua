@@ -250,21 +250,27 @@ drawMiniWindow = function()
     local printable_area = { x = (CONFIG.WINDOW_WIDTH - consts.GetBorderWidth() * 2), y = (CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth() * 2) }
 
     local width, height = printable_area.x, printable_area.y --WindowInfo(WIN, 3), WindowInfo(WIN, 4)
-    local num_of_tiles = (2^ZOOM_LEVEL[CURRENT_PLANE])
+    local zoom = ZOOM_LEVEL[CURRENT_PLANE]
+    local num_of_tiles = 2^zoom
     local max_x = 1150 * num_of_tiles
     local max_y = 750 * num_of_tiles
+    -- at negative zoom, a single scaled-down zoom-0 tile covers the whole world
+    local tile_w = zoom >= 0 and 1150 or (1150 * num_of_tiles)
+    local tile_h = zoom >= 0 and 750  or (750  * num_of_tiles)
     local scaled_x = COORD_X / PLANE_DETAILS[CURRENT_PLANE].x * max_x
     local scaled_y = COORD_Y / PLANE_DETAILS[CURRENT_PLANE].y * max_y
-    local tile_x = math.floor(scaled_x / 1150)
-    local tile_y = math.floor(scaled_y / 750)
-    local local_x = scaled_x % 1150
-    local local_y = scaled_y % 750
+    local tile_x = math.floor(scaled_x / tile_w)
+    local tile_y = math.floor(scaled_y / tile_h)
+    local local_x = scaled_x % tile_w
+    local local_y = scaled_y % tile_h
     local offset_x = local_x - width / 2
     local offset_y = local_y - height / 2
     local debug_boxes = {}
 
-    offset_x = math.floor(-1 * (offset_x + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].x + consts.GetBorderWidth()))
-    offset_y = math.floor(-1 * (offset_y + CONFIG.OFFSETS[CURRENT_PLANE][ZOOM_LEVEL[CURRENT_PLANE] + 1].y + consts.GetBorderWidth()))
+    local offset_idx = math.max(zoom, 0) + 1
+    local plane_offset = CONFIG.OFFSETS[CURRENT_PLANE][offset_idx] or { x = 0, y = 0 }
+    offset_x = math.floor(-1 * (offset_x + plane_offset.x + consts.GetBorderWidth()))
+    offset_y = math.floor(-1 * (offset_y + plane_offset.y + consts.GetBorderWidth()))
     
     local window_name = WIN
     if CONFIG.CIRCLE then
@@ -275,15 +281,15 @@ drawMiniWindow = function()
       WindowImageFromWindow(window_name, "alpha", window_name)
     end    
 
-    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y, offset_x, offset_y, "main", 32768))  
-    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y, offset_x + 1150, offset_y, "right", ColourNameToRGB("red")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y, offset_x - 1150, offset_y, "left", ColourNameToRGB("tomato")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y + 1, offset_x, offset_y + 750, "down", ColourNameToRGB("blue")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y - 1, offset_x, offset_y - 750, "up", ColourNameToRGB("deepskyblue")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y + 1, offset_x + 1150, offset_y + 750, "right-down", ColourNameToRGB("yellow")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y - 1, offset_x - 1150, offset_y - 750, "left-up", ColourNameToRGB("cyan")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y - 1, offset_x + 1150, offset_y - 750, "right-up", ColourNameToRGB("orange")))
-    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y + 1, offset_x - 1150, offset_y + 750, "left-down", ColourNameToRGB("purple")))
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y, offset_x, offset_y, "main", 32768, tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y, offset_x + tile_w, offset_y, "right", ColourNameToRGB("red"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y, offset_x - tile_w, offset_y, "left", ColourNameToRGB("tomato"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y + 1, offset_x, offset_y + tile_h, "down", ColourNameToRGB("blue"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x, tile_y - 1, offset_x, offset_y - tile_h, "up", ColourNameToRGB("deepskyblue"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y + 1, offset_x + tile_w, offset_y + tile_h, "right-down", ColourNameToRGB("yellow"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y - 1, offset_x - tile_w, offset_y - tile_h, "left-up", ColourNameToRGB("cyan"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x + 1, tile_y - 1, offset_x + tile_w, offset_y - tile_h, "right-up", ColourNameToRGB("orange"), tile_w, tile_h))
+    table.insert(debug_boxes, drawTile(window_name, tile_x - 1, tile_y + 1, offset_x - tile_w, offset_y + tile_h, "left-down", ColourNameToRGB("purple"), tile_w, tile_h))
     
     if CONFIG.DRAW_DEBUG then
       for _, box in ipairs(debug_boxes) do
@@ -435,31 +441,33 @@ tryShowDestinationMarkers = function(window_name, max_x, max_y, center_x, center
   end
 end
 
-drawTile = function(window_name, tile_x, tile_y, offset_x, offset_y, debug, color)
-  if (offset_x > CONFIG.WINDOW_WIDTH - consts.GetBorderWidth()) or (offset_x + 1150 < consts.GetBorderWidth()) or
-     (offset_y > CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth()) or (offset_y + 750 < consts.GetBorderWidth()) then
+drawTile = function(window_name, tile_x, tile_y, offset_x, offset_y, debug, color, tile_w, tile_h)
+  if (offset_x > CONFIG.WINDOW_WIDTH - consts.GetBorderWidth()) or (offset_x + tile_w < consts.GetBorderWidth()) or
+     (offset_y > CONFIG.WINDOW_HEIGHT - consts.GetBorderWidth()) or (offset_y + tile_h < consts.GetBorderWidth()) then
     return nil
   end
 
-  local tile = getMapTile(window_name, tile_x % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_y % (2^ZOOM_LEVEL[CURRENT_PLANE]), tile_x, tile_y, debug == "main")
+  local file_zoom = math.max(ZOOM_LEVEL[CURRENT_PLANE], 0)
+  local file_tile_count = 2^file_zoom
+  local tile = getMapTile(window_name, tile_x % file_tile_count, tile_y % file_tile_count, tile_x, tile_y, debug == "main")
   local flag = (CONFIG.STRETCH and miniwin.image_stretch) or miniwin.image_copy
 
   if tile == nil then
     return nil
   end
 
-  WindowDrawImage(window_name, tile, 
-    offset_x, 
-    offset_y, 
-    offset_x + 1150, 
-    offset_y + 750, 
-    flag)--miniwin.image_copy)--miniwin.image_stretch)
+  WindowDrawImage(window_name, tile,
+    offset_x,
+    offset_y,
+    offset_x + tile_w,
+    offset_y + tile_h,
+    flag)
 
-  return { 
-    left = offset_x, 
-    top = offset_y, 
-    right = offset_x + 1150, 
-    bottom = offset_y + 750,
+  return {
+    left = offset_x,
+    top = offset_y,
+    right = offset_x + tile_w,
+    bottom = offset_y + tile_h,
     color = color,
     label = debug
   }
@@ -474,7 +482,7 @@ getMapTile = function(window_name, x, y, ox, oy, is_main)
   end
 
   local filename = string.format("x%03dy%03d.png", x, y)
-  local filepath = CONFIG.IMAGES_PATH .. CURRENT_PLANE .. "/" .. ZOOM_LEVEL[CURRENT_PLANE] .. "/" .. filename
+  local filepath = CONFIG.IMAGES_PATH .. CURRENT_PLANE .. "/" .. math.max(ZOOM_LEVEL[CURRENT_PLANE], 0) .. "/" .. filename
 
   if TILE_CACHE[filepath] then
     for i, name in ipairs(CACHE_ORDER) do
@@ -645,8 +653,21 @@ end
 
 function OnWheel(flags, hotspot_id)
   if bit.band(flags, miniwin.wheel_scroll_back) ~= 0 then
-    if ZOOM_LEVEL[CURRENT_PLANE] == 0 then return end
-    ZOOM_LEVEL[CURRENT_PLANE] = math.max(ZOOM_LEVEL[CURRENT_PLANE] - 1, 0)
+    local min_zoom = 0
+    if PLANE_DETAILS[CURRENT_PLANE].l then
+      -- allow zooming out until the world tile first fits inside the window (tile repeats on screen)
+      local function firstRepeatZoom(world_size, window_size)
+        local z = math.floor(math.log(window_size / world_size) / math.log(2))
+        while world_size * (2^z) >= window_size do z = z - 1 end
+        return z
+      end
+      min_zoom = math.min(
+        firstRepeatZoom(1150, CONFIG.WINDOW_WIDTH),
+        firstRepeatZoom(750,  CONFIG.WINDOW_HEIGHT)
+      )
+    end
+    if ZOOM_LEVEL[CURRENT_PLANE] <= min_zoom then return end
+    ZOOM_LEVEL[CURRENT_PLANE] = ZOOM_LEVEL[CURRENT_PLANE] - 1
   else
     if ZOOM_LEVEL[CURRENT_PLANE] == PLANE_DETAILS[CURRENT_PLANE].z then return end
     ZOOM_LEVEL[CURRENT_PLANE] = math.min(ZOOM_LEVEL[CURRENT_PLANE] + 1, PLANE_DETAILS[CURRENT_PLANE].z)
