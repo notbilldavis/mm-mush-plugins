@@ -64,6 +64,52 @@ local function convertToBool(bool_value, def_value)
   return def_value
 end
 
+local function setOffset(time_str, convert)
+  local hour_offset = GetVariable("hour_offset")
+
+  if convert then
+    local month_map = {
+      Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
+      Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12
+    }
+
+    local input_time = os.time {
+      year = 2000 + tonumber(time_str:sub(22, 25)),
+      month = month_map[time_str:sub(5, 7)],
+      day = tonumber(time_str:sub(9, 10)),
+      hour = tonumber(time_str:sub(12, 13)),
+      min = tonumber(time_str:sub(15, 16)),
+      sec = tonumber(time_str:sub(18, 19)),
+    }
+
+    local offset_seconds = os.difftime(input_time, os.time())
+    local offset_hours = math.floor(offset_seconds / 3600 + 0.5)
+
+    hour_offset = tonumber(offset_hours)
+  else
+    time_str = Trim(time_str or "")
+    if time_str == "" then
+      if hour_offset ~= nil then
+        Note("Current hour offset is " .. hour_offset .. " hours.")
+      else
+        Note("Hour offset is not set.")
+      end
+      return
+    elseif time_str == "reset" then
+      DeleteVariable("hour_offset")
+      Note("Hour offset has been reset.")
+      return
+    end
+    
+    hour_offset = tonumber(time_str) or 0
+  end
+
+  SetVariable("hour_offset", hour_offset)
+  SaveState()
+
+  return hour_offset
+end
+
 return {
   Serialize = serialize,
   Deserialize = deserialize,
@@ -71,5 +117,6 @@ return {
   GetGmcpValue = getGmcpValue,
   GetSerializedVariable = getSerializedVariable,
   SaveSerializedVariable = saveSerializedVariable,
-  ConvertToBool = convertToBool
+  ConvertToBool = convertToBool,
+  SetOffset = setOffset,
 }

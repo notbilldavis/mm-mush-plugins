@@ -46,8 +46,8 @@ The location links will "run" or "mapper goto" where appropriate.
     <send>beginCurioSort("%1")</send>
   </alias>
 
-  <alias match="^curio[ ]+offset[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
-    <send>setOffset("%1", false)</send>
+  <alias match="^curio[ ]+offset+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
+    <send>SetOffset("%1", false)</send>
   </alias>
 
   <alias match="^curio[ ]+ignore[ ]+(.*?)$" enabled="y" regexp="y" send_to="12" sequence="100" group="curio_sort">
@@ -247,6 +247,7 @@ end
 function SetOffset(time_str, convert)
   EnableTrigger("capture_time_offset", false)
   hour_offset = serialization_helper.SetOffset(time_str, convert)
+  Note("Offset has been set to " .. hour_offset .. " hours.")
 end
 
 function SetCharacterName(name)
