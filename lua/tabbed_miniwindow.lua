@@ -594,13 +594,15 @@ drawSelection = function(x, y, w, offset, s)
       if (low_x > high_x) then return end
     end
 
-    if (high_x >= x and high_x <= x + w) or (low_x >= x and low_x <= x + w) then
+    if high_x > x and low_x < x + w then
       local final_start_x, final_end_x = math.max(x, low_x), math.min(x + w, high_x)
       WindowRectOp(WIN, miniwin.rect_fill, final_start_x, y, final_end_x, y + LINE_HEIGHT, ColourNameToRGB("dimgray"))
 
-      local start_idx = (final_start_x - x) / CHARACTER_WIDTH + 1
-      local end_idx = (final_end_x - x) / CHARACTER_WIDTH
-      SELECTED_TEXT = SELECTED_TEXT .. s.text:sub(start_idx, end_idx)
+      local start_idx = math.max(1, math.floor((final_start_x - x) / CHARACTER_WIDTH) + 1)
+      local end_idx = math.min(#s.text, math.floor((final_end_x - x) / CHARACTER_WIDTH))
+      if start_idx <= end_idx then
+        SELECTED_TEXT = SELECTED_TEXT .. s.text:sub(start_idx, end_idx)
+      end
     end
   end
 end
