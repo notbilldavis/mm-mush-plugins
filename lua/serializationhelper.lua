@@ -20,9 +20,10 @@ local function serialize(table)
 end
 
 local function deserialize(serializedTable)
-  local func = load("return " .. serializedTable)
+  local load_func = loadstring or load
+  local func = load_func("return " .. serializedTable)
   if func then return func() end
-    return nil  
+  return nil  
 end
 
 local function getValueOrDefault(value, default)
@@ -35,6 +36,7 @@ end
 
 local function getGmcpValue(gmcp_field)
   local res, value = CallPlugin("f67c4339ed0591a5b010d05b", "gmcpval", gmcp_field)
+  if res ~= 0 or Trim(value or "") == "" then return nil end
   return deserialize(value)
 end
 
