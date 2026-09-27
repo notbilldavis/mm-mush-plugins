@@ -975,14 +975,16 @@ function ClickTrackedIngredients()
     Note("| Ingredient" .. string.rep(" ", longest - 9) .. "| Find | Delete |")
     Note("." .. string.rep("-", longest + 2) .. ".------.--------.")
     for ing, t in pairs(config.tracked_ingredients) do
-      ing = Trim(ing:lower())
-      Tell("| ")
-      ColourTell("white", "black", ing .. string.rep(" ", longest - #ing))
-      Tell(" | ")
-      Hyperlink("!!" .. GetPluginID() .. ":FindIngredient(" .. ing .. ")", "find", "Find ingredient", "cyan", "black", false)
-      Tell(" | ")
-      Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ing .. ")", "delete", "Stop tracking this ingredient", "red", "black", false)
-      Note(" |")
+      if t then
+        ing = Trim(ing:lower())
+        Tell("| ")
+        ColourTell("white", "black", ing .. string.rep(" ", longest - #ing))
+        Tell(" | ")
+        Hyperlink("!!" .. GetPluginID() .. ":FindIngredient(" .. ing .. ")", "find", "Find ingredient", "cyan", "black", false)
+        Tell(" | ")
+        Hyperlink("!!" .. GetPluginID() .. ":TrackPouchIngredient(" .. ing .. ")", "delete", "Stop tracking this ingredient", "red", "black", false)
+        Note(" |")
+      end
     end
   else
     local none_message = "No ingredients are currently being tracked in the pouch of plenitude."
@@ -1023,11 +1025,12 @@ function ClickTrackIngredient()
   local ingredient = utils.inputbox("What is the exact name of the ingredient?", "Track new ingredient", "")
   if ingredient ~= nil and Trim(ingredient) ~= 0 then
     ingredient = Trim(ingredient)
-    config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
     if config.tracked_ingredients[ingredient] then
-      ColourNote("green", "black", "Tracking " .. ingredient .. " in pouch of plenitude.")
-    else
+      config.tracked_ingredients[ingredient] = nil
       ColourNote("red", "black", "Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+    else
+      config.tracked_ingredients[ingredient] = true
+      ColourNote("green", "black", "Tracking " .. ingredient .. " in pouch of plenitude.")
     end
     serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
   end
@@ -1504,11 +1507,12 @@ function TrackPouchIngredient(ingredient)
     elseif ingredient == "clean" then
       cleanContainerOfIngredients()
     else
-      config.tracked_ingredients[ingredient] = not config.tracked_ingredients[ingredient]
       if config.tracked_ingredients[ingredient] then
-        Note("Tracking " .. ingredient .. " in pouch of plenitude.")
-      else
+        config.tracked_ingredients[ingredient] = nil
         Note("Stopped tracking " .. ingredient .. " in pouch of plenitude.")
+      else
+        config.tracked_ingredients[ingredient] = true
+        Note("Tracking " .. ingredient .. " in pouch of plenitude.")
       end
     end
     serialization_helper.SaveSerializedVariable(character_name .. "_cooking_config", config)
@@ -1979,7 +1983,7 @@ function AddRecipeToPouch()
 end
 
 function ClearPouch()
-  if #config.tracked_ingredients == 0 then
+  if next(config.tracked_ingredients) == nil then
     Note("You have no tracked ingredients to clear.")
     return
   end
