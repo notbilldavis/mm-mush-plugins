@@ -64,11 +64,11 @@ The location links will "run" or "mapper goto" where appropriate.
 </aliases>
 
 <triggers>
-  <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="12" sequence="100" omit_from_output="y" match="^(.*?) altar not active\.$">
+  <trigger group="get_curios" keep_evaluating="n" regexp="y" send_to="12" sequence="100" omit_from_output="y" match="^\s*((?:Ambitious|Angry|Bored|Breathtaking|Chemically|Compassionate|Confused|Content|Curious|Determined|Envious|Excited|Fearful|Frustrated|Grateful|Hopeful|Inspired|Jealous|Joyful|Lonely|Loving|Mischievous|Nostalgic|Overwhelmed|Peaceful|Priceless|Proud|Rebellious|Regretful|Sad|Serene|Suspicious|Suspicous|Tranquil|Triumphant|Vengeful).*?) altar not active\.$">
     <send>addToAltar("%1", "- not active", "")</send>
   </trigger>
 
-  <trigger group="get_curios" keep_evaluating="y" regexp="y" send_to="12" sequence="101" omit_from_output="y" match="^(.*) (\d+) (.*)$">
+  <trigger group="get_curios" keep_evaluating="y" regexp="y" send_to="12" sequence="101" omit_from_output="y" match="^\s*((?:Ambitious|Angry|Bored|Breathtaking|Chemically|Compassionate|Confused|Content|Curious|Determined|Envious|Excited|Fearful|Frustrated|Grateful|Hopeful|Inspired|Jealous|Joyful|Lonely|Loving|Mischievous|Nostalgic|Overwhelmed|Peaceful|Priceless|Proud|Rebellious|Regretful|Sad|Serene|Suspicious|Suspicous|Tranquil|Triumphant|Vengeful).*) (\d+) (.*)$">
     <send></send>
   </trigger>
 
@@ -485,7 +485,7 @@ function getDisplayName(ogName)
     return "Angry Altar"
   elseif (name == "Hopeful Altar:") then    
     return "Hopeful Altar"
-  elseif (name == "Suspicious Altar") then    
+  elseif (name == "Suspicous Altar") then    
     return "Suspicious Altar"
   elseif (name == "Sad Altar:") then    
     return "Sad Altar"
